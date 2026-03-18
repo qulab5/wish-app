@@ -3,44 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wish App - Test</title>
+    <title>Wish App - React Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <style>
-        body {
-            background: #0d0b1e;
-            color: white;
-            font-family: Arial, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-        .box {
-            background: #13102a;
-            padding: 40px;
-            border-radius: 20px;
-            border: 1px solid #8b5cf6;
-            text-align: center;
-            max-width: 400px;
-        }
+        body { background: #0d0b1e; color: white; font-family: Arial; margin: 0; }
+        #root { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .box { background: #13102a; padding: 40px; border-radius: 20px; border: 1px solid #8b5cf6; text-align: center; }
         h1 { color: #8b5cf6; }
-        button {
-            background: #8b5cf6;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 10px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
+        button { background: #8b5cf6; color: white; border: none; padding: 12px 24px; border-radius: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h1>✨ Wish App</h1>
-        <p>If you see this, your app is working!</p>
-        <button onclick="alert('Button clicked!')">Click Me</button>
-    </div>
+    <div id="root"></div>
+    <script>
+        const { useState } = React;
+
+        function App() {
+            const [count, setCount] = useState(0);
+            
+            return React.createElement('div', { className: 'box' },
+                React.createElement('h1', null, '✨ Wish App - React Working'),
+                React.createElement('p', null, 'Count: ', count),
+                React.createElement('button', { onClick: () => setCount(count + 1) }, 'Increment')
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
 </body>
 </html>
