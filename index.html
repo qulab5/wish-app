@@ -3,14 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wish App</title>
+    <title>Wish — Earn & Reward Platform</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0d0b1e; font-family: 'Plus Jakarta Sans', sans-serif; }
-        @keyframes up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        body { background: #0d0b1e; font-family: 'Plus Jakarta Sans', sans-serif; overflow-x: hidden; }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 20px rgba(139,92,246,0.3); }
+            50% { box-shadow: 0 0 40px rgba(139,92,246,0.6); }
+            100% { box-shadow: 0 0 20px rgba(139,92,246,0.3); }
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        @keyframes up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -18,19 +36,61 @@
     <script>
         const { useState, useEffect, useRef } = React;
 
-        // Colors
+        // Enhanced Colors
         const C = {
             bg: "#0d0b1e",
             s1: "#13102a",
             s2: "#191534",
+            s3: "#211d42",
             brand: "#8b5cf6",
             brandLt: "#a78bfa",
             brandDk: "#6d28d9",
-            green: "#10b981",
+            pink: "#ec4899",
+            cyan: "#06b6d4",
             gold: "#f59e0b",
+            goldLt: "#fbbf24",
+            green: "#10b981",
+            greenLt: "#34d399",
             red: "#ef4444",
-            muted: "rgba(255,255,255,.4)"
+            muted: "rgba(255,255,255,.4)",
+            white: "#fff"
         };
+
+        // Password Strength Checker
+        function checkPasswordStrength(password) {
+            let score = 0;
+            const feedback = [];
+            
+            if (password.length >= 8) score++;
+            else feedback.push("8+ characters");
+            
+            if (password.length >= 12) score++;
+            
+            if (/[A-Z]/.test(password)) score++;
+            else feedback.push("uppercase");
+            
+            if (/[a-z]/.test(password)) score++;
+            else feedback.push("lowercase");
+            
+            if (/[0-9]/.test(password)) score++;
+            else feedback.push("number");
+            
+            if (/[^A-Za-z0-9]/.test(password)) score++;
+            else feedback.push("special char");
+            
+            let strength = "Weak";
+            let color = C.red;
+            
+            if (score >= 5) {
+                strength = "Strong";
+                color = C.green;
+            } else if (score >= 3) {
+                strength = "Medium";
+                color = C.gold;
+            }
+            
+            return { score, strength, color, feedback };
+        }
 
         // ========== AUTH SCREEN ==========
         function AuthScreen({ onLogin }) {
@@ -46,6 +106,8 @@
             const [resendTimer, setResendTimer] = useState(60);
             const [canResend, setCanResend] = useState(false);
             const [pendingUser, setPendingUser] = useState(null);
+            const [showPass, setShowPass] = useState(false);
+            const [showConfirm, setShowConfirm] = useState(false);
             const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
             // Timer
@@ -100,7 +162,7 @@
                         usd: 1.25,
                         joined: new Date().toLocaleDateString(),
                         country: '🌍',
-                        isAdmin: false,
+                        isAdmin: pendingUser.email === 'admin@wish.com',
                         active: true
                     };
                     
@@ -145,7 +207,29 @@
 
             const handleSubmit = (e) => {
                 e.preventDefault();
+                
+                // Validation
+                const newErrors = {};
+                if (mode === 'register') {
+                    if (!form.name) newErrors.name = 'Name required';
+                    if (!form.email && !form.phone) newErrors.email = 'Email or phone required';
+                    if (!form.pass) newErrors.pass = 'Password required';
+                    if (form.pass !== form.conf) newErrors.conf = 'Passwords do not match';
+                    
+                    const strength = checkPasswordStrength(form.pass);
+                    if (strength.score < 3) newErrors.pass = 'Password too weak';
+                } else {
+                    if (!form.email && !form.phone) newErrors.email = 'Email or phone required';
+                    if (!form.pass) newErrors.pass = 'Password required';
+                }
+                
+                if (Object.keys(newErrors).length > 0) {
+                    setErrors(newErrors);
+                    return;
+                }
+                
                 setLoading(true);
+                setErrors({});
                 
                 setTimeout(() => {
                     if (mode === 'login') {
@@ -159,11 +243,6 @@
                             setErrors({ pass: 'Invalid credentials' });
                         }
                     } else {
-                        if (!form.name || !form.email || !form.pass) {
-                            setErrors({ name: 'All fields required' });
-                            setLoading(false);
-                            return;
-                        }
                         sendOtp({
                             name: form.name,
                             email: form.email,
@@ -175,16 +254,27 @@
                 }, 500);
             };
 
+            const passwordStrength = checkPasswordStrength(form.pass);
+
             // OTP Screen
             if (otpStep) {
-                return React.createElement('div', { style: { minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' } },
-                    React.createElement('div', { style: { background: C.s1, padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '380px', border: '1px solid rgba(139,92,246,.2)' } },
-                        React.createElement('div', { style: { textAlign: 'center', marginBottom: '20px' } },
-                            React.createElement('div', { style: { fontSize: '48px', marginBottom: '10px' } }, '✨'),
-                            React.createElement('div', { style: { fontSize: '20px', fontWeight: 'bold', color: '#fff' } }, 'Verify Code'),
-                            React.createElement('div', { style: { fontSize: '12px', color: C.muted, marginTop: '5px' } }, 'Enter the 6-digit code')
+                const isEmail = pendingUser?.email?.includes('@');
+                const masked = isEmail 
+                    ? pendingUser.email.replace(/(.{2})(.+)(@.+)/, '$1****$3')
+                    : pendingUser.phone?.replace(/(.{3}).+(.{2})$/, '$1*****$2');
+
+                return React.createElement('div', { style: { minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #1a1540, #0d0b1e)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' } },
+                    React.createElement('div', { style: { background: C.s1, padding: '40px 30px', borderRadius: '30px', width: '100%', maxWidth: '380px', border: '1px solid rgba(139,92,246,.3)', boxShadow: '0 20px 60px rgba(139,92,246,.2)', animation: 'up 0.4s ease' } },
+                        React.createElement('div', { style: { textAlign: 'center', marginBottom: '30px' } },
+                            React.createElement('div', { style: { fontSize: '56px', marginBottom: '15px', animation: 'float 3s ease infinite' } }, '✨'),
+                            React.createElement('h2', { style: { color: '#fff', fontSize: '24px', marginBottom: '5px' } }, 'Verify Your Account'),
+                            React.createElement('p', { style: { color: C.muted, fontSize: '13px' } }, 
+                                'Code sent to ', 
+                                React.createElement('span', { style: { color: C.brandLt, fontFamily: "'DM Mono',monospace" } }, masked)
+                            )
                         ),
-                        React.createElement('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '20px' } },
+
+                        React.createElement('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '25px' } },
                             otpInput.map((v, i) => 
                                 React.createElement('input', {
                                     key: i,
@@ -195,52 +285,69 @@
                                     onChange: (e) => handleOtpChange(i, e.target.value),
                                     onKeyDown: (e) => handleOtpKeyDown(i, e),
                                     style: {
-                                        width: '45px',
-                                        height: '50px',
+                                        width: '48px',
+                                        height: '56px',
                                         textAlign: 'center',
-                                        fontSize: '20px',
-                                        background: '#0d0b1e',
-                                        border: '1px solid ' + (v ? C.brand : 'rgba(139,92,246,.2)'),
-                                        borderRadius: '10px',
-                                        color: '#fff'
+                                        fontSize: '24px',
+                                        fontFamily: "'DM Mono',monospace",
+                                        fontWeight: 'bold',
+                                        background: v ? 'rgba(139,92,246,.15)' : '#0d0b1e',
+                                        border: '2px solid ' + (v ? C.brand : 'rgba(139,92,246,.2)'),
+                                        borderRadius: '14px',
+                                        color: '#fff',
+                                        outline: 'none',
+                                        transition: 'all 0.2s',
+                                        boxShadow: v ? '0 0 0 3px rgba(139,92,246,.2)' : 'none'
                                     }
                                 })
                             )
                         ),
-                        React.createElement('div', { style: { textAlign: 'center', marginBottom: '15px', fontSize: '13px', color: C.gold } },
-                            resendTimer > 0 ? `Code expires in ${resendTimer}s` : 'Code expired!'
+
+                        React.createElement('div', { style: { textAlign: 'center', marginBottom: '20px', fontSize: '14px' } },
+                            React.createElement('span', { style: { color: resendTimer > 0 ? C.gold : C.red } },
+                                resendTimer > 0 ? `⏰ Code expires in ${resendTimer}s` : '⏰ Code expired!'
+                            )
                         ),
-                        otpError && React.createElement('div', { style: { background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '8px', padding: '10px', marginBottom: '15px', color: '#f87171', fontSize: '12px', textAlign: 'center' } }, otpError),
+
+                        otpError && React.createElement('div', { style: { background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '12px', padding: '12px', marginBottom: '20px', color: '#f87171', fontSize: '13px', textAlign: 'center' } }, otpError),
+
                         React.createElement('button', {
                             onClick: verifyOtp,
                             disabled: otpSending,
                             style: {
                                 width: '100%',
-                                padding: '14px',
-                                background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)',
+                                padding: '16px',
+                                background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
                                 border: 'none',
-                                borderRadius: '12px',
+                                borderRadius: '16px',
                                 color: '#fff',
-                                fontSize: '15px',
+                                fontSize: '16px',
                                 fontWeight: 'bold',
                                 cursor: 'pointer',
-                                marginBottom: '10px'
+                                marginBottom: '12px',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 8px 20px rgba(139,92,246,.4)'
                             }
-                        }, otpSending ? 'Verifying...' : 'Verify'),
+                        }, otpSending ? 'Verifying...' : '✓ Verify & Continue'),
+
                         React.createElement('button', {
                             onClick: resendOtp,
                             disabled: !canResend,
                             style: {
                                 width: '100%',
-                                padding: '10px',
+                                padding: '12px',
                                 background: 'transparent',
-                                border: 'none',
+                                border: '1px solid ' + (canResend ? C.brand : 'rgba(139,92,246,.2)'),
+                                borderRadius: '14px',
                                 color: canResend ? C.brandLt : C.muted,
                                 cursor: canResend ? 'pointer' : 'default',
-                                fontSize: '13px',
-                                textDecoration: 'underline'
+                                fontSize: '14px',
+                                fontWeight: 'bold',
+                                marginBottom: '10px',
+                                transition: 'all 0.2s'
                             }
-                        }, canResend ? 'Resend Code' : `Resend in ${resendTimer}s`),
+                        }, canResend ? '⟲ Resend Code' : `⟲ Resend in ${resendTimer}s`),
+
                         React.createElement('button', {
                             onClick: () => { setOtpStep(false); setPendingUser(null); },
                             style: {
@@ -250,132 +357,382 @@
                                 border: 'none',
                                 color: C.muted,
                                 cursor: 'pointer',
-                                fontSize: '12px',
-                                marginTop: '10px'
+                                fontSize: '13px',
+                                textDecoration: 'underline'
                             }
-                        }, '← Back')
+                        }, '← Use different ' + (isEmail ? 'email' : 'phone'))
                     )
                 );
             }
 
-            // Welcome Screen
+            // Welcome Screen (Enhanced)
             if (mode === 'welcome') {
-                return React.createElement('div', { style: { minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', animation: 'up 0.3s ease' } },
-                    React.createElement('div', { style: { textAlign: 'center', marginBottom: '40px' } },
-                        React.createElement('div', { style: { fontSize: '72px', marginBottom: '20px' } }, '✨'),
-                        React.createElement('div', { style: { fontSize: '36px', fontWeight: 'bold', color: '#fff', marginBottom: '10px' } }, 'Wish'),
-                        React.createElement('div', { style: { fontSize: '16px', color: C.muted } }, 'Earn & Reward Platform')
+                return React.createElement('div', { style: { minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #1a1540, #0d0b1e)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative', overflow: 'hidden' } },
+                    // Animated background elements
+                    React.createElement('div', { style: { position: 'absolute', width: '600px', height: '600px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,.15) 0%, transparent 70%)', top: '-300px', left: '50%', transform: 'translateX(-50%)', animation: 'glow 4s ease infinite' } }),
+                    React.createElement('div', { style: { position: 'absolute', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(236,72,153,.1) 0%, transparent 70%)', bottom: '-200px', right: '-100px' } }),
+                    
+                    React.createElement('div', { style: { textAlign: 'center', marginBottom: '50px', animation: 'up 0.6s ease', position: 'relative', zIndex: 1 } },
+                        React.createElement('div', { style: { fontSize: '80px', marginBottom: '20px', animation: 'float 4s ease infinite' } }, '✨'),
+                        React.createElement('h1', { style: { fontSize: '48px', fontWeight: '800', background: 'linear-gradient(135deg, #fff, #a78bfa, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: '10px', letterSpacing: '-1px' } }, 'Wish'),
+                        React.createElement('p', { style: { fontSize: '18px', color: C.muted, fontWeight: '300' } }, 'Earn rewards, achieve your dreams')
                     ),
-                    React.createElement('div', { style: { width: '100%', maxWidth: '300px' } },
-                        React.createElement('button', { onClick: () => setMode('login'), style: { width: '100%', padding: '15px', background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '10px' } }, 'Sign In'),
-                        React.createElement('button', { onClick: () => setMode('register'), style: { width: '100%', padding: '15px', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(139,92,246,.2)', borderRadius: '12px', color: '#fff', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' } }, 'Create Account')
+                    
+                    React.createElement('div', { style: { width: '100%', maxWidth: '320px', animation: 'up 0.8s ease', position: 'relative', zIndex: 1 } },
+                        React.createElement('button', { 
+                            onClick: () => setMode('login'), 
+                            style: { 
+                                width: '100%', 
+                                padding: '18px', 
+                                background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                                border: 'none', 
+                                borderRadius: '18px', 
+                                color: '#fff', 
+                                fontSize: '18px', 
+                                fontWeight: 'bold', 
+                                cursor: 'pointer', 
+                                marginBottom: '15px',
+                                boxShadow: '0 10px 25px rgba(139,92,246,.5)',
+                                transition: 'all 0.2s'
+                            },
+                            onMouseEnter: (e) => e.currentTarget.style.transform = 'translateY(-2px)',
+                            onMouseLeave: (e) => e.currentTarget.style.transform = 'translateY(0)'
+                        }, '🚀 Sign In'),
+                        
+                        React.createElement('button', { 
+                            onClick: () => setMode('register'), 
+                            style: { 
+                                width: '100%', 
+                                padding: '18px', 
+                                background: 'rgba(255,255,255,.05)', 
+                                border: '2px solid rgba(139,92,246,.3)',
+                                borderRadius: '18px', 
+                                color: '#fff', 
+                                fontSize: '18px', 
+                                fontWeight: 'bold', 
+                                cursor: 'pointer',
+                                backdropFilter: 'blur(10px)',
+                                transition: 'all 0.2s'
+                            },
+                            onMouseEnter: (e) => { e.currentTarget.style.background = 'rgba(139,92,246,.1)'; e.currentTarget.style.borderColor = C.brand; },
+                            onMouseLeave: (e) => { e.currentTarget.style.background = 'rgba(255,255,255,.05)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,.3)'; }
+                        }, '✨ Create Account')
+                    ),
+                    
+                    React.createElement('div', { style: { display: 'flex', gap: '20px', marginTop: '40px', fontSize: '13px', color: C.muted, animation: 'up 1s ease' } },
+                        ['🌍 Global', '🔒 Secure', '💰 Real Rewards'].map((text, i) => 
+                            React.createElement('span', { key: i, style: { display: 'flex', alignItems: 'center', gap: '5px' } }, text)
+                        )
                     )
                 );
             }
 
-            // Login/Register Form
-            return React.createElement('div', { style: { minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' } },
-                React.createElement('div', { style: { background: C.s1, padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '350px', border: '1px solid rgba(139,92,246,.2)' } },
-                    React.createElement('button', { onClick: () => setMode('welcome'), style: { background: 'none', border: 'none', color: C.muted, fontSize: '14px', cursor: 'pointer', marginBottom: '15px' } }, '← Back'),
-                    React.createElement('h2', { style: { color: '#fff', marginBottom: '20px' } }, mode === 'login' ? 'Welcome Back' : 'Create Account'),
+            // Login/Register Form (Enhanced)
+            return React.createElement('div', { style: { minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #1a1540, #0d0b1e)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' } },
+                React.createElement('div', { style: { background: 'rgba(19,16,42,.9)', backdropFilter: 'blur(20px)', padding: '40px 30px', borderRadius: '30px', width: '100%', maxWidth: '380px', border: '1px solid rgba(139,92,246,.3)', boxShadow: '0 20px 60px rgba(0,0,0,.5)', animation: 'up 0.4s ease' } },
                     
-                    mode === 'register' && React.createElement('input', {
-                        type: 'text',
-                        placeholder: 'Full Name',
-                        value: form.name,
-                        onChange: (e) => setForm({...form, name: e.target.value}),
-                        style: { width: '100%', padding: '12px', marginBottom: '15px', background: '#0d0b1e', border: '1px solid rgba(139,92,246,.2)', borderRadius: '10px', color: '#fff' }
-                    }),
-
-                    React.createElement('div', { style: { display: 'flex', gap: '10px', marginBottom: '15px' } },
+                    React.createElement('button', { onClick: () => setMode('welcome'), style: { background: 'none', border: 'none', color: C.muted, fontSize: '14px', cursor: 'pointer', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '5px' } }, '← Back'),
+                    
+                    React.createElement('h2', { style: { color: '#fff', fontSize: '28px', fontWeight: '700', marginBottom: '5px', background: 'linear-gradient(135deg, #fff, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } }, 
+                        mode === 'login' ? 'Welcome Back' : 'Join Wish'
+                    ),
+                    
+                    React.createElement('p', { style: { color: C.muted, fontSize: '14px', marginBottom: '25px' } },
+                        mode === 'login' ? 'Sign in to continue earning' : 'Start your rewards journey today'
+                    ),
+                    
+                    // Method switcher
+                    React.createElement('div', { style: { display: 'flex', gap: '10px', background: 'rgba(0,0,0,.3)', borderRadius: '14px', padding: '4px', marginBottom: '20px' } },
                         ['email', 'phone'].map(m => 
                             React.createElement('button', {
                                 key: m,
                                 onClick: () => setMethod(m),
                                 style: {
                                     flex: 1,
-                                    padding: '8px',
-                                    background: method === m ? C.brand : 'transparent',
-                                    border: '1px solid ' + (method === m ? C.brand : 'rgba(139,92,246,.2)'),
-                                    borderRadius: '8px',
+                                    padding: '10px',
+                                    background: method === m ? 'linear-gradient(135deg,#8b5cf6,#6d28d9)' : 'transparent',
+                                    border: 'none',
+                                    borderRadius: '12px',
                                     color: method === m ? '#fff' : C.muted,
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    fontWeight: method === m ? 'bold' : 'normal',
+                                    transition: 'all 0.2s'
                                 }
                             }, m === 'email' ? '📧 Email' : '📱 Phone')
                         )
                     ),
 
-                    React.createElement('input', {
-                        type: method === 'email' ? 'email' : 'tel',
-                        placeholder: method === 'email' ? 'your@email.com' : '+123456789',
-                        value: method === 'email' ? form.email : form.phone,
-                        onChange: (e) => setForm({...form, [method === 'email' ? 'email' : 'phone']: e.target.value}),
-                        style: { width: '100%', padding: '12px', marginBottom: '15px', background: '#0d0b1e', border: '1px solid rgba(139,92,246,.2)', borderRadius: '10px', color: '#fff' }
-                    }),
+                    // Name field (register only)
+                    mode === 'register' && React.createElement('div', { style: { marginBottom: '15px' } },
+                        React.createElement('input', {
+                            type: 'text',
+                            placeholder: 'Full Name',
+                            value: form.name,
+                            onChange: (e) => setForm({...form, name: e.target.value}),
+                            style: {
+                                width: '100%',
+                                padding: '14px',
+                                background: '#0d0b1e',
+                                border: '2px solid ' + (errors.name ? C.red : 'rgba(139,92,246,.2)'),
+                                borderRadius: '14px',
+                                color: '#fff',
+                                fontSize: '14px',
+                                outline: 'none',
+                                transition: 'all 0.2s'
+                            }
+                        }),
+                        errors.name && React.createElement('div', { style: { color: C.red, fontSize: '12px', marginTop: '5px', marginLeft: '5px' } }, errors.name)
+                    ),
 
-                    React.createElement('input', {
-                        type: 'password',
-                        placeholder: 'Password',
-                        value: form.pass,
-                        onChange: (e) => setForm({...form, pass: e.target.value}),
-                        style: { width: '100%', padding: '12px', marginBottom: '15px', background: '#0d0b1e', border: '1px solid rgba(139,92,246,.2)', borderRadius: '10px', color: '#fff' }
-                    }),
+                    // Email/Phone field
+                    React.createElement('div', { style: { marginBottom: '15px' } },
+                        React.createElement('input', {
+                            type: method === 'email' ? 'email' : 'tel',
+                            placeholder: method === 'email' ? 'your@email.com' : '+1 234 567 890',
+                            value: method === 'email' ? form.email : form.phone,
+                            onChange: (e) => setForm({...form, [method === 'email' ? 'email' : 'phone']: e.target.value}),
+                            style: {
+                                width: '100%',
+                                padding: '14px',
+                                background: '#0d0b1e',
+                                border: '2px solid ' + ((errors.email || errors.phone) ? C.red : 'rgba(139,92,246,.2)'),
+                                borderRadius: '14px',
+                                color: '#fff',
+                                fontSize: '14px',
+                                outline: 'none',
+                                transition: 'all 0.2s'
+                            }
+                        })
+                    ),
 
-                    mode === 'register' && React.createElement('input', {
-                        type: 'password',
-                        placeholder: 'Confirm Password',
-                        value: form.conf,
-                        onChange: (e) => setForm({...form, conf: e.target.value}),
-                        style: { width: '100%', padding: '12px', marginBottom: '20px', background: '#0d0b1e', border: '1px solid rgba(139,92,246,.2)', borderRadius: '10px', color: '#fff' }
-                    }),
+                    // Password field
+                    React.createElement('div', { style: { marginBottom: mode === 'register' ? '10px' : '20px', position: 'relative' } },
+                        React.createElement('input', {
+                            type: showPass ? 'text' : 'password',
+                            placeholder: 'Password',
+                            value: form.pass,
+                            onChange: (e) => setForm({...form, pass: e.target.value}),
+                            style: {
+                                width: '100%',
+                                padding: '14px',
+                                paddingRight: '45px',
+                                background: '#0d0b1e',
+                                border: '2px solid ' + (errors.pass ? C.red : 'rgba(139,92,246,.2)'),
+                                borderRadius: '14px',
+                                color: '#fff',
+                                fontSize: '14px',
+                                outline: 'none',
+                                transition: 'all 0.2s'
+                            }
+                        }),
+                        React.createElement('button', {
+                            onClick: () => setShowPass(!showPass),
+                            style: {
+                                position: 'absolute',
+                                right: '12px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: C.muted,
+                                cursor: 'pointer',
+                                fontSize: '18px'
+                            }
+                        }, showPass ? '👁️' : '👁️‍🗨️')
+                    ),
 
-                    errors.pass && React.createElement('div', { style: { color: C.red, fontSize: '12px', marginBottom: '10px' } }, errors.pass),
+                    // Password strength meter (register only)
+                    mode === 'register' && form.pass.length > 0 && React.createElement('div', { style: { marginBottom: '15px' } },
+                        React.createElement('div', { style: { display: 'flex', gap: '4px', marginBottom: '5px' } },
+                            [1,2,3,4,5,6].map(i => 
+                                React.createElement('div', {
+                                    key: i,
+                                    style: {
+                                        flex: 1,
+                                        height: '4px',
+                                        borderRadius: '2px',
+                                        background: i <= passwordStrength.score ? passwordStrength.color : 'rgba(255,255,255,.1)',
+                                        transition: 'background 0.3s'
+                                    }
+                                })
+                            )
+                        ),
+                        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                            React.createElement('span', { style: { fontSize: '12px', color: passwordStrength.color, fontWeight: 'bold' } }, 
+                                passwordStrength.strength
+                            ),
+                            passwordStrength.feedback.length > 0 && 
+                            React.createElement('span', { style: { fontSize: '11px', color: C.muted } },
+                                'Need: ' + passwordStrength.feedback.slice(0,2).join(', ')
+                            )
+                        )
+                    ),
 
+                    // Confirm password (register only)
+                    mode === 'register' && React.createElement('div', { style: { marginBottom: '20px', position: 'relative' } },
+                        React.createElement('input', {
+                            type: showConfirm ? 'text' : 'password',
+                            placeholder: 'Confirm Password',
+                            value: form.conf,
+                            onChange: (e) => setForm({...form, conf: e.target.value}),
+                            style: {
+                                width: '100%',
+                                padding: '14px',
+                                paddingRight: '45px',
+                                background: '#0d0b1e',
+                                border: '2px solid ' + (errors.conf ? C.red : form.conf && form.pass === form.conf ? C.green : 'rgba(139,92,246,.2)'),
+                                borderRadius: '14px',
+                                color: '#fff',
+                                fontSize: '14px',
+                                outline: 'none',
+                                transition: 'all 0.2s'
+                            }
+                        }),
+                        React.createElement('button', {
+                            onClick: () => setShowConfirm(!showConfirm),
+                            style: {
+                                position: 'absolute',
+                                right: '12px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: C.muted,
+                                cursor: 'pointer',
+                                fontSize: '18px'
+                            }
+                        }, showConfirm ? '👁️' : '👁️‍🗨️'),
+                        form.conf && form.pass === form.conf && 
+                        React.createElement('span', { style: { position: 'absolute', right: '45px', top: '50%', transform: 'translateY(-50%)', color: C.green, fontSize: '16px' } }, '✓')
+                    ),
+
+                    // Error message
+                    errors.pass && React.createElement('div', { style: { color: C.red, fontSize: '12px', marginBottom: '15px', textAlign: 'center' } }, errors.pass),
+
+                    // Submit button
                     React.createElement('button', {
                         onClick: handleSubmit,
                         disabled: loading,
                         style: {
                             width: '100%',
-                            padding: '14px',
-                            background: loading ? 'rgba(139,92,246,.5)' : 'linear-gradient(135deg,#8b5cf6,#6d28d9)',
+                            padding: '16px',
+                            background: loading ? 'rgba(139,92,246,.5)' : 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
                             border: 'none',
-                            borderRadius: '12px',
+                            borderRadius: '18px',
                             color: '#fff',
                             fontSize: '16px',
                             fontWeight: 'bold',
-                            cursor: loading ? 'wait' : 'pointer'
+                            cursor: loading ? 'wait' : 'pointer',
+                            marginBottom: '15px',
+                            boxShadow: '0 8px 20px rgba(139,92,246,.4)',
+                            transition: 'all 0.2s'
                         }
-                    }, loading ? 'Please wait...' : (mode === 'login' ? 'Sign In' : 'Create Account'))
+                    }, loading ? '⏳ Please wait...' : (mode === 'login' ? '🚀 Sign In' : '✨ Create Account')),
+
+                    // Toggle mode
+                    React.createElement('p', { style: { textAlign: 'center', color: C.muted, fontSize: '14px' } },
+                        mode === 'login' ? "Don't have an account? " : "Already have an account? ",
+                        React.createElement('span', {
+                            onClick: () => setMode(mode === 'login' ? 'register' : 'login'),
+                            style: { color: C.brandLt, cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }
+                        }, mode === 'login' ? 'Sign up' : 'Sign in')
+                    ),
+
+                    // Demo accounts note
+                    React.createElement('div', { style: { marginTop: '20px', padding: '12px', background: 'rgba(139,92,246,.07)', borderRadius: '12px', fontSize: '11px', color: C.muted, textAlign: 'center' } },
+                        '✨ Demo: ahmad@wish.com / ahmad123 | admin@wish.com / admin@123'
+                    )
                 )
             );
         }
 
-        // ========== MAIN APP ==========
+        // ========== MAIN APP (Enhanced Dashboard) ==========
         function MainApp({ user, onLogout }) {
-            return React.createElement('div', { style: { minHeight: '100vh', background: C.bg, color: '#fff', padding: '20px' } },
+            const [points, setPoints] = useState(user.pts || 1250);
+            const [usd, setUsd] = useState(user.usd || 1.25);
+            
+            return React.createElement('div', { style: { minHeight: '100vh', background: 'radial-gradient(circle at 50% 0%, #1a1540, #0d0b1e)', color: '#fff', padding: '20px' } },
                 React.createElement('div', { style: { maxWidth: '400px', margin: '0 auto' } },
-                    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' } },
-                        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } },
-                            React.createElement('div', { style: { width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg,#8b5cf6,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, '✨'),
+                    
+                    // Header
+                    React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', animation: 'up 0.3s ease' } },
+                        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } },
+                            React.createElement('div', { style: { width: '48px', height: '48px', borderRadius: '16px', background: 'linear-gradient(135deg, #8b5cf6, #ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 8px 20px rgba(139,92,246,.4)' } }, '✨'),
                             React.createElement('div', null,
-                                React.createElement('div', { style: { fontWeight: 'bold' } }, 'Welcome,', ' ', user.name),
+                                React.createElement('div', { style: { fontWeight: 'bold', fontSize: '18px' } }, 'Welcome,', ' ', user.name),
                                 React.createElement('div', { style: { fontSize: '12px', color: C.muted } }, user.email || user.phone)
                             )
                         ),
-                        React.createElement('button', { onClick: onLogout, style: { padding: '8px 12px', background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: '8px', color: '#f87171', cursor: 'pointer' } }, 'Logout')
+                        React.createElement('button', { 
+                            onClick: onLogout, 
+                            style: { 
+                                padding: '10px 15px', 
+                                background: 'rgba(239,68,68,.1)', 
+                                border: '1px solid rgba(239,68,68,.2)', 
+                                borderRadius: '12px', 
+                                color: '#f87171', 
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                transition: 'all 0.2s'
+                            },
+                            onMouseEnter: (e) => e.currentTarget.style.background = 'rgba(239,68,68,.2)',
+                            onMouseLeave: (e) => e.currentTarget.style.background = 'rgba(239,68,68,.1)'
+                        }, '🚪 Logout')
                     ),
-                    React.createElement('div', { style: { background: C.s1, borderRadius: '16px', padding: '20px', border: '1px solid rgba(139,92,246,.1)', marginBottom: '20px' } },
-                        React.createElement('div', { style: { fontSize: '14px', color: C.muted, marginBottom: '5px' } }, 'Total Points'),
-                        React.createElement('div', { style: { fontSize: '36px', fontWeight: 'bold' } }, user.pts.toLocaleString()),
-                        React.createElement('div', { style: { fontSize: '12px', color: C.green, marginTop: '5px' } }, '≈ $' + (user.pts * 0.001).toFixed(2))
+
+                    // Balance Card
+                    React.createElement('div', { style: { background: 'linear-gradient(135deg, #1a1540, #13102a)', borderRadius: '24px', padding: '24px', border: '1px solid rgba(139,92,246,.3)', marginBottom: '20px', boxShadow: '0 15px 35px rgba(0,0,0,.5)', animation: 'up 0.4s ease' } },
+                        React.createElement('div', { style: { fontSize: '14px', color: C.muted, marginBottom: '8px' } }, 'Total Balance'),
+                        React.createElement('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '5px' } },
+                            React.createElement('span', { style: { fontSize: '42px', fontWeight: '800', fontFamily: "'DM Mono',monospace", background: 'linear-gradient(135deg, #fff, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } }, points.toLocaleString()),
+                            React.createElement('span', { style: { color: C.muted, fontSize: '14px' } }, 'pts')
+                        ),
+                        React.createElement('div', { style: { fontSize: '18px', color: C.green, fontFamily: "'DM Mono',monospace" } }, '≈ $' + usd.toFixed(2)),
+                        React.createElement('div', { style: { marginTop: '15px', height: '4px', background: 'rgba(139,92,246,.1)', borderRadius: '2px', overflow: 'hidden' } },
+                            React.createElement('div', { style: { height: '100%', width: '65%', background: 'linear-gradient(90deg, #8b5cf6, #ec4899)', borderRadius: '2px' } })
+                        )
                     ),
-                    React.createElement('div', { style: { background: C.s1, borderRadius: '16px', padding: '20px', border: '1px solid rgba(139,92,246,.1)' } },
-                        React.createElement('div', { style: { fontSize: '14px', color: C.muted, marginBottom: '10px' } }, 'Quick Stats'),
+
+                    // Stats Grid
+                    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', animation: 'up 0.5s ease' } },
+                        [
+                            { icon: '⛏️', label: 'Mining', value: '8h cycle', color: C.cyan },
+                            { icon: '🎰', label: 'Spins', value: '3 left', color: C.gold },
+                            { icon: '📋', label: 'Tasks', value: '5 new', color: C.green },
+                            { icon: '🏆', label: 'Rank', value: '#42', color: C.pink }
+                        ].map((item, i) => 
+                            React.createElement('div', { key: i, style: { background: 'rgba(19,16,42,.8)', backdropFilter: 'blur(10px)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(139,92,246,.2)', textAlign: 'center' } },
+                                React.createElement('div', { style: { fontSize: '28px', marginBottom: '8px' } }, item.icon),
+                                React.createElement('div', { style: { fontSize: '12px', color: C.muted, marginBottom: '4px' } }, item.label),
+                                React.createElement('div', { style: { fontSize: '16px', fontWeight: 'bold', color: item.color } }, item.value)
+                            )
+                        )
+                    ),
+
+                    // Quick Actions
+                    React.createElement('div', { style: { background: 'rgba(19,16,42,.8)', backdropFilter: 'blur(10px)', borderRadius: '24px', padding: '20px', border: '1px solid rgba(139,92,246,.2)', animation: 'up 0.6s ease' } },
+                        React.createElement('h3', { style: { fontSize: '18px', marginBottom: '15px', color: '#fff' } }, 'Quick Actions'),
                         React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
-                            React.createElement('div', { style: { padding: '10px', background: 'rgba(139,92,246,.1)', borderRadius: '8px', textAlign: 'center' } }, '📊 Mining'),
-                            React.createElement('div', { style: { padding: '10px', background: 'rgba(139,92,246,.1)', borderRadius: '8px', textAlign: 'center' } }, '🎮 Spins'),
-                            React.createElement('div', { style: { padding: '10px', background: 'rgba(139,92,246,.1)', borderRadius: '8px', textAlign: 'center' } }, '📋 Tasks'),
-                            React.createElement('div', { style: { padding: '10px', background: 'rgba(139,92,246,.1)', borderRadius: '8px', textAlign: 'center' } }, '🏆 Leaderboard')
+                            ['📺 Watch Ad', '🎮 Spin Wheel', '📋 Do Tasks', '👥 Refer'].map((action, i) => 
+                                React.createElement('button', {
+                                    key: i,
+                                    style: {
+                                        padding: '14px',
+                                        background: 'rgba(139,92,246,.1)',
+                                        border: '1px solid rgba(139,92,246,.2)',
+                                        borderRadius: '14px',
+                                        color: '#fff',
+                                        fontSize: '14px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    },
+                                    onMouseEnter: (e) => e.currentTarget.style.background = 'rgba(139,92,246,.2)',
+                                    onMouseLeave: (e) => e.currentTarget.style.background = 'rgba(139,92,246,.1)'
+                                }, action)
+                            )
                         )
                     )
                 )
