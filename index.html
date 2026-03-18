@@ -20,11 +20,6 @@
             50% { box-shadow: 0 0 40px rgba(139,92,246,0.6); }
             100% { box-shadow: 0 0 20px rgba(139,92,246,0.3); }
         }
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
         @keyframes up {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -56,13 +51,27 @@
             white: "#fff"
         };
 
+        // Initialize default users
+        useEffect(() => {
+            const users = JSON.parse(localStorage.getItem('wish_users') || '[]');
+            if (users.length === 0) {
+                // Add default users
+                const defaultUsers = [
+                    { id: "u1", name: "Ahmad Ali", email: "ahmad@wish.com", phone: "", pass: "ahmad123", pts: 48200, usd: 48.2, joined: "Jan 2025", country: "🇵🇰", isAdmin: false, active: true },
+                    { id: "u2", name: "Sara Khan", email: "sara@wish.com", phone: "", pass: "sara123", pts: 41500, usd: 41.5, joined: "Feb 2025", country: "🇮🇳", isAdmin: false, active: true },
+                    { id: "admin", name: "Admin", email: "admin@wish.com", phone: "", pass: "admin@123", pts: 0, usd: 0, joined: "Jan 2025", country: "🌍", isAdmin: true, active: true }
+                ];
+                localStorage.setItem('wish_users', JSON.stringify(defaultUsers));
+            }
+        }, []);
+
         // Password Strength Checker
         function checkPasswordStrength(password) {
             let score = 0;
             const feedback = [];
             
             if (password.length >= 8) score++;
-            else feedback.push("8+ characters");
+            else feedback.push("8+ chars");
             
             if (password.length >= 12) score++;
             
@@ -76,7 +85,7 @@
             else feedback.push("number");
             
             if (/[^A-Za-z0-9]/.test(password)) score++;
-            else feedback.push("special char");
+            else feedback.push("special");
             
             let strength = "Weak";
             let color = C.red;
@@ -152,6 +161,7 @@
                 setOtpSending(true);
                 
                 setTimeout(() => {
+                    const users = JSON.parse(localStorage.getItem('wish_users') || '[]');
                     const newUser = {
                         id: 'u' + Date.now(),
                         name: pendingUser.name,
@@ -162,11 +172,10 @@
                         usd: 1.25,
                         joined: new Date().toLocaleDateString(),
                         country: '🌍',
-                        isAdmin: pendingUser.email === 'admin@wish.com',
+                        isAdmin: false,
                         active: true
                     };
                     
-                    const users = JSON.parse(localStorage.getItem('wish_users') || '[]');
                     users.push(newUser);
                     localStorage.setItem('wish_users', JSON.stringify(users));
                     onLogin(newUser);
@@ -205,6 +214,13 @@
                 }
             };
 
+            // Handle Enter key for form submission
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter') {
+                    handleSubmit(e);
+                }
+            };
+
             const handleSubmit = (e) => {
                 e.preventDefault();
                 
@@ -234,9 +250,14 @@
                 setTimeout(() => {
                     if (mode === 'login') {
                         const users = JSON.parse(localStorage.getItem('wish_users') || '[]');
-                        const user = users.find(u => 
-                            (u.email === form.email || u.phone === form.phone) && u.pass === form.pass
-                        );
+                        const user = users.find(u => {
+                            if (method === 'email') {
+                                return u.email === form.email && u.pass === form.pass;
+                            } else {
+                                return u.phone === form.phone && u.pass === form.pass;
+                            }
+                        });
+                        
                         if (user) {
                             onLogin(user);
                         } else {
@@ -470,6 +491,7 @@
                             placeholder: 'Full Name',
                             value: form.name,
                             onChange: (e) => setForm({...form, name: e.target.value}),
+                            onKeyPress: handleKeyPress,
                             style: {
                                 width: '100%',
                                 padding: '14px',
@@ -492,6 +514,7 @@
                             placeholder: method === 'email' ? 'your@email.com' : '+1 234 567 890',
                             value: method === 'email' ? form.email : form.phone,
                             onChange: (e) => setForm({...form, [method === 'email' ? 'email' : 'phone']: e.target.value}),
+                            onKeyPress: handleKeyPress,
                             style: {
                                 width: '100%',
                                 padding: '14px',
@@ -513,6 +536,7 @@
                             placeholder: 'Password',
                             value: form.pass,
                             onChange: (e) => setForm({...form, pass: e.target.value}),
+                            onKeyPress: handleKeyPress,
                             style: {
                                 width: '100%',
                                 padding: '14px',
@@ -576,6 +600,7 @@
                             placeholder: 'Confirm Password',
                             value: form.conf,
                             onChange: (e) => setForm({...form, conf: e.target.value}),
+                            onKeyPress: handleKeyPress,
                             style: {
                                 width: '100%',
                                 padding: '14px',
@@ -637,11 +662,6 @@
                             onClick: () => setMode(mode === 'login' ? 'register' : 'login'),
                             style: { color: C.brandLt, cursor: 'pointer', fontWeight: 'bold', textDecoration: 'underline' }
                         }, mode === 'login' ? 'Sign up' : 'Sign in')
-                    ),
-
-                    // Demo accounts note
-                    React.createElement('div', { style: { marginTop: '20px', padding: '12px', background: 'rgba(139,92,246,.07)', borderRadius: '12px', fontSize: '11px', color: C.muted, textAlign: 'center' } },
-                        '✨ Demo: ahmad@wish.com / ahmad123 | admin@wish.com / admin@123'
                     )
                 )
             );
@@ -680,98 +700,3 @@
                             onMouseEnter: (e) => e.currentTarget.style.background = 'rgba(239,68,68,.2)',
                             onMouseLeave: (e) => e.currentTarget.style.background = 'rgba(239,68,68,.1)'
                         }, '🚪 Logout')
-                    ),
-
-                    // Balance Card
-                    React.createElement('div', { style: { background: 'linear-gradient(135deg, #1a1540, #13102a)', borderRadius: '24px', padding: '24px', border: '1px solid rgba(139,92,246,.3)', marginBottom: '20px', boxShadow: '0 15px 35px rgba(0,0,0,.5)', animation: 'up 0.4s ease' } },
-                        React.createElement('div', { style: { fontSize: '14px', color: C.muted, marginBottom: '8px' } }, 'Total Balance'),
-                        React.createElement('div', { style: { display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '5px' } },
-                            React.createElement('span', { style: { fontSize: '42px', fontWeight: '800', fontFamily: "'DM Mono',monospace", background: 'linear-gradient(135deg, #fff, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } }, points.toLocaleString()),
-                            React.createElement('span', { style: { color: C.muted, fontSize: '14px' } }, 'pts')
-                        ),
-                        React.createElement('div', { style: { fontSize: '18px', color: C.green, fontFamily: "'DM Mono',monospace" } }, '≈ $' + usd.toFixed(2)),
-                        React.createElement('div', { style: { marginTop: '15px', height: '4px', background: 'rgba(139,92,246,.1)', borderRadius: '2px', overflow: 'hidden' } },
-                            React.createElement('div', { style: { height: '100%', width: '65%', background: 'linear-gradient(90deg, #8b5cf6, #ec4899)', borderRadius: '2px' } })
-                        )
-                    ),
-
-                    // Stats Grid
-                    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', animation: 'up 0.5s ease' } },
-                        [
-                            { icon: '⛏️', label: 'Mining', value: '8h cycle', color: C.cyan },
-                            { icon: '🎰', label: 'Spins', value: '3 left', color: C.gold },
-                            { icon: '📋', label: 'Tasks', value: '5 new', color: C.green },
-                            { icon: '🏆', label: 'Rank', value: '#42', color: C.pink }
-                        ].map((item, i) => 
-                            React.createElement('div', { key: i, style: { background: 'rgba(19,16,42,.8)', backdropFilter: 'blur(10px)', padding: '16px', borderRadius: '18px', border: '1px solid rgba(139,92,246,.2)', textAlign: 'center' } },
-                                React.createElement('div', { style: { fontSize: '28px', marginBottom: '8px' } }, item.icon),
-                                React.createElement('div', { style: { fontSize: '12px', color: C.muted, marginBottom: '4px' } }, item.label),
-                                React.createElement('div', { style: { fontSize: '16px', fontWeight: 'bold', color: item.color } }, item.value)
-                            )
-                        )
-                    ),
-
-                    // Quick Actions
-                    React.createElement('div', { style: { background: 'rgba(19,16,42,.8)', backdropFilter: 'blur(10px)', borderRadius: '24px', padding: '20px', border: '1px solid rgba(139,92,246,.2)', animation: 'up 0.6s ease' } },
-                        React.createElement('h3', { style: { fontSize: '18px', marginBottom: '15px', color: '#fff' } }, 'Quick Actions'),
-                        React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } },
-                            ['📺 Watch Ad', '🎮 Spin Wheel', '📋 Do Tasks', '👥 Refer'].map((action, i) => 
-                                React.createElement('button', {
-                                    key: i,
-                                    style: {
-                                        padding: '14px',
-                                        background: 'rgba(139,92,246,.1)',
-                                        border: '1px solid rgba(139,92,246,.2)',
-                                        borderRadius: '14px',
-                                        color: '#fff',
-                                        fontSize: '14px',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    },
-                                    onMouseEnter: (e) => e.currentTarget.style.background = 'rgba(139,92,246,.2)',
-                                    onMouseLeave: (e) => e.currentTarget.style.background = 'rgba(139,92,246,.1)'
-                                }, action)
-                            )
-                        )
-                    )
-                )
-            );
-        }
-
-        // ========== ROOT APP ==========
-        function App() {
-            const [user, setUser] = useState(null);
-            
-            useEffect(() => {
-                const saved = localStorage.getItem('wish_current_user');
-                if (saved) {
-                    try {
-                        setUser(JSON.parse(saved));
-                    } catch (e) {}
-                }
-            }, []);
-
-            const handleLogin = (userData) => {
-                setUser(userData);
-                localStorage.setItem('wish_current_user', JSON.stringify(userData));
-            };
-
-            const handleLogout = () => {
-                setUser(null);
-                localStorage.removeItem('wish_current_user');
-            };
-
-            if (!user) {
-                return React.createElement(AuthScreen, { onLogin: handleLogin });
-            }
-
-            return React.createElement(MainApp, { user: user, onLogout: handleLogout });
-        }
-
-        // Render
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
-    </script>
-</body>
-</html>
