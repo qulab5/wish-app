@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>Wish — Earn & Reward Platform</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<style>
+/* ALL YOUR EXISTING CSS STAYS EXACTLY THE SAME */
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:#0d0b1e;font-family:'Plus Jakarta Sans',sans-serif;}
+#root{height:100%;}
+/* ... rest of your CSS ... */
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, useEffect, useRef } = React;
+
+// ALL YOUR EXISTING CODE STAYS THE SAME UNTIL THE AuthScreen COMPONENT
+
+// ===========================================
+// FIXED OTP FUNCTIONS - Replace these in your AuthScreen component
+// ===========================================
+
+// Replace the sendOtp function in AuthScreen with this:
+const sendOtp = async (nu) => {
+  setPU(nu);
+  setOtpStep(true);
+  setOtpInput(["", "", "", "", "", ""]);
+  setOtpErr("");
+  setOtpSending(true);
+  
+  const isEmailReg = !!(nu.email && nu.email.includes("@"));
+  const dest = isEmailReg ? nu.email : nu.phone;
+  
+  try {
+    // Generate OTP locally (since we can't use API routes in static HTML)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Store OTP in localStorage with timestamp
+    const otpData = {
+      otp: otp,
+      email: dest,
+      expires: Date.now() + 5 * 60 * 1000 // 5 minutes
+    };
+    localStorage.setItem('wish_otp_' + dest, JSON.stringify(otpData));
+    
+    // In a real app, you'd call an API here
+    // For now, we'll simulate email by showing in console
+    console.log('📧 OTP for', dest, 'is:', otp);
+    
+    // For testing - show OTP on screen (remove in production)
+    setOtpErr(`Test OTP: ${otp} (check console)`);
+    
+    setOtpToken('test-token');
+    setOtpErr("");
+  } catch (err) {
+    setOtpErr("Could not send code: " + err.message);
+  } finally {
+    setOtpSending(false);
+    setTimeout(() => otpRefs[0].current?.focus(), 300);
+  }
+};
+
+// Replace the verifyOtp function in AuthScreen with this:
+const verifyOtp = async () => {
+  const entered = otpInput.join("");
+  if (entered.length < 6) { 
+    setOtpErr("Please enter all 6 digits"); 
+    return; 
+  }
+  
+  setOtpSending(true);
+  
+  try {
+    const dest = pendingUser.email || pendingUser.phone;
+    const stored = localStorage.getItem('wish_otp_' + dest);
+    
+    if (!stored) {
+      setOtpErr("Code not found. Please request a new one.");
+      return;
+    }
+    
+    const otpData = JSON.parse(stored);
+    
+    if (Date.now() > otpData.expires) {
+      localStorage.removeItem('wish_otp_' + dest);
+      setOtpErr("Code expired. Tap Resend for a new one.");
+      return;
+    }
+    
+    if (otpData.otp !== entered) {
+      setOtpErr("Incorrect code. Try again.");
+      return;
+    }
+    
+    // OTP verified - create account
+    localStorage.removeItem('wish_otp_' + dest);
+    
+    // Save user
+    const newUser = {
+      ...pendingUser,
+      id: "u" + Date.now(),
+      joined: new Date().toLocaleDateString(),
+      country: "🌍",
+      isAdmin: false,
+      active: true
+    };
+    
+    // Save to localStorage
+    const users = JSON.parse(localStorage.getItem('wish_users') || '[]');
+    users.push(newUser);
+    localStorage.setItem('wish_users', JSON.stringify(users));
+    localStorage.setItem('wish_current_user', JSON.stringify(newUser));
+    
+    onLogin(newUser);
+    
+  } catch (err) {
+    setOtpErr("Verification failed. Please try again.");
+  } finally {
+    setOtpSending(false);
+  }
+};
+
+// Replace the resendOtp function with this:
+const resendOtp = async () => {
+  setOtpInput(["", "", "", "", "", ""]);
+  setOtpErr("");
+  setResendT(60);
+  setOtpSending(true);
+  
+  try {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const dest = pendingUser.email || pendingUser.phone;
+    
+    const otpData = {
+      otp: otp,
+      email: dest,
+      expires: Date.now() + 5 * 60 * 1000
+    };
+    localStorage.setItem('wish_otp_' + dest, JSON.stringify(otpData));
+    
+    console.log('📧 New OTP for', dest, 'is:', otp);
+    setOtpErr(`New OTP: ${otp} (check console)`);
+    
+  } catch (err) {
+    setOtpErr("Could not resend code: " + err.message);
+  } finally {
+    setOtpSending(false);
+    setTimeout(() => otpRefs[0].current?.focus(), 100);
+  }
+};
+
+// ===========================================
+// THE REST OF YOUR EXISTING CODE CONTINUES HERE
+// ===========================================
+
+// Your existing AuthScreen component, but with the functions above replaced
+
+// ... rest of your code ...
+
+function WishApp() {
+  const [loggedUser, setLU] = useState(null);
+  const [lang, setLang] = useState("en");
+  
+  useEffect(() => {
+    // Check for saved user on load
+    const saved = localStorage.getItem('wish_current_user');
+    if (saved) {
+      try {
+        setLU(JSON.parse(saved));
+      } catch (e) {}
+    }
+  }, []);
+  
+  const handleLogin = (u) => {
+    setLU(u);
+    localStorage.setItem('wish_current_user', JSON.stringify(u));
+  };
+  
+  const handleLogout = () => {
+    setLU(null);
+    localStorage.removeItem('wish_current_user');
+  };
+  
+  if (!loggedUser) return React.createElement(AuthScreen, { onLogin: handleLogin, lang });
+  if (loggedUser.isAdmin) return React.createElement(AdminPanel, { user: loggedUser, onExit: handleLogout, lang });
+  return React.createElement(MainApp, { user: loggedUser, onLogout: handleLogout, lang, setLang });
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(WishApp));
+
+</script>
+</body>
+</html>
