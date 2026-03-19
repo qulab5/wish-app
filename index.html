@@ -35,6 +35,15 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+  @keyframes mine-pulse {
+    0%   { box-shadow: 0 0 20px rgba(245,158,11,.6), 0 0 40px rgba(139,92,246,.4); transform: scale(1); }
+    50%  { box-shadow: 0 0 40px rgba(245,158,11,.9), 0 0 80px rgba(139,92,246,.6); transform: scale(1.08); }
+    100% { box-shadow: 0 0 20px rgba(245,158,11,.6), 0 0 40px rgba(139,92,246,.4); transform: scale(1); }
+  }
+  @keyframes orbit {
+    from { transform: rotate(0deg) translateX(56px) rotate(0deg); }
+    to   { transform: rotate(360deg) translateX(56px) rotate(-360deg); }
+  }
   .glass-effect {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -281,27 +290,23 @@ function t$(lang,key){ return (TR[lang]||TR.en)[key] || (TR.en)[key] || key; }
 ═══════════════════════════════════════════════ */
 const TASK_SETS = [
   [
-    {id:"t1",platform:"YouTube",  action:"Like a video",       type:"like",   pts:40},
     {id:"t2",platform:"Facebook", action:"Share a post",       type:"share",  pts:60},
     {id:"t3",platform:"Twitter",  action:"Retweet a post",     type:"share",  pts:50},
     {id:"t4",platform:"Instagram",action:"Comment on a photo", type:"comment",pts:55},
-    {id:"t5",platform:"TikTok",   action:"Like & Share video", type:"like",   pts:45},
+    {id:"tb",platform:"Telegram", action:"Share a message",    type:"share",  pts:45},
   ],
   [
-    {id:"t6",platform:"YouTube",  action:"Comment on video",   type:"comment",pts:55},
     {id:"t7",platform:"Facebook", action:"Like a page",        type:"like",   pts:35},
     {id:"t8",platform:"Twitter",  action:"Like & Reply",       type:"comment",pts:50},
-    {id:"t9",platform:"LinkedIn", action:"Share an article",   type:"share",  pts:70},
-    {id:"ta",platform:"TikTok",   action:"Follow an account",  type:"follow", pts:40},
+    {id:"t4b",platform:"Instagram",action:"Like a photo",      type:"like",   pts:45},
+    {id:"tc",platform:"WhatsApp", action:"Share a status",     type:"share",  pts:40},
   ],
 ];
 const SOCIAL_JOINS = [
   {id:"sj1",platform:"Telegram", pts:100},
   {id:"sj2",platform:"WhatsApp", pts:80},
-  {id:"sj3",platform:"YouTube",  pts:120},
   {id:"sj4",platform:"Facebook", pts:90},
   {id:"sj5",platform:"Instagram",pts:95},
-  {id:"sj6",platform:"TikTok",   pts:85},
 ];
 const PL = {YouTube:"#FF0000",Facebook:"#1877F2",Twitter:"#111",Instagram:"#E1306C",TikTok:"#010101",LinkedIn:"#0A66C2",Telegram:"#2AABEE",WhatsApp:"#25D366"};
 const GENERIC_ADS=[{e:"🛒",c:"Shopping"},{e:"🎮",c:"Gaming"},{e:"🍔",c:"Food"},{e:"✈️",c:"Travel"},{e:"👗",c:"Fashion"},{e:"💻",c:"Tech"},{e:"🏋️",c:"Fitness"},{e:"📱",c:"Apps"}];
@@ -1142,7 +1147,7 @@ function MainApp({user,onLogout,lang,setLang}){
         <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>SOCIAL TASKS</div>
         {CURRENT_TASKS.map(t=>(
           <div key={t.id} style={{background:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:10,border:`1px solid ${tasksDone[t.id]?C.green:C.border}`,display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:40,height:40,borderRadius:12,background:(PL[t.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{PE[t.platform]}</div>
+            <div style={{width:40,height:40,borderRadius:12,background:(PL[t.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden"}}>{LOGOS[t.platform]||<span style={{fontSize:20}}>{PE[t.platform]}</span>}</div>
             <div style={{flex:1}}>
               <div style={{fontSize:14,fontWeight:600,color:C.white}}>{t.platform}</div>
               <div style={{fontSize:12,color:C.muted}}>{t.action}</div>
@@ -1156,7 +1161,7 @@ function MainApp({user,onLogout,lang,setLang}){
         <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,marginTop:6,letterSpacing:1}}>JOIN & EARN</div>
         {SOCIAL_JOINS.map(j=>(
           <div key={j.id} style={{background:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:10,border:`1px solid ${joinsDone[j.id]?C.green:C.border}`,display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:40,height:40,borderRadius:12,background:(PL[j.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{PE[j.platform]}</div>
+            <div style={{width:40,height:40,borderRadius:12,background:(PL[j.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden"}}>{LOGOS[j.platform]||<span style={{fontSize:20}}>{PE[j.platform]}</span>}</div>
             <div style={{flex:1}}>
               <div style={{fontSize:14,fontWeight:600,color:C.white}}>{j.platform}</div>
               <div style={{fontSize:12,color:C.muted}}>Join our channel</div>
@@ -1185,7 +1190,20 @@ function MainApp({user,onLogout,lang,setLang}){
     mining:(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16}}>
-          <div style={{fontSize:48,marginBottom:8,animation:mineStarted?"rotate 4s linear infinite":"none"}}>⛏️</div>
+          <div style={{position:"relative",width:110,height:110,margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            {mineStarted&&<div style={{position:"absolute",width:"100%",height:"100%",borderRadius:"50%",border:"2px dashed rgba(245,158,11,.5)",animation:"rotate 8s linear infinite"}}/>}
+            {mineStarted&&<div style={{position:"absolute",width:10,height:10,borderRadius:"50%",background:C.gold,animation:"orbit 2s linear infinite",boxShadow:`0 0 8px ${C.gold}`}}/>}
+            <div style={{
+              width:90,height:90,borderRadius:"50%",
+              background:`radial-gradient(circle at 35% 35%,${C.gold}40,${C.brandDk}90)`,
+              border:`2.5px solid ${C.gold}80`,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:44,
+              animation:mineStarted?"mine-pulse 1.8s ease-in-out infinite":"pulse-glow 3s infinite",
+              boxShadow:mineStarted?`0 0 30px rgba(245,158,11,.7),0 0 60px rgba(139,92,246,.4)`:`0 0 18px rgba(139,92,246,.4)`,
+              transition:"all .5s ease",
+            }}>⛏️</div>
+          </div>
           <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>{L("miningTitle")}</div>
           <div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:16}}>{L("season")} 1 · 500 pts per cycle</div>
           {!mineStarted
@@ -1206,11 +1224,18 @@ function MainApp({user,onLogout,lang,setLang}){
     ),
     wallet:(
       <div style={{padding:"0 16px 16px"}}>
-        <div style={{background:`linear-gradient(135deg,${C.s3},${C.s2})`,borderRadius:20,padding:24,marginBottom:16,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:13,color:C.muted,marginBottom:4}}>Total Balance</div>
-          <div style={{fontSize:36,fontWeight:800,color:C.white}}>${u.usd.toFixed(2)}</div>
-          <div style={{fontSize:13,color:C.muted,marginTop:4}}>{u.pts.toLocaleString()} pts</div>
-        </div>
+        {u.pts===0&&u.usd===0
+          ?<div style={{background:`linear-gradient(135deg,${C.s3},${C.s2})`,borderRadius:20,padding:28,marginBottom:16,border:`1px dashed ${C.border}`,textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:10}}>💰</div>
+            <div style={{fontSize:16,fontWeight:700,color:C.white,marginBottom:6}}>No Balance Yet</div>
+            <div style={{fontSize:13,color:C.muted}}>Start earning by watching ads, completing tasks, or mining to see your balance here.</div>
+          </div>
+          :<div style={{background:`linear-gradient(135deg,${C.s3},${C.s2})`,borderRadius:20,padding:24,marginBottom:16,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:13,color:C.muted,marginBottom:4}}>Total Balance</div>
+            <div style={{fontSize:36,fontWeight:800,color:C.white}}>${u.usd.toFixed(2)}</div>
+            <div style={{fontSize:13,color:C.muted,marginTop:4}}>{u.pts.toLocaleString()} pts</div>
+          </div>
+        }
         <div style={{background:C.s2,borderRadius:16,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
           <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:12}}>💱 {L("exchange")}</div>
           {[["Points",u.pts.toLocaleString()],["Rate","1000 pts = $1.00"],].map(([k,v])=>(
