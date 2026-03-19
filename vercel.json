@@ -1,17 +1,8 @@
 {
   "version": 2,
   "routes": [
-    {
-      "src": "/api/send-otp",
-      "dest": "/api/send-otp.js"
-    },
-    {
-      "src": "/api/verify-otp",
-      "dest": "/api/verify-otp.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
+    { "src": "/api/send-otp", "dest": "/api/send-otp.js" },
+    { "src": "/api/verify-otp", "dest": "/api/verify-otp.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
