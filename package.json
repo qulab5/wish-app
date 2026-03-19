@@ -1,0 +1,11 @@
+{
+  "name": "wish-app",
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "resend": "^3.5.0"
+  }
+}
