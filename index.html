@@ -1053,6 +1053,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [adData,setAD]     = useState(null);
   const [spinning,setSpin] = useState(false);
   const [spinResult,setSR] = useState(null);
+  const [spinAngle,setSA] = useState(0);
   const [mineT,setMineT]      = useState(MINING_CYCLE);
   const [mineReady,setMR]     = useState(false);
   const [mineStarted,setMS]   = useState(false);
@@ -1076,7 +1077,17 @@ function MainApp({user,onLogout,lang,setLang}){
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
   const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
   const claimAd=()=>{addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);};
-  const doSpin=()=>{if(spinning)return;setSpin(true);setSR(null);setTimeout(()=>{const i=Math.floor(Math.random()*SPIN_PTS.length);addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});setSpin(false);},1500);};
+  const doSpin=()=>{
+    if(spinning)return;
+    setSpin(true);setSR(null);
+    const i=Math.floor(Math.random()*SPIN_PTS.length);
+    const targetOffset=(337.5-i*45+720)%360;
+    const currentMod=spinAngle%360;
+    const diff=(targetOffset-currentMod+360)%360;
+    const newAngle=spinAngle+5*360+diff;
+    setSA(newAngle);
+    setTimeout(()=>{addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});setSpin(false);},4200);
+  };
   const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
   const claimMining=()=>{if(!mineReady)return;addPts(500);setMineT(MINING_CYCLE);setMR(false);setMS(false);};
@@ -1131,13 +1142,22 @@ function MainApp({user,onLogout,lang,setLang}){
             {adLeft>0?"Watch Ad (+20–40 pts)":"No Ads Left Today"}
           </button>
         </div>
-        <div style={{background:C.s2,borderRadius:16,padding:16,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:4}}>🎡 {L("spinNow")}</div>
-          <div style={{fontSize:13,color:C.muted,marginBottom:12}}>Win up to 500 pts</div>
-          <div style={{textAlign:"center",fontSize:64,marginBottom:12,filter:spinning?"blur(2px)":"none",transition:"filter .3s"}}>🎰</div>
-          {spinResult&&!spinning&&<div style={{textAlign:"center",background:`rgba(139,92,246,.15)`,borderRadius:10,padding:10,marginBottom:10,color:C.brandLt,fontWeight:700}}>🎉 +{spinResult.pts} pts & +${spinResult.usd.toFixed(2)}!</div>}
-          <button onClick={doSpin} disabled={spinning} style={{width:"100%",background:spinning?"rgba(255,255,255,.1)":`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:spinning?"not-allowed":"pointer"}}>
-            {spinning?L("spinning"):L("spinNow")}
+        <div style={{background:`linear-gradient(160deg,${C.s2},${C.s3})`,borderRadius:20,padding:20,border:`1px solid ${C.border}`,overflow:"hidden",position:"relative"}}>
+          <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",background:`radial-gradient(circle,${C.brand}20,transparent 70%)`,pointerEvents:"none"}}/>
+          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:2}}>🎡 {L("spinNow")}</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Win up to 500 pts & cash prizes!</div>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:16,transform:"scale(1.15)",transformOrigin:"center top"}}>
+            <SpinWheel angle={spinAngle} spinning={spinning} phase="points"/>
+          </div>
+          {spinResult&&!spinning&&(
+            <div style={{textAlign:"center",background:`linear-gradient(135deg,rgba(245,158,11,.2),rgba(139,92,246,.2))`,border:`1px solid ${C.gold}50`,borderRadius:12,padding:"12px 16px",marginBottom:12,animation:"popIn .4s ease"}}>
+              <div style={{fontSize:22,marginBottom:4}}>🎉</div>
+              <div style={{fontWeight:800,fontSize:16,color:C.gold}}>+{spinResult.pts} pts</div>
+              <div style={{fontSize:13,color:C.muted}}>& +${spinResult.usd.toFixed(2)} USD added!</div>
+            </div>
+          )}
+          <button onClick={doSpin} disabled={spinning} style={{width:"100%",background:spinning?"rgba(255,255,255,.08)":`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:spinning?"not-allowed":"pointer",boxShadow:spinning?"none":`0 4px 20px rgba(245,158,11,.35)`,transition:"all .3s"}}>
+            {spinning?"⏳ Spinning…":"🎰 Spin Now!"}
           </button>
         </div>
       </div>
