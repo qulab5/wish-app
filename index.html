@@ -656,7 +656,7 @@ function AuthScreen({onLogin,lang}){
     return()=>clearInterval(iv);
   },[otpStep]);
 
-  /* ===== UPDATED sendOtp FUNCTION WITH DEBUGGING ===== */
+  /* ===== FIXED sendOtp FUNCTION WITH ERROR HANDLING ===== */
   const sendOtp = async (nu) => {
     setPU(nu);
     setOtpStep(true);
@@ -681,38 +681,46 @@ function AuthScreen({onLogin,lang}){
       });
       
       console.log('3. Response status:', res.status);
-      console.log('4. Response headers:', [...res.headers.entries()]);
       
       const text = await res.text();
-      console.log('5. Raw response:', text);
+      console.log('4. Raw response:', text);
       
       let data;
       try {
         data = JSON.parse(text);
-        console.log('6. Parsed data:', data);
+        console.log('5. Parsed data:', data);
       } catch (e) {
-        console.error('7. JSON parse error:', e);
-        setOtpErr(`Server returned: ${text.substring(0, 50)}`);
+        console.error('6. JSON parse error:', e);
+        setOtpErr(`Server returned invalid response. Status: ${res.status}`);
         setOtpSending(false);
         return;
       }
       
       if (data.success) {
-        console.log('8. Success!');
-        setOtpErr("");
+        console.log('7. Success!');
+        setOtpErr(""); // Clear any errors
       } else {
-        console.log('8. Error:', data.error);
-        setOtpErr(data.error || "Failed to send code");
+        console.log('7. Error received:', data.error);
+        // FIXED: Convert error object to string safely
+        let errorMessage = "Failed to send code";
+        if (data.error) {
+          if (typeof data.error === 'string') {
+            errorMessage = data.error;
+          } else if (typeof data.error === 'object') {
+            errorMessage = data.error.message || JSON.stringify(data.error);
+          }
+        }
+        setOtpErr(errorMessage);
       }
     } catch (err) {
-      console.error('9. Fetch error:', err);
+      console.error('8. Fetch error:', err);
       setOtpErr(`Network error: ${err.message}`);
     } finally {
       setOtpSending(false);
       setTimeout(() => otpRefs[0].current?.focus(), 100);
     }
   };
-  /* ===== END OF UPDATED sendOtp FUNCTION ===== */
+  /* ===== END OF FIXED sendOtp FUNCTION ===== */
 
   const resendOtp = async () => {
     if (!canResend) return;
@@ -745,7 +753,15 @@ function AuthScreen({onLogin,lang}){
         setResendT(60);
         setCanResend(false);
       } else {
-        setOtpErr(data.error || "Failed to resend code");
+        let errorMessage = "Failed to resend code";
+        if (data.error) {
+          if (typeof data.error === 'string') {
+            errorMessage = data.error;
+          } else if (typeof data.error === 'object') {
+            errorMessage = data.error.message || JSON.stringify(data.error);
+          }
+        }
+        setOtpErr(errorMessage);
       }
     } catch (err) {
       setOtpErr("Network error");
