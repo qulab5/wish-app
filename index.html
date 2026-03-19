@@ -396,7 +396,7 @@ function Inp({label,type="text",val,onChange,err,placeholder,icon,countryCode,on
             <input 
               type="tel"
               value={val} 
-              onChange={onChange} 
+              onChange={(e) => onChange(e.target.value)} // FIXED: e.target.value
               placeholder={placeholder}
               onFocus={()=>setFocused(true)}
               onBlur={()=>setFocused(false)}
@@ -421,7 +421,7 @@ function Inp({label,type="text",val,onChange,err,placeholder,icon,countryCode,on
     );
   }
   
-  // Regular input (non-phone)
+  // Regular input (non-phone) - FIXED HERE
   return(
     <div style={{marginBottom:16}}>
       {label&&<div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:.08,textTransform:"uppercase",marginBottom:6}}>{label}</div>}
@@ -430,7 +430,7 @@ function Inp({label,type="text",val,onChange,err,placeholder,icon,countryCode,on
         <input 
           type={type==="password"?(show?"text":"password"):type} 
           value={val} 
-          onChange={onChange} 
+          onChange={(e) => onChange(e.target.value)} // FIXED: e.target.value instead of onChange directly
           placeholder={placeholder}
           onFocus={()=>setFocused(true)}
           onBlur={()=>setFocused(false)}
@@ -898,7 +898,940 @@ function AuthScreen({onLogin,lang}){
   );
 }
 
-// ... (AdminPanel, MainApp, and WishApp remain exactly the same as before)
+/* ═══════════════════════════════════════════════
+   ██   ADMIN PANEL 
+═══════════════════════════════════════════════ */
+function AdminPanel({user,onExit,lang}){
+  const [aTab,setATab]     = useState("dashboard");
+  const [users]            = useState(INITIAL_USERS.filter(u=>!u.isAdmin));
+  const [adCfg,setAdCfg]   = useState(DEFAULT_AD_CONFIG);
+  const [saved,setSaved]   = useState(false);
+  const [admobF,setAdmobF] = useState({...DEFAULT_AD_CONFIG.admob});
+  const [aplF,setAplF]     = useState({...DEFAULT_AD_CONFIG.applovin});
+  const totalPts  = users.reduce((a,u)=>a+u.pts,0);
+  const totalUsd  = users.reduce((a,u)=>a+u.usd,0);
+  const activeU   = users.filter(u=>u.active).length;
+
+  const saveAdCfg=()=>{
+    setAdCfg(p=>({...p,admob:admobF,applovin:aplF}));
+    setSaved(true);setTimeout(()=>setSaved(false),2500);
+  };
+
+  const admobTabs=[
+    {id:"dashboard",label:"📊 Dashboard"},
+    {id:"users",    label:"👥 Users"},
+    {id:"adcontrol",label:"📡 Ad Control"},
+    {id:"settings", label:"⚙️ Settings"},
+  ];
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",color:C.white,maxWidth:430,margin:"0 auto",paddingBottom:20}}>
+      <style>{CSS}</style>
+
+      {/* admin header */}
+      <div style={{background:"linear-gradient(135deg,rgba(139,92,246,.2),rgba(236,72,153,.1))",borderBottom:"1px solid rgba(139,92,246,.2)",padding:"20px 20px 0"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:38,height:38,borderRadius:11,background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:`0 0 20px ${C.brand}60`}}>🛡️</div>
+            <div>
+              <div style={{fontWeight:800,fontSize:15}}>Admin Panel</div>
+              <div style={{fontSize:10,color:C.muted}}>{APP_NAME} · Super Admin</div>
+            </div>
+          </div>
+          <Btn label="← Exit" onClick={onExit} variant="ghost" style={{padding:"8px 14px",fontSize:12,borderRadius:10}}/>
+        </div>
+        <div className="admin-nav">
+          {admobTabs.map(at=>(
+            <button key={at.id} className={`admin-tab ${aTab===at.id?"active":""}`} onClick={()=>setATab(at.id)}>{at.label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{padding:"16px 18px"}}>
+
+        {/* DASHBOARD */}
+        {aTab==="dashboard"&&(
+          <div className="sec">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+              {[
+                {label:"Total Users",  val:users.length,  icon:"👥", col:C.brand},
+                {label:"Active Users", val:activeU,       icon:"✅", col:C.green},
+                {label:"Total Points", val:totalPts.toLocaleString(),icon:"🏆",col:C.gold},
+                {label:"Total USD",    val:"$"+totalUsd.toFixed(2),  icon:"💵",col:C.cyan},
+              ].map((s,i)=>(
+                <div key={i} className="stat-card">
+                  <div style={{fontSize:26,marginBottom:8}}>{s.icon}</div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:18,fontWeight:800,color:s.col,marginBottom:3}}>{s.val}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Ad network status */}
+            <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px"}}>
+              <SH title="Ad Network Status"/>
+              {[
+                {name:"Google AdMob", icon:"🔵", enabled:adCfg.admob.enabled,  col:"#4285F4"},
+                {name:"AppLovin MAX", icon:"🔶", enabled:adCfg.applovin.enabled,col:"#FF6B00"},
+              ].map((n,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:i===0?"1px solid rgba(139,92,246,.08)":"none"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <span style={{fontSize:20}}>{n.icon}</span>
+                    <span style={{fontSize:13,fontWeight:600}}>{n.name}</span>
+                  </div>
+                  <Pill label={n.enabled?"Active":"Inactive"} col={n.enabled?C.green:C.muted}/>
+                </div>
+              ))}
+            </div>
+
+            <div style={{marginTop:14,background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px"}}>
+              <SH title="Quick Stats"/>
+              {[
+                {l:"Ads Per Day (Weekday)", v:adCfg.adsPerDay},
+                {l:"Ads Per Day (Sunday)",  v:adCfg.sundayAds},
+                {l:"Cooldown Hours",        v:adCfg.cooldownHours+"h"},
+                {l:"Ad Frequency",          v:"Every "+adCfg.adFrequency+" actions"},
+              ].map((s,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(139,92,246,.06)"}}>
+                  <span style={{fontSize:12,color:C.muted}}>{s.l}</span>
+                  <span style={{fontSize:12,fontWeight:700,fontFamily:"'DM Mono',monospace",color:C.brandLt}}>{s.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* USERS */}
+        {aTab==="users"&&(
+          <div className="sec">
+            <div style={{fontWeight:700,fontSize:16,marginBottom:14}}>All Users ({users.length})</div>
+            {users.map(u=>(
+              <div key={u.id} className="user-row">
+                <Avatar name={u.name} size={42}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{u.name}</div>
+                  <div style={{fontSize:10,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
+                  <div style={{fontSize:10,color:C.muted}}>{u.phone}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:C.brandLt}}>{u.pts.toLocaleString()} pts</div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:C.green}}>${u.usd.toFixed(2)}</div>
+                  <Pill label={u.active?"Active":"Banned"} col={u.active?C.green:C.red}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* AD CONTROL */}
+        {aTab==="adcontrol"&&(
+          <div className="sec">
+            {saved&&<div style={{background:"rgba(16,185,129,.1)",border:"1px solid rgba(16,185,129,.3)",borderRadius:12,padding:"10px 16px",marginBottom:14,color:C.green,fontWeight:600,fontSize:13,textAlign:"center"}}>✅ Settings Saved!</div>}
+
+            {/* Network Selector */}
+            <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px",marginBottom:14}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>📡 Active Ad Network</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {["admob","applovin","both","none"].map(n=>(
+                  <div key={n} onClick={()=>setAdCfg(p=>({...p,activeNetwork:n}))} style={{padding:"12px",borderRadius:12,border:`1.5px solid ${adCfg.activeNetwork===n?C.brand:C.border}`,background:adCfg.activeNetwork===n?"rgba(139,92,246,.12)":C.s3,cursor:"pointer",textAlign:"center",transition:"all .2s"}}>
+                    <div style={{fontSize:11,fontWeight:700,color:adCfg.activeNetwork===n?C.brandLt:C.muted,textTransform:"uppercase"}}>
+                      {n==="admob"?"🔵 AdMob":n==="applovin"?"🔶 AppLovin":n==="both"?"🔀 Both":"⛔ None"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* AdMob Config */}
+            <div style={{background:C.s2,border:"1.5px solid rgba(66,133,244,.2)",borderRadius:16,padding:"18px",marginBottom:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:"rgba(66,133,244,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🔵</div>
+                  <div><div style={{fontWeight:700,fontSize:14}}>Google AdMob</div><div style={{fontSize:10,color:C.muted}}>admob.google.com</div></div>
+                </div>
+                <button className={`toggle ${admobF.enabled?"on":"off"}`} onClick={()=>setAdmobF(p=>({...p,enabled:!p.enabled}))}/>
+              </div>
+              {[
+                {k:"appId",        label:"App ID",              ph:"ca-app-pub-XXXXXXXX~XXXXXXXXXX"},
+                {k:"bannerUnitId", label:"Banner Ad Unit ID",   ph:"ca-app-pub-XXXXXXXX/XXXXXXXXXX"},
+                {k:"interUnitId",  label:"Interstitial Unit ID",ph:"ca-app-pub-XXXXXXXX/XXXXXXXXXX"},
+                {k:"rewardUnitId", label:"Rewarded Unit ID",    ph:"ca-app-pub-XXXXXXXX/XXXXXXXXXX"},
+              ].map(f=>(
+                <div key={f.k} style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:5,textTransform:"uppercase",letterSpacing:.07}}>{f.label}</div>
+                  <input className="inp-base" value={admobF[f.k]} onChange={e=>setAdmobF(p=>({...p,[f.k]:e.target.value}))} placeholder={f.ph} style={{fontFamily:"'DM Mono',monospace",fontSize:11}}/>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+                <span style={{fontSize:12,color:C.muted}}>Test Mode</span>
+                <button className={`toggle ${admobF.testMode?"on":"off"}`} onClick={()=>setAdmobF(p=>({...p,testMode:!p.testMode}))}/>
+              </div>
+            </div>
+
+            {/* AppLovin Config */}
+            <div style={{background:C.s2,border:"1.5px solid rgba(255,107,0,.2)",borderRadius:16,padding:"18px",marginBottom:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:"rgba(255,107,0,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🔶</div>
+                  <div><div style={{fontWeight:700,fontSize:14}}>AppLovin MAX</div><div style={{fontSize:10,color:C.muted}}>applovin.com/max</div></div>
+                </div>
+                <button className={`toggle ${aplF.enabled?"on":"off"}`} onClick={()=>setAplF(p=>({...p,enabled:!p.enabled}))}/>
+              </div>
+              {[
+                {k:"sdkKey",    label:"SDK Key",              ph:"Your AppLovin SDK Key"},
+                {k:"bannerAdId",label:"Banner Ad Unit ID",    ph:"YOUR_BANNER_AD_UNIT_ID"},
+                {k:"interAdId", label:"Interstitial Unit ID", ph:"YOUR_INTER_AD_UNIT_ID"},
+                {k:"rewardAdId",label:"Rewarded Unit ID",     ph:"YOUR_REWARD_AD_UNIT_ID"},
+              ].map(f=>(
+                <div key={f.k} style={{marginBottom:12}}>
+                  <div style={{fontSize:11,fontWeight:600,color:C.muted,marginBottom:5,textTransform:"uppercase",letterSpacing:.07}}>{f.label}</div>
+                  <input className="inp-base" value={aplF[f.k]} onChange={e=>setAplF(p=>({...p,[f.k]:e.target.value}))} placeholder={f.ph} style={{fontFamily:"'DM Mono',monospace",fontSize:11}}/>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+                <span style={{fontSize:12,color:C.muted}}>Test Mode</span>
+                <button className={`toggle ${aplF.testMode?"on":"off"}`} onClick={()=>setAplF(p=>({...p,testMode:!p.testMode}))}/>
+              </div>
+            </div>
+
+            {/* Ad Frequency */}
+            <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px",marginBottom:14}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>⚙️ Ad Frequency Settings</div>
+              {[
+                {label:"Ads Per Day (Weekday)",k:"adsPerDay",    min:5,max:50},
+                {label:"Ads Per Day (Sunday)", k:"sundayAds",    min:5,max:60},
+                {label:"Cooldown (Hours)",     k:"cooldownHours",min:1,max:24},
+                {label:"Ad Frequency (Every N actions)",k:"adFrequency",min:1,max:20},
+              ].map(f=>(
+                <div key={f.k} style={{marginBottom:14}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                    <span style={{fontSize:12,color:C.muted}}>{f.label}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:C.brandLt,fontFamily:"'DM Mono',monospace"}}>{adCfg[f.k]}</span>
+                  </div>
+                  <input type="range" min={f.min} max={f.max} value={adCfg[f.k]} onChange={e=>setAdCfg(p=>({...p,[f.k]:+e.target.value}))} style={{width:"100%",accentColor:C.brand}}/>
+                </div>
+              ))}
+            </div>
+
+            <Btn label={saved?"✅ Saved!":"💾 Save Ad Settings"} onClick={saveAdCfg} full variant={saved?"green":"brand"} style={{padding:15,fontSize:14}}/>
+          </div>
+        )}
+
+        {/* SETTINGS */}
+        {aTab==="settings"&&(
+          <div className="sec">
+            <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"18px",marginBottom:14}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:14}}>🌍 App Settings</div>
+              {[
+                {label:"App Name",        val:APP_NAME},
+                {label:"USD per Point",   val:"$"+USD_PER_POINT},
+                {label:"Referral Bonus",  val:REFERRAL_BONUS+" pts"},
+                {label:"Mining Cycle",    val:"8 hours"},
+                {label:"Sunday Cycle",    val:"4 hours"},
+                {label:"Spin Phases",     val:"5 pts + 3 free $"},
+              ].map((s,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid rgba(139,92,246,.06)"}}>
+                  <span style={{fontSize:13,color:C.muted}}>{s.label}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:C.brandLt,fontFamily:"'DM Mono',monospace"}}>{s.val}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{background:"rgba(239,68,68,.06)",border:"1px solid rgba(239,68,68,.15)",borderRadius:14,padding:"14px 16px",fontSize:12,color:"rgba(248,113,113,.8)",lineHeight:1.65}}>
+              ⚠️ <strong>Production Note:</strong> In a real deployment, connect this panel to a backend API (Node.js/Firebase/Supabase). These settings currently live in-memory and reset on refresh.
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   ██   MAIN APP (enhanced dashboard)
+═══════════════════════════════════════════════ */
+function MainApp({user,onLogout,lang,setLang}){
+  const [tab,setTab]           = useState("home");
+  const [points,setPoints]     = useState(user.pts||1250);
+  const [usdBal,setUsdBal]     = useState(user.usd||3.42);
+  const [balHide,setBalHide]   = useState(false);
+  const [adsToday,setAdsToday] = useState(0);
+  const [cdEnd,setCdEnd]       = useState(null);
+  const [cdLeft,setCdLeft]     = useState(0);
+  const [mLeft,setMLeft]       = useState(MINING_S);
+  const [mEpoch,setMEpoch]     = useState(0);
+  const [doneBonus,setDB]      = useState([]);
+  const [refs,setRefs]         = useState(["Ali Hassan","Sara Ahmed"]);
+  const [refInput,setRI]       = useState("");
+  const [showAd,setShowAd]     = useState(false);
+  const [curAd,setCurAd]       = useState(null);
+  const [adTimer,setAdTimer]   = useState(5);
+  const [adReady,setAdReady]   = useState(false);
+  const [isSkip,setIsSkip]     = useState(false);
+  const [toast,setToast]       = useState(null);
+  const [showSkip,setShowSkip] = useState(false);
+  const [menuOpen,setMO]       = useState(false);
+  const [showLP,setShowLP]     = useState(false);
+  const [showLogout,setSL]     = useState(false);
+  const [showExch,setSE]       = useState(false);
+  const [taskL,setTL]          = useState({});
+  const [doneTasks,setDT]      = useState([]);
+  const [socialL,setSoL]       = useState({});
+  const [doneSoc,setDS]        = useState([]);
+  const [expTask,setET]        = useState(null);
+  const [expSoc,setES]         = useState(null);
+  const [calM,setCalM]         = useState(now.getMonth());
+  const [calY,setCalY]         = useState(now.getFullYear());
+  const [mDays]                = useState([todayDate-2,todayDate-1,todayDate]);
+  const [txns,setTxns]         = useState([
+    {id:1,desc:"Watched ad",  pts:28, usd:.028,time:"2h ago"},
+    {id:2,desc:"Referral",    pts:300,usd:.30, time:"1d ago"},
+    {id:3,desc:"Spin win $2", pts:0,  usd:2,   time:"2d ago"},
+    {id:4,desc:"Mining",      pts:dailyPts,usd:+(dailyPts*USD_PER_POINT).toFixed(3),time:"3d ago"},
+  ]);
+  const [spinAngle,setSA]      = useState(0);
+  const [spinning,setSpng]     = useState(false);
+  const [spinInRound,setSIR]   = useState(0);
+  const [adsInRound,setAIR]    = useState(0);
+  const [freeLeft,setFL]       = useState(0);
+  const [sunAds,setSunAds]     = useState(0);
+  const [sunSpins,setSunSp]    = useState(0);
+  const [lastWin,setLW]        = useState(null);
+
+  const L=(k)=>t$(lang,k);
+  const adsLimit = isSunday?20:15;
+  const adsLeft  = adsLimit-adsToday;
+  const inCD     = cdEnd&&Date.now()<cdEnd;
+  const curPhase = isSunday?"sunday":freeLeft>0?"free":"points";
+  const canSpin  = isSunday?(sunSpins>0):(freeLeft>0||adsInRound===0);
+  const needAd   = !isSunday&&freeLeft===0&&adsInRound>0;
+  const dir      = (LANGS[lang]||LANGS.en).dir;
+
+  const adRef=useRef(),cdRef=useRef(),mnRef=useRef();
+
+  useEffect(()=>{
+    cdRef.current=setInterval(()=>{
+      if(cdEnd&&Date.now()<cdEnd)setCdLeft(Math.ceil((cdEnd-Date.now())/1000));
+      else{setCdLeft(0);if(cdEnd&&Date.now()>=cdEnd)setCdEnd(null);}
+    },1000);
+    return()=>clearInterval(cdRef.current);
+  },[cdEnd]);
+  useEffect(()=>{
+    mnRef.current=setInterval(()=>{
+      setMLeft(t=>{
+        if(t<=1){
+          const a=+(dailyPts*USD_PER_POINT).toFixed(3);
+          setUsdBal(b=>+(b+a).toFixed(3));setPoints(p=>p+dailyPts);
+          setTxns(p=>[{id:Date.now(),desc:`Mining #${mEpoch+1}`,pts:dailyPts,usd:a,time:"now"},...p.slice(0,19)]);
+          setMEpoch(e=>e+1);return MINING_S;
+        }
+        return t-1;
+      });
+    },1000);
+    return()=>clearInterval(mnRef.current);
+  },[mEpoch]);
+  useEffect(()=>{
+    if(!showAd)return;
+    setAdTimer(5);setAdReady(false);clearInterval(adRef.current);
+    adRef.current=setInterval(()=>setAdTimer(t=>{if(t<=1){clearInterval(adRef.current);setAdReady(true);return 0;}return t-1;}),1000);
+    return()=>clearInterval(adRef.current);
+  },[showAd,curAd]);
+
+  const toast$=(m,tp="ok")=>{setToast({m,tp});setTimeout(()=>setToast(null),3000);};
+  const addR=(p,u,desc)=>{if(p)setPoints(x=>x+p);if(u)setUsdBal(x=>+(x+u).toFixed(3));setTxns(pv=>[{id:Date.now(),desc,pts:p||0,usd:u||0,time:"now"},...pv.slice(0,19)]);};
+  const openAd=(skip=false)=>{if(adsLeft<=0){toast$("Daily limit reached!","err");return;}setCurAd(rndAd());setIsSkip(skip);setShowAd(true);setShowSkip(false);};
+  const handleWatch=()=>{if(inCD){setShowSkip(true);return;}openAd(false);};
+
+  const claimAd=()=>{
+    const ep=curAd.pts,eu=+(ep*USD_PER_POINT).toFixed(3);
+    const sb=isSunday?+(0.05+Math.random()*0.15).toFixed(2):0;
+    addR(ep,+(eu+sb).toFixed(3),`Ad: ${curAd.cat}${sb>0?" ☀️":""}`);
+    const n=adsToday+1;setAdsToday(n);
+    if(isSunday){const sa=sunAds+1;setSunAds(sa);if(sa%5===0){setSunSp(s=>s+5);toast$(`+${ep} pts & 5 Sunday Spins! 🎰`);}else toast$(`+${ep} pts! ${5-(sa%5)} ads → 5 Sunday Spins`);}
+    else{setAIR(0);if(freeLeft>0)toast$(`+${ep} pts! Spin ready 🎰`);else toast$(`+${ep} pts! Spin available 🎰`);}
+    if(isSkip){setCdEnd(null);setCdLeft(0);}else if(n%5===0&&n<adsLimit)setCdEnd(Date.now()+AD_COOLDOWN_S*1000);
+    setShowAd(false);
+  };
+
+  const doSpin=()=>{
+    if(spinning||!canSpin){if(!canSpin)toast$(needAd?"Watch 1 ad first!":"No spins!","err");return;}
+    setSpng(true);setSA(a=>a+1440+Math.floor(Math.random()*360));
+    setTimeout(()=>{
+      setSpng(false);
+      if(isSunday){const w=SPIN_USD[Math.floor(Math.random()*SPIN_USD.length)];setSunSp(s=>s-1);addR(0,w,"Sunday Spin 🎰");setLW({t:"usd",v:w});toast$(`🎰 Won $${w}!`);}
+      else if(freeLeft>0){const w=SPIN_USD[Math.floor(Math.random()*SPIN_USD.length)];setFL(f=>f-1);addR(0,w,"Free Spin 🎰");setLW({t:"usd",v:w});toast$(`🎰 Free Spin Won $${w}!`);}
+      else{const w=SPIN_PTS[Math.floor(Math.random()*SPIN_PTS.length)];addR(w,0,`Spin 🎰 ${w}pts`);setLW({t:"pts",v:w});const nr=spinInRound+1;if(nr>=5){setSIR(0);setAIR(0);setFL(3);toast$(`🎰 ${w} pts! 5 spins done → 3 FREE $ Spins! 🎉`);}else{setSIR(nr);setAIR(1);toast$(`🎰 ${w} pts! Watch 1 ad, then spin (${nr}/5)`);};}
+    },3800);
+  };
+
+  const fmtT=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sc=s%60;return h>0?`${h}h ${String(m).padStart(2,"0")}m ${String(sc).padStart(2,"0")}s`:m>0?`${m}m ${String(sc).padStart(2,"0")}s`:`${sc}s`;};
+  const MN=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const dimF=(m,y)=>new Date(y,m+1,0).getDate();
+  const fdF=(m,y)=>new Date(y,m,1).getDay();
+  const cDays=dimF(calM,calY),cFirst=fdF(calM,calY);
+  const pM=calM===0?{m:11,y:calY-1}:{m:calM-1,y:calY};
+  const pDays=dimF(pM.m,pM.y);
+
+  const tabs=[
+    {id:"home",    icon:"⊞", label:L("home")},
+    {id:"earn",    icon:"▶", label:L("earn")},
+    {id:"tasks",   icon:"◈", label:L("tasks")},
+    {id:"board",   icon:"🏆",label:L("leaders")},
+    {id:"calendar",icon:"📅",label:L("mining")},
+    {id:"wallet",  icon:"◉", label:L("wallet")},
+  ];
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",color:C.white,maxWidth:430,margin:"0 auto",paddingBottom:90,direction:dir,position:"relative",overflowX:"hidden"}}>
+      <style>{CSS}</style>
+
+      {/* atmosphere */}
+      <div style={{position:"fixed",inset:0,zIndex:0,pointerEvents:"none"}}>
+        <div style={{position:"absolute",width:480,height:480,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.09) 0%,transparent 70%)",top:-160,left:"50%",transform:"translateX(-50%)",animation:"float 8s ease infinite"}}/>
+        <div style={{position:"absolute",width:260,height:260,borderRadius:"50%",background:"radial-gradient(circle,rgba(236,72,153,.06) 0%,transparent 70%)",bottom:80,right:-60,animation:"float 5s ease infinite reverse"}}/>
+      </div>
+
+      {/* TOAST */}
+      {toast&&<div style={{position:"fixed",top:14,left:"50%",transform:"translateX(-50%)",zIndex:9999,animation:"popIn .2s",padding:"11px 22px",borderRadius:12,fontSize:13,fontWeight:600,whiteSpace:"nowrap",maxWidth:"92vw",background:toast.tp==="err"?"rgba(30,8,8,.97)":"rgba(5,15,12,.97)",border:`1px solid ${toast.tp==="err"?"rgba(239,68,68,.4)":"rgba(16,185,129,.3)"}`,color:toast.tp==="err"?"#f87171":"#34d399",boxShadow:"0 8px 32px rgba(0,0,0,.8)"}}>{toast.m}</div>}
+
+      {/* MENU DRAWER */}
+      {menuOpen&&<>
+        <div className="menu-overlay" onClick={()=>setMO(false)}/>
+        <div className="menu-drawer" style={{left:dir==="rtl"?"auto":0,right:dir==="rtl"?0:"auto",animation:dir==="rtl"?"slideR .25s ease":"slideL .25s ease"}}>
+          {/* profile header */}
+          <div style={{background:`linear-gradient(145deg,rgba(139,92,246,.18),rgba(236,72,153,.08))`,borderBottom:"1px solid rgba(139,92,246,.12)",padding:"28px 22px 20px"}}>
+            <Avatar name={user.name} size={58} color={`linear-gradient(135deg,${C.brand},${C.pink})`}/>
+            <div style={{fontWeight:800,fontSize:16,marginTop:10,marginBottom:2}}>{user.name}</div>
+            <div style={{fontSize:11,color:C.muted,marginBottom:6}}>{user.email||user.phone}</div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <span style={{fontSize:11,color:C.green,fontWeight:600}}>✓ Verified</span>
+              <span style={{fontSize:10,color:C.muted}}>· {user.country}</span>
+            </div>
+            <div style={{marginTop:10,background:"rgba(139,92,246,.1)",borderRadius:10,padding:"9px 12px",display:"flex",justifyContent:"space-between"}}>
+              <div><div style={{fontSize:10,color:C.muted}}>Referral Code</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:C.gold,marginTop:2}}>EZ-{user.id?.toUpperCase().slice(-6)||"ABC123"}</div></div>
+              <span style={{fontSize:18}}>📋</span>
+            </div>
+          </div>
+
+          <div style={{flex:1,overflowY:"auto",paddingTop:6}}>
+            <button className="menu-item" onClick={()=>{setTab("home");setMO(false);}}>
+              <span style={{fontSize:20}}>👤</span><span>{L("profile")}</span>
+            </button>
+            <button className="menu-item" onClick={()=>{setSE(true);setMO(false);}}>
+              <span style={{fontSize:20}}>💱</span>
+              <div style={{flex:1}}><div>{L("exchange")}</div><div style={{fontSize:10,color:C.gold}}>Coming Soon</div></div>
+              <Pill label={L("soon")} col={C.gold}/>
+            </button>
+            <button className="menu-item" onClick={()=>{setShowLP(true);setMO(false);}}>
+              <span style={{fontSize:20}}>🌐</span><span>{L("language")}</span>
+              <span style={{marginLeft:"auto",fontSize:12,color:C.muted}}>{(LANGS[lang]||LANGS.en).flag}</span>
+            </button>
+            <DivLine/>
+            <div style={{padding:"8px 22px"}}>
+              {[
+                {l:L("totalPts"),  v:points.toLocaleString()+" pts", col:C.brandLt},
+                {l:L("usdBal"),    v:balHide?"$••••":"$"+usdBal.toFixed(2),col:C.green},
+                {l:"Member Since", v:user.joined||"2025",col:C.muted},
+              ].map((s,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid rgba(139,92,246,.06)"}}>
+                <span style={{fontSize:12,color:C.muted}}>{s.l}</span>
+                <span style={{fontSize:12,fontWeight:700,color:s.col,fontFamily:"'DM Mono',monospace"}}>{s.v}</span>
+              </div>)}
+            </div>
+            <DivLine/>
+            <button className="menu-item" onClick={()=>{setSL(true);setMO(false);}}>
+              <span style={{fontSize:20}}>🚪</span><span style={{color:C.red}}>{L("logout")}</span>
+            </button>
+          </div>
+          <div style={{padding:"14px 22px",borderTop:"1px solid rgba(139,92,246,.08)",fontSize:11,color:C.muted,textAlign:"center"}}>{APP_NAME} v2.0 · 🌍 International</div>
+        </div>
+      </>}
+
+      {/* HEADER */}
+      <div style={{position:"relative",zIndex:1}}>
+        <div style={{background:"linear-gradient(180deg,rgba(139,92,246,.12) 0%,rgba(139,92,246,.02) 100%)",borderBottom:"1px solid rgba(139,92,246,.12)",padding:"18px 20px 16px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <button onClick={()=>setMO(true)} style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 10px",cursor:"pointer",display:"flex",flexDirection:"column",gap:4}}>
+              {[0,1,2].map(i=><div key={i} style={{width:18,height:2,borderRadius:2,background:"rgba(255,255,255,.7)"}}/>)}
+            </button>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:34,height:34,borderRadius:11,background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,boxShadow:`0 4px 14px rgba(139,92,246,.4)`,animation:"float 3s ease infinite"}}>✨</div>
+              <div>
+                <div style={{fontSize:16,fontWeight:900,letterSpacing:-.3,background:`linear-gradient(135deg,${C.white},${C.brandLt})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{APP_NAME}</div>
+                <div style={{fontSize:9,color:C.muted}}>{APP_TAGLINE}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:7,alignItems:"center"}}>
+              <button onClick={()=>setShowLP(true)} style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,borderRadius:9,padding:"5px 8px",cursor:"pointer",fontSize:15}}>{(LANGS[lang]||LANGS.en).flag}</button>
+              {isSunday&&<Pill label="☀️" col={C.gold} anim/>}
+              <div style={{width:34,height:34,borderRadius:10,background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:14}}>🔔</div>
+            </div>
+          </div>
+
+          {/* mining bar */}
+          <div style={{background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.18)",borderRadius:14,padding:"13px 16px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                <div className="dot" style={{background:C.green}}/>
+                <span style={{fontWeight:700,fontSize:12,color:C.green}}>{L("miningTitle")} #{mEpoch+1}</span>
+              </div>
+              <Pill label="LIVE" col={C.green}/>
+            </div>
+            <div style={{fontFamily:"'DM Mono',monospace",fontSize:32,fontWeight:800,color:C.white,letterSpacing:1,lineHeight:1,marginBottom:5,animation:"tick 1s infinite"}}>{fmtT(mLeft)}</div>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:11,color:C.muted}}>{L("miningNext")}</span>
+              <span style={{fontSize:11,color:C.green,fontFamily:"'DM Mono',monospace",fontWeight:600}}>+{dailyPts} pts</span>
+            </div>
+            <div className="ptr" style={{marginTop:9}}><div className="ptrf" style={{width:`${((MINING_S-mLeft)/MINING_S)*100}%`,background:`linear-gradient(90deg,${C.brand},${C.cyan})`}}/></div>
+          </div>
+        </div>
+
+        {/* BALANCE CARD */}
+        <div style={{padding:"14px 18px 0"}}>
+          <div style={{background:"linear-gradient(145deg,#13102a,#1c1840)",border:`1px solid ${C.border2}`,borderRadius:22,padding:"20px",marginBottom:14,position:"relative",overflow:"hidden",boxShadow:"0 8px 32px rgba(139,92,246,.1)"}}>
+            <div style={{position:"absolute",top:0,left:"-100%",width:"50%",height:"100%",backgroundImage:"linear-gradient(90deg,transparent,rgba(255,255,255,.018),transparent)",animation:"shimmer 5s ease infinite",pointerEvents:"none"}}/>
+            <div style={{position:"absolute",right:-30,top:-30,width:120,height:120,borderRadius:"50%",background:`radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)`,pointerEvents:"none"}}/>
+
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+              <div>
+                <div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:.1,textTransform:"uppercase",marginBottom:6}}>{L("totalPts")}</div>
+                <div style={{fontSize:40,fontWeight:900,letterSpacing:-2,fontFamily:"'DM Mono',monospace",background:`linear-gradient(135deg,#fff,${C.brandLt})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1}}>{points.toLocaleString()}</div>
+                <div style={{fontSize:11,color:C.muted,marginTop:3}}>pts</div>
+              </div>
+              <div style={{textAlign:dir==="rtl"?"left":"right"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,justifyContent:dir==="rtl"?"flex-start":"flex-end",marginBottom:5}}>
+                  <div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:.1,textTransform:"uppercase"}}>{L("usdBal")}</div>
+                  <button onClick={()=>setBalHide(h=>!h)} style={{background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:14,lineHeight:1,padding:2}}>{balHide?"🙈":"👁"}</button>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8,justifyContent:dir==="rtl"?"flex-start":"flex-end"}}>
+                  <div style={{fontSize:28,fontWeight:900,fontFamily:"'DM Mono',monospace",color:C.green,letterSpacing:-.5}}>
+                    {balHide?"$••••":"$"+usdBal.toFixed(2)}
+                  </div>
+                  <span style={{background:"rgba(16,185,129,0.1)",padding:"2px 8px",borderRadius:12,fontSize:10,color:C.green,border:"1px solid rgba(16,185,129,0.2)"}}>
+                    +2.5% today
+                  </span>
+                </div>
+                <div style={{fontSize:10,color:C.muted,marginTop:2}}>1 pt = $0.001</div>
+              </div>
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1px 1fr 1px 1fr",background:"rgba(139,92,246,.06)",borderRadius:12,padding:"11px 0"}}>
+              {[
+                {l:L("adsLeft"),v:adsLeft, col:adsLeft>5?C.green:adsLeft>0?C.gold:C.red},
+                null,
+                {l:L("spins"),  v:isSunday?sunSpins:freeLeft>0?freeLeft:canSpin?"✓":"Ad↑", col:freeLeft>0||sunSpins>0?C.green:canSpin?C.brandLt:C.muted},
+                null,
+                {l:L("season"), v:`#${mEpoch+1}`,col:C.cyan},
+              ].map((s,i)=>s
+                ?<div key={i} style={{textAlign:"center"}}><div style={{fontSize:18,fontWeight:900,fontFamily:"'DM Mono',monospace",color:s.col,lineHeight:1}}>{s.v}</div><div style={{fontSize:9,fontWeight:700,letterSpacing:.08,textTransform:"uppercase",color:C.muted,marginTop:4}}>{s.l}</div></div>
+                :<div key={i} style={{background:"rgba(139,92,246,.1)"}}/>
+              )}
+            </div>
+
+            <div style={{marginTop:12,display:"flex",justifyContent:"space-between",alignItems:"center",background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.15)",borderRadius:11,padding:"9px 14px"}}>
+              <div><div style={{fontSize:11,color:C.muted}}>Today's Bonus ({todayDate}th)</div><div style={{fontSize:10,color:C.gold,marginTop:2}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div></div>
+              <div style={{textAlign:"right"}}><div style={{fontFamily:"'DM Mono',monospace",fontSize:15,fontWeight:700,color:C.gold}}>+{dailyPts} pts</div><div style={{fontSize:10,color:C.muted}}>= ${(dailyPts*USD_PER_POINT).toFixed(3)}</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* TAB CONTENT */}
+      <div style={{padding:"0 18px",position:"relative",zIndex:1}}>
+
+        {/* HOME */}
+        {tab==="home"&&<div className="sec">
+          {inCD&&<div style={{background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.18)",borderRadius:14,padding:"13px 16px",marginBottom:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div><div style={{fontWeight:700,fontSize:13,color:C.gold,marginBottom:3}}>⏳ Cooldown</div><div style={{fontSize:11,color:C.muted}}>Watch 1 ad to skip</div></div>
+            <div style={{textAlign:"right"}}><div style={{fontFamily:"'DM Mono',monospace",fontSize:19,fontWeight:700,color:C.gold,animation:"tick 1s infinite"}}>{fmtT(cdLeft)}</div><Btn label="Skip →" onClick={()=>setShowSkip(true)} variant="brand" style={{marginTop:6,padding:"7px 14px",fontSize:12,borderRadius:9}}/></div>
+          </div>}
+          {isSunday&&<div style={{background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.18)",borderRadius:13,padding:"12px 15px",marginBottom:13}}>
+            <div style={{fontWeight:700,fontSize:13,color:C.gold}}>☀️ Sunday Special — Extra bonus on every ad!</div>
+          </div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:16}}>
+            {[{l:L("watchAd"),s:"Earn pts + spins",i:"📺",col:C.brand,fn:handleWatch},
+              {l:"Spin Wheel",s:`${freeLeft>0?freeLeft+" free":"Spin ready"}`,i:"🎰",col:C.gold,fn:()=>setTab("earn")},
+              {l:L("tasks"),s:"Social tasks",i:"✅",col:C.green,fn:()=>setTab("tasks")},
+              {l:L("mining"),s:`${fmtT(mLeft)} left`,i:"⛏️",col:C.cyan,fn:()=>setTab("calendar")},
+            ].map((q,i)=>(
+              <div key={i} onClick={q.fn} className="rip" style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px 14px",cursor:"pointer",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",bottom:0,left:0,right:0,height:3,background:`linear-gradient(90deg,${q.col},transparent)`,opacity:.6}}/>
+                <div style={{fontSize:26,marginBottom:9}}>{q.i}</div>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>{q.l}</div>
+                <div style={{fontSize:11,color:C.muted}}>{q.s}</div>
+              </div>
+            ))}
+          </div>
+          <SH title="My Activity" right={<span style={{fontSize:11,color:C.muted}}>Last 20</span>}/>
+          {txns.slice(0,8).map(tx=>(
+            <div key={tx.id} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:13,padding:"12px 15px",marginBottom:7,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:11}}>
+                <div style={{width:36,height:36,borderRadius:11,background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15}}>
+                  {tx.desc.includes("Spin")?"🎰":tx.desc.includes("Mining")?"⛏️":tx.desc.includes("Ref")?"🤝":tx.desc.includes("Joined")?"📲":"◈"}
+                </div>
+                <div><div style={{fontSize:13,fontWeight:500}}>{tx.desc}</div><div style={{fontSize:10,color:C.muted,marginTop:1}}>{tx.time}</div></div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                {tx.pts>0&&<div style={{fontFamily:"'DM Mono',monospace",fontWeight:600,fontSize:11,color:C.brandLt}}>+{tx.pts} pts</div>}
+                {tx.usd>0&&<div style={{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:13,color:C.green}}>{balHide?"$••":"+$"+(tx.usd>=1?tx.usd.toFixed(2):tx.usd.toFixed(3))}</div>}
+              </div>
+            </div>
+          ))}
+        </div>}
+
+        {/* EARN */}
+        {tab==="earn"&&<div className="sec">
+          <div style={{background:"rgba(139,92,246,.07)",border:`1px solid ${C.border2}`,borderRadius:15,padding:"15px 17px",marginBottom:13}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>🎯 How Spins Work</div>
+            {[{i:"1️⃣",t:"Spin → Watch 1 Ad → Spin (5 times)"},
+              {i:"🎯",t:"First 5 spins earn Points (100–500)"},
+              {i:"💵",t:"After 5 spins → 3 FREE spins ($1–$3 each)"},
+              {i:isSunday?"☀️":"🔄",t:isSunday?"Sunday: 5 ads → 5 Free Spins ($1–$3)":"Cycle resets after 3 free spins"},
+            ].map((r,i)=><div key={i} style={{display:"flex",gap:9,alignItems:"flex-start",marginBottom:7}}><span style={{fontSize:16,flexShrink:0}}>{r.i}</span><span style={{fontSize:12,color:C.muted,lineHeight:1.5}}>{r.t}</span></div>)}
+          </div>
+
+          <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:15,padding:"15px 17px",marginBottom:13}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:11}}>
+              <div><div style={{fontWeight:700,fontSize:14,marginBottom:3}}>{L("watchAd")}</div><div style={{fontSize:11,color:C.muted}}>{adsLeft} slots left{isSunday?" · ☀️ Sunday bonus!":""}</div></div>
+              <div style={{background:adsLeft>5?"rgba(16,185,129,.1)":adsLeft>0?"rgba(245,158,11,.1)":"rgba(239,68,68,.1)",border:`1px solid ${adsLeft>5?"rgba(16,185,129,.22)":adsLeft>0?"rgba(245,158,11,.22)":"rgba(239,68,68,.22)"}`,borderRadius:10,padding:"8px 13px",textAlign:"center"}}>
+                <div style={{fontSize:24,fontWeight:900,fontFamily:"'DM Mono',monospace",color:adsLeft>5?C.green:adsLeft>0?C.gold:C.red}}>{adsLeft}</div>
+                <div style={{fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:.08}}>left</div>
+              </div>
+            </div>
+            <div className="ptr"><div className="ptrf" style={{width:`${(adsToday/adsLimit)*100}%`,background:`linear-gradient(90deg,${C.brand},${C.cyan})`}}/></div>
+          </div>
+
+          {inCD
+            ?<div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:15,padding:"20px",marginBottom:13,textAlign:"center"}}>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:38,fontWeight:900,color:C.gold,animation:"tick 1s infinite",lineHeight:1,marginBottom:8}}>{fmtT(cdLeft)}</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Watch 1 ad to skip</div>
+              <Btn label="📺 Watch Ad to Skip" onClick={()=>setShowSkip(true)} full variant="brand" style={{padding:13}}/>
+            </div>
+            :<Btn label={adsLeft>0?`▶ ${L("watchAd")}`:`✅ ${L("watchAd")}`} onClick={()=>openAd(false)} full disabled={adsLeft<=0} style={{marginBottom:13,padding:15,fontSize:14}}/>}
+
+          <DivLine/>
+          <SH title={curPhase==="free"?"💵 Free Dollar Wheel":curPhase==="sunday"?"☀️ Sunday Wheel":"🎰 Points Wheel"} right={curPhase!=="points"?<Pill label="$1–$3" col={C.green}/>:undefined}/>
+
+          <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:18,padding:"22px 16px",textAlign:"center"}}>
+            <div style={{position:"relative",display:"inline-block",marginBottom:16}}>
+              <SpinWheel angle={spinAngle} spinning={spinning} phase={curPhase}/>
+              {(freeLeft>0||sunSpins>0)&&<div className="pill-badge">{freeLeft>0?freeLeft:sunSpins}</div>}
+            </div>
+
+            <div style={{display:"flex",gap:6,justifyContent:"center",marginBottom:14,flexWrap:"wrap"}}>
+              <Pill label={`${spinInRound}/5 Points`} col={curPhase==="points"?C.brand:C.muted}/>
+              <Pill label={`${freeLeft} Free $ Spins`} col={freeLeft>0?C.green:C.muted}/>
+            </div>
+
+            {lastWin&&!spinning&&<div style={{background:lastWin.t==="usd"?"rgba(16,185,129,.1)":"rgba(139,92,246,.1)",border:`1px solid ${lastWin.t==="usd"?"rgba(16,185,129,.2)":"rgba(139,92,246,.2)"}`,borderRadius:11,padding:"9px",marginBottom:13,fontFamily:"'DM Mono',monospace",fontSize:17,fontWeight:800,color:lastWin.t==="usd"?C.green:C.brandLt}}>
+              {lastWin.t==="usd"?`Last Win: $${lastWin.v} 💵`:`Last Win: ${lastWin.v} pts 🎯`}
+            </div>}
+
+            {canSpin
+              ?<Btn label={spinning?L("spinning"):curPhase==="free"?`🎰 Free Spin ($1–$3) · ${freeLeft} left`:curPhase==="sunday"?`☀️ Sunday Spin ($1–$3) · ${sunSpins} left`:`🎯 Spin for Points · ${spinInRound+1}/5`}
+                onClick={doSpin} disabled={spinning} full variant={curPhase==="free"||curPhase==="sunday"?"gold":"brand"} style={{padding:14,fontSize:14}}/>
+              :<div>
+                <div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.2)",borderRadius:11,padding:"11px",marginBottom:11,fontSize:13,color:C.gold,fontWeight:600}}>👆 Watch 1 ad above to unlock next spin</div>
+                <Btn label="📺 Watch Ad → Unlock Spin" onClick={()=>openAd(false)} full variant="ghost" style={{padding:12}}/>
+              </div>}
+          </div>
+        </div>}
+
+        {/* TASKS */}
+        {tab==="tasks"&&<div className="sec">
+          <div style={{background:"rgba(139,92,246,.06)",border:`1px solid ${C.border2}`,borderRadius:13,padding:"12px 15px",marginBottom:15}}>
+            <div style={{fontWeight:700,fontSize:13,color:C.brandLt,marginBottom:3}}>📋 Social Media Tasks</div>
+            <div style={{fontSize:11,color:C.muted,lineHeight:1.6}}>Complete tasks, paste link, earn rewards. Rotates every 10 days.</div>
+          </div>
+          {CURRENT_TASKS.map(t=>{
+            const done=doneTasks.includes(t.id),open=expTask===t.id,col=PL[t.platform]||C.brand;
+            return(<div key={t.id} style={{background:C.s2,border:`1px solid ${done?"rgba(16,185,129,.22)":open?C.border2:C.border}`,borderRadius:16,marginBottom:9,overflow:"hidden",opacity:done?.65:1}}>
+              <div className="rip" onClick={()=>!done&&setET(open?null:t.id)} style={{padding:"14px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",gap:11,alignItems:"center"}}>
+                  <div style={{width:42,height:42,borderRadius:12,flexShrink:0,background:`${col}14`,border:`1.5px solid ${col}28`,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>{LOGOS[t.platform]||"📱"}</div>
+                  <div><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}><span style={{fontWeight:700,fontSize:13}}>{t.platform}</span><span style={{background:`${col}18`,color:col,borderRadius:6,padding:"1px 7px",fontSize:10,fontWeight:700}}>{t.type}</span></div><div style={{fontSize:12,color:C.muted}}>{t.action}</div></div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                  {done?<Pill label="✓ Done" col={C.green}/>:<><div style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:C.brandLt}}>+{t.pts}</div><div style={{fontSize:10,color:C.muted}}>pts</div></>}
+                </div>
+              </div>
+              {open&&!done&&<div style={{padding:"0 16px 16px",animation:"up .2s ease"}}>
+                <div style={{background:"rgba(139,92,246,.06)",borderRadius:10,padding:"9px 12px",marginBottom:10,fontSize:12,color:C.muted,lineHeight:1.65}}>💡 Complete the task then paste the URL below</div>
+                <input className="inp-base" value={taskL[t.id]||""} onChange={e=>setTL(p=>({...p,[t.id]:e.target.value}))} placeholder="https://..." style={{marginBottom:9}}/>
+                <div style={{display:"flex",gap:7}}><Btn label="Cancel" onClick={()=>setET(null)} variant="ghost" style={{flex:1,padding:"9px 12px",fontSize:12}}/><Btn label={`✓ Claim +${t.pts} pts`} onClick={()=>{const lnk=(taskL[t.id]||"").trim();if(!lnk.startsWith("http")){toast$("Paste valid URL","err");return;}setDT(p=>[...p,t.id]);addR(t.pts,+(t.pts*USD_PER_POINT).toFixed(3),`${t.platform}: ${t.action}`);toast$(`+${t.pts} pts ✅`);setET(null);}} variant="green" style={{flex:2,padding:"9px 12px",fontSize:12}}/></div>
+              </div>}
+            </div>);
+          })}
+          <DivLine/>
+          <SH title="Join & Earn" right={<span style={{fontSize:11,color:C.muted}}>One-time</span>}/>
+          {SOCIAL_JOINS.map(sj=>{
+            const done=doneSoc.includes(sj.id),open=expSoc===sj.id,col=PL[sj.platform]||C.brand;
+            return(<div key={sj.id} style={{background:C.s2,border:`1px solid ${done?"rgba(16,185,129,.22)":open?C.border2:C.border}`,borderRadius:16,marginBottom:9,overflow:"hidden",opacity:done?.65:1}}>
+              <div className="rip" onClick={()=>!done&&setES(open?null:sj.id)} style={{padding:"13px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",gap:11,alignItems:"center"}}>
+                  <div style={{width:40,height:40,borderRadius:11,flexShrink:0,background:`${col}14`,border:`1.5px solid ${col}28`,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>{LOGOS[sj.platform]||"📱"}</div>
+                  <div><div style={{fontWeight:700,fontSize:13,marginBottom:1}}>{sj.platform}</div><div style={{fontSize:11,color:C.muted}}>Join & verify</div></div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                  {done?<Pill label="✓ Joined" col={C.green}/>:<><div style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:C.brandLt}}>+{sj.pts}</div><div style={{fontSize:10,color:C.muted}}>pts</div></>}
+                </div>
+              </div>
+              {open&&!done&&<div style={{padding:"0 16px 16px",animation:"up .2s ease"}}>
+                <input className="inp-base" value={socialL[sj.id]||""} onChange={e=>setSoL(p=>({...p,[sj.id]:e.target.value}))} placeholder="Paste link or username…" style={{marginBottom:9}}/>
+                <div style={{display:"flex",gap:7}}><Btn label="Cancel" onClick={()=>setES(null)} variant="ghost" style={{flex:1,padding:"9px 12px",fontSize:12}}/><Btn label={`✓ Claim +${sj.pts} pts`} onClick={()=>{if(!(socialL[sj.id]||"").trim()){toast$("Paste link","err");return;}setDS(p=>[...p,sj.id]);addR(sj.pts,+(sj.pts*USD_PER_POINT).toFixed(3),`Joined: ${sj.platform}`);toast$(`+${sj.pts} pts ✅`);setES(null);}} variant="green" style={{flex:2,padding:"9px 12px",fontSize:12}}/></div>
+              </div>}
+            </div>);
+          })}
+        </div>}
+
+        {/* LEADERS */}
+        {tab==="board"&&<div className="sec">
+          <div style={{background:`linear-gradient(145deg,rgba(245,158,11,.08),rgba(245,158,11,.03))`,border:"1px solid rgba(245,158,11,.18)",borderRadius:16,padding:"18px",marginBottom:15,textAlign:"center"}}>
+            <div style={{fontSize:36,marginBottom:7}}>🏆</div>
+            <div style={{fontWeight:800,fontSize:17,marginBottom:3}}>Points Leaderboard</div>
+            <div style={{fontSize:11,color:C.muted}}>Ranked by total points · USD always private</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1.2fr 1fr",gap:8,marginBottom:18}}>
+            {[FAKE_LEADERS[1],FAKE_LEADERS[0],FAKE_LEADERS[2]].map((u,i)=>{
+              const rank=i===1?1:i===0?2:3,col=rank===1?C.gold:rank===2?"#94a3b8":"#cd7f32";
+              return(<div key={u.name} style={{background:rank===1?"rgba(245,158,11,.08)":C.s2,border:`1px solid ${rank===1?"rgba(245,158,11,.2)":C.border}`,borderRadius:14,padding:"13px 8px",textAlign:"center"}}>
+                <div style={{fontSize:14,marginBottom:4}}>{"🥇🥈🥉"[rank-1]}</div>
+                <Avatar name={u.name} size={rank===1?50:42}/>
+                <div style={{fontSize:11,fontWeight:700,marginTop:7,marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:800,color:col}}>{u.pts.toLocaleString()}</div>
+                <div style={{fontSize:12,marginTop:3}}>{u.country}</div>
+              </div>);
+            })}
+          </div>
+          {FAKE_LEADERS.map((u,i)=>(
+            <div key={u.name} style={{display:"flex",alignItems:"center",gap:11,padding:"11px 14px",borderRadius:13,marginBottom:7,background:u.isMe?"rgba(139,92,246,.1)":i<3?"rgba(245,158,11,.05)":C.s2,border:`1px solid ${u.isMe?C.border2:i<3?"rgba(245,158,11,.1)":C.border}`}}>
+              <div style={{width:30,textAlign:"center",fontWeight:800,fontSize:12,color:i===0?C.gold:i===1?"#94a3b8":i===2?"#cd7f32":C.muted,fontFamily:"'DM Mono',monospace",flexShrink:0}}>
+                {i<3?["🥇","🥈","🥉"][i]:i+1}
+              </div>
+              <Avatar name={u.name} size={36}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,fontWeight:u.isMe?700:500,color:u.isMe?C.brandLt:C.white}}>{u.name}{u.isMe&&<span style={{fontSize:10,color:C.brand}}> (You)</span>}</div>
+                <div style={{fontSize:10,color:C.muted,marginTop:1}}>{u.country}</div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:i<3?C.gold:u.isMe?C.brandLt:C.muted}}>{u.pts.toLocaleString()}</div>
+                <div style={{fontSize:9,color:C.muted,textTransform:"uppercase",letterSpacing:.07}}>pts</div>
+              </div>
+            </div>
+          ))}
+        </div>}
+
+        {/* CALENDAR / MINING */}
+        {tab==="calendar"&&<div className="sec">
+          <div style={{background:"linear-gradient(145deg,rgba(139,92,246,.08),rgba(6,182,212,.04))",border:`1px solid ${C.border2}`,borderRadius:17,padding:"18px",marginBottom:15}}>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:12}}>⛏️ Continuous Mining</div>
+            <div style={{textAlign:"center",background:"rgba(0,0,0,.2)",borderRadius:12,padding:"15px",marginBottom:13}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:7}}>Next Season In</div>
+              <div style={{fontFamily:"'DM Mono',monospace",fontSize:38,fontWeight:900,color:C.green,letterSpacing:2,animation:"tick 1s infinite",lineHeight:1}}>{fmtT(mLeft)}</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+              {[{l:"Today's Reward",v:`+${dailyPts} pts`,col:C.gold},{l:"Seasons Done",v:mEpoch,col:C.green}].map((s,i)=>(
+                <div key={i} style={{background:"rgba(255,255,255,.04)",borderRadius:11,padding:"11px",textAlign:"center"}}>
+                  <div style={{fontSize:10,color:C.muted,marginBottom:4,textTransform:"uppercase",letterSpacing:.07}}>{s.l}</div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:15,fontWeight:800,color:s.col}}>{s.v}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {isSunday&&<div style={{background:"rgba(245,158,11,.07)",border:"1px solid rgba(245,158,11,.2)",borderRadius:13,padding:"12px 15px",marginBottom:15}}>
+            <div style={{fontWeight:700,fontSize:13,color:C.gold}}>☀️ Sunday: 4-hour cycles + ad spin bonuses!</div>
+          </div>}
+
+          {/* Calendar */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:11}}>
+            <Btn label="‹" onClick={()=>{if(calM===0){setCalM(11);setCalY(y=>y-1);}else setCalM(m=>m-1);}} variant="ghost" style={{padding:"7px 14px",fontSize:16,borderRadius:10}}/>
+            <span style={{fontWeight:700,fontSize:14}}>{MN[calM]} {calY}</span>
+            <Btn label="›" onClick={()=>{if(calM===11){setCalM(0);setCalY(y=>y+1);}else setCalM(m=>m+1);}} variant="ghost" style={{padding:"7px 14px",fontSize:16,borderRadius:10}}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5,marginBottom:6}}>
+            {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=><div key={d} style={{textAlign:"center",fontSize:10,fontWeight:700,color:d==="Su"?C.gold:C.muted,padding:"3px 0"}}>{d}</div>)}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:5,marginBottom:14}}>
+            {Array.from({length:cFirst}).map((_,i)=>{const d=pDays-cFirst+i+1;return(<div key={"p"+i} style={{aspectRatio:"1",borderRadius:8,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:"rgba(139,92,246,.03)",border:`1px solid ${C.border}`,opacity:.25}}><span style={{fontSize:11,color:C.muted}}>{d}</span></div>);})}
+            {Array.from({length:cDays}).map((_,i)=>{
+              const d=i+1,dt=new Date(calY,calM,d);
+              const isToday=d===todayDate&&calM===now.getMonth()&&calY===now.getFullYear();
+              const isSun=dt.getDay()===0,hasMine=mDays.includes(d)&&calM===now.getMonth();
+              return(<div key={d} style={{aspectRatio:"1",borderRadius:8,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,background:isToday?`linear-gradient(135deg,${C.brand},${C.brandDk})`:hasMine?"rgba(16,185,129,.1)":isSun?"rgba(245,158,11,.07)":"rgba(139,92,246,.04)",border:`1px solid ${isToday?"transparent":hasMine?"rgba(16,185,129,.2)":isSun?"rgba(245,158,11,.15)":C.border}`,boxShadow:isToday?`0 4px 12px rgba(139,92,246,.35)`:"none"}}>
+                <span style={{fontSize:11,fontWeight:isToday?900:500,color:isToday?"#fff":isSun?C.gold:C.white}}>{d}</span>
+                {hasMine&&<span style={{fontSize:8,color:C.green}}>✓</span>}
+                {!hasMine&&<span style={{fontSize:7,color:C.muted,fontFamily:"'DM Mono',monospace"}}>{isSun?"2×":"+"+( DAILY_PTS_MAP[d]||60)}</span>}
+              </div>);
+            })}
+          </div>
+          <div style={{display:"flex",gap:13,flexWrap:"wrap",marginBottom:14}}>
+            {[{col:C.brand,l:"Today"},{col:C.green,l:"Mining ✓"},{col:C.gold,l:"Sunday 2×"}].map((x,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:9,height:9,borderRadius:3,background:x.col}}/><span style={{fontSize:10,color:C.muted}}>{x.l}</span></div>
+            ))}
+          </div>
+          <DivLine/>
+          <SH title="Activity Bonuses"/>
+          {[{id:1,t:"Complete profile",pts:200,e:"👤"},{id:2,t:"Daily check-in",pts:50,e:"📅"},{id:3,t:"Rate the app",pts:150,e:"⭐"},{id:4,t:"Invite friend",pts:100,e:"📲"}].map(b=>{
+            const done=doneBonus.includes(b.id),sm=isSunday?2:1;
+            return(<div key={b.id} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:14,padding:"13px 15px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center",opacity:done?.55:1}}>
+              <div style={{display:"flex",gap:11,alignItems:"center"}}>
+                <div style={{width:40,height:40,borderRadius:11,background:"rgba(139,92,246,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>{b.e}</div>
+                <div><div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{b.t}</div><div style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:C.green}}>+{b.pts*sm} pts</div></div>
+              </div>
+              <Btn label={done?"Done":"Claim"} onClick={()=>{if(!done){setDB(p=>[...p,b.id]);addR(b.pts*sm,+(b.pts*sm*USD_PER_POINT).toFixed(3),b.t);toast$(`+${b.pts*sm} pts!`);}}} disabled={done} variant={done?"ghost":"brand"} style={{padding:"8px 14px",fontSize:12,borderRadius:10}}/>
+            </div>);
+          })}
+          <DivLine/>
+          <SH title="Refer & Earn" right={<span style={{fontSize:11,color:C.muted}}>+300 pts each</span>}/>
+          <div style={{background:C.s2,border:`1px solid ${C.border2}`,borderRadius:16,padding:"16px",marginBottom:13}}>
+            <div style={{display:"flex",gap:8,marginBottom:11}}>
+              <input className="inp-base" value={refInput} onChange={e=>setRI(e.target.value)} placeholder="Friend's referral code"/>
+              <Btn label="Add" onClick={()=>{if(!refInput.trim())return;setRefs(r=>[...r,refInput.trim()]);addR(REFERRAL_BONUS,+(REFERRAL_BONUS*USD_PER_POINT).toFixed(2),`Referral: ${refInput}`);setRI("");toast$(`+${REFERRAL_BONUS} pts!`);}} variant="brand" style={{padding:"11px 16px",fontSize:13,borderRadius:11,flexShrink:0}}/>
+            </div>
+            {refs.map((r,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderTop:`1px solid ${C.border}`}}>
+                <div style={{display:"flex",gap:9,alignItems:"center"}}><Avatar name={r} size={28}/><span style={{fontSize:13,fontWeight:500}}>{r}</span></div>
+                <span style={{fontFamily:"'DM Mono',monospace",color:C.green,fontWeight:700,fontSize:12}}>+{REFERRAL_BONUS} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>}
+
+        {/* WALLET */}
+        {tab==="wallet"&&<div className="sec">
+          <div style={{background:"linear-gradient(145deg,#0f1e15,#0d1a20)",border:"1px solid rgba(16,185,129,.2)",borderRadius:19,padding:"20px",marginBottom:13}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div>
+                <div style={{fontSize:10,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:6}}>{L("usdBal")}</div>
+                <div style={{fontSize:42,fontWeight:900,color:C.green,fontFamily:"'DM Mono',monospace",letterSpacing:-1.5,lineHeight:1}}>{balHide?"$••••":"$"+usdBal.toFixed(2)}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:7}}>{points.toLocaleString()} pts earned</div>
+              </div>
+              <button onClick={()=>setBalHide(h=>!h)} style={{background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:22,padding:4}}>{balHide?"🙈":"👁"}</button>
+            </div>
+          </div>
+
+          {/* KYC */}
+          <div style={{background:"linear-gradient(145deg,rgba(139,92,246,.08),rgba(236,72,153,.04))",border:`1px solid ${C.border2}`,borderRadius:19,padding:"20px",marginBottom:13}}>
+            <div style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:16}}>
+              <div style={{width:48,height:48,borderRadius:13,background:"rgba(139,92,246,.12)",border:`1px solid ${C.border2}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0}}>🔐</div>
+              <div><div style={{fontWeight:700,fontSize:15,marginBottom:4}}>KYC Verification</div><div style={{fontSize:12,color:C.muted,lineHeight:1.65}}>Verify identity to unlock withdrawals.</div></div>
+            </div>
+            {[{n:1,l:"Account Created",done:true,soon:false},{n:2,l:"Phone Verified",done:true,soon:false},{n:3,l:"Submit ID / CNIC",done:false,soon:true},{n:4,l:"Selfie Verification",done:false,soon:true},{n:5,l:"KYC Approved",done:false,soon:true},{n:6,l:"Withdrawals Unlocked",done:false,soon:false}].map(s=>(
+              <div key={s.n} style={{display:"flex",alignItems:"center",gap:11,marginBottom:10}}>
+                <div style={{width:28,height:28,borderRadius:"50%",flexShrink:0,background:s.done?"rgba(16,185,129,.15)":s.soon?"rgba(245,158,11,.08)":"rgba(255,255,255,.05)",border:`1.5px solid ${s.done?"rgba(16,185,129,.4)":s.soon?"rgba(245,158,11,.25)":"rgba(255,255,255,.1)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:s.done?C.green:s.soon?C.gold:C.muted}}>
+                  {s.done?"✓":s.n}
+                </div>
+                <div style={{fontSize:13,fontWeight:s.done?600:400,color:s.done?C.white:C.muted,flex:1}}>{s.l}</div>
+                {s.done&&<span style={{fontSize:10,color:C.green,fontWeight:600}}>✓</span>}
+                {s.soon&&<Pill label="SOON" col={C.gold} anim/>}
+              </div>
+            ))}
+            <Btn label="🔐 KYC — Coming Soon" onClick={()=>{}} disabled full variant="brand" style={{marginTop:11,padding:13,fontSize:13}}/>
+          </div>
+
+          {/* withdrawal */}
+          <div style={{background:"rgba(139,92,246,.05)",border:`1px solid ${C.border}`,borderRadius:16,padding:"26px 20px",marginBottom:13,textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:13}}>💳</div>
+            <Pill label="🚀 Withdrawal — Coming Soon" col={C.gold} anim/>
+          </div>
+
+          <SH title="Transaction History"/>
+          {txns.map(tx=>(
+            <div key={tx.id} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:13,padding:"12px 15px",marginBottom:7,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div><div style={{fontSize:13,fontWeight:500}}>{tx.desc}</div><div style={{fontSize:10,color:C.muted,marginTop:1}}>{tx.time}</div></div>
+              <div style={{textAlign:"right"}}>
+                {tx.pts>0&&<div style={{fontFamily:"'DM Mono',monospace",fontWeight:600,fontSize:11,color:C.brandLt}}>+{tx.pts} pts</div>}
+                {tx.usd>0&&<div style={{fontFamily:"'DM Mono',monospace",fontWeight:700,fontSize:13,color:C.green}}>{balHide?"$••":"+$"+(tx.usd>=1?tx.usd.toFixed(2):tx.usd.toFixed(3))}</div>}
+              </div>
+            </div>
+          ))}
+        </div>}
+
+      </div>
+
+      {/* BOTTOM NAV */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,zIndex:100,background:"rgba(13,11,30,.97)",backdropFilter:"blur(28px)",borderTop:"1px solid rgba(139,92,246,.12)"}}>
+        <div style={{display:"flex"}}>
+          {tabs.map(t=>(
+            <div key={t.id} className="tab-btn" onClick={()=>setTab(t.id)} style={{color:tab===t.id?C.white:C.muted}}>
+              <div style={{width:38,height:38,borderRadius:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,background:tab===t.id?`linear-gradient(135deg,${C.brand},${C.brandDk})`:"transparent",boxShadow:tab===t.id?`0 4px 14px rgba(139,92,246,.35)`:"none",transition:"all .2s"}}>{t.icon}</div>
+              <div style={{fontSize:9,fontWeight:tab===t.id?700:400,letterSpacing:.03}}>{t.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MODALS */}
+      {/* Language Picker */}
+      {showLP&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center",backdropFilter:"blur(10px)"}} onClick={()=>setShowLP(false)}>
+        <div style={{width:"100%",maxWidth:430,background:C.s1,borderRadius:"22px 22px 0 0",padding:"22px 20px 40px",animation:"up .25s ease"}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div style={{fontWeight:700,fontSize:16}}>🌐 Language</div>
+            <Btn label="✕" onClick={()=>setShowLP(false)} variant="ghost" style={{padding:"6px 12px",fontSize:13,borderRadius:9}}/>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+            {Object.entries(LANGS).map(([code,info])=>(
+              <div key={code} onClick={()=>{setLang(code);setShowLP(false);}} style={{padding:"12px 14px",borderRadius:13,cursor:"pointer",background:lang===code?"rgba(139,92,246,.15)":C.s2,border:`1.5px solid ${lang===code?C.brand:C.border}`,display:"flex",gap:10,alignItems:"center",transition:"all .15s"}}>
+                <span style={{fontSize:22}}>{info.flag}</span>
+                <div><div style={{fontSize:12,fontWeight:700,color:lang===code?C.brandLt:C.white}}>{info.name}</div></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>}
+
+      {/* Exchange modal */}
+      {showExch&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:22,backdropFilter:"blur(12px)"}}>
+        <div style={{width:"100%",maxWidth:340,background:C.s1,border:`1px solid ${C.border2}`,borderRadius:22,padding:"28px 24px",textAlign:"center",animation:"popIn .25s ease"}}>
+          <div style={{fontSize:40,marginBottom:14}}>💱</div>
+          <div style={{fontWeight:800,fontSize:18,marginBottom:6}}>Exchange</div>
+          <Pill label="Coming Soon" col={C.gold} anim/>
+          <div style={{fontSize:12,color:C.muted,marginTop:14,marginBottom:22,lineHeight:1.7}}>Convert your points to crypto or other currencies. Launching soon!</div>
+          <Btn label="Close" onClick={()=>setSE(false)} full variant="ghost" style={{padding:13}}/>
+        </div>
+      </div>}
+
+      {/* Logout modal */}
+      {showLogout&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:22,backdropFilter:"blur(12px)"}}>
+        <div style={{width:"100%",maxWidth:320,background:C.s1,border:`1px solid ${C.border}`,borderRadius:22,padding:"28px 24px",textAlign:"center",animation:"popIn .25s ease"}}>
+          <div style={{fontSize:40,marginBottom:14}}>🚪</div>
+          <div style={{fontWeight:800,fontSize:17,marginBottom:8}}>{L("logout")}?</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:22}}>{L("logoutQ")}</div>
+          <div style={{display:"flex",gap:9}}>
+            <Btn label={L("cancel")} onClick={()=>setSL(false)} variant="ghost" style={{flex:1,padding:13}}/>
+            <Btn label={L("yes")} onClick={onLogout} variant="red" style={{flex:1,padding:13}}/>
+          </div>
+        </div>
+      </div>}
+
+      {/* Skip cooldown modal */}
+      {showSkip&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:22,backdropFilter:"blur(12px)"}}>
+        <div style={{width:"100%",maxWidth:330,background:C.s1,border:"1px solid rgba(245,158,11,.22)",borderRadius:22,padding:"28px 24px",textAlign:"center",animation:"popIn .25s ease"}}>
+          <div style={{fontSize:40,marginBottom:12}}>⏳</div>
+          <div style={{fontWeight:800,fontSize:17,marginBottom:6}}>Cooldown Active</div>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:36,fontWeight:900,color:C.gold,animation:"tick 1s infinite",lineHeight:1,marginBottom:8}}>{fmtT(cdLeft)}</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:20,lineHeight:1.7}}>Watch one ad to instantly clear the cooldown.</div>
+          <Btn label="📺 Watch Ad to Skip" onClick={()=>openAd(true)} full style={{marginBottom:9,padding:14}}/>
+          <Btn label="Wait Instead" onClick={()=>setShowSkip(false)} full variant="ghost" style={{padding:13}}/>
+        </div>
+      </div>}
+
+      {/* Ad modal */}
+      {showAd&&curAd&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:22,backdropFilter:"blur(12px)"}}>
+        <div style={{width:"100%",maxWidth:350,background:C.s1,border:`1px solid ${C.border}`,borderRadius:22,padding:"28px 24px",textAlign:"center",animation:"popIn .25s ease"}}>
+          <div style={{fontSize:10,fontWeight:700,color:C.muted,letterSpacing:.1,textTransform:"uppercase",marginBottom:14}}>{isSkip?"Skip Cooldown":"Advertisement"}</div>
+          <div style={{width:80,height:80,borderRadius:22,margin:"0 auto 14px",background:"rgba(139,92,246,.1)",border:`1px solid ${C.border2}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:42}}>{curAd.emoji}</div>
+          <div style={{fontWeight:800,fontSize:16,marginBottom:3}}>{curAd.cat} Ad</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:18}}>Special offer for you!</div>
+          {!adReady
+            ?<div style={{marginBottom:18}}><Ring val={adTimer} max={5}/><div style={{fontSize:12,color:C.muted,marginTop:11}}>{isSkip?"Clearing cooldown…":<>Earning <span style={{color:C.green,fontWeight:700}}>+{curAd.pts} pts</span>{needAd&&<span style={{color:C.brandLt}}> · spin unlocks after</span>}</>}</div>
+              {isSunday&&sunAds%5===4&&<div style={{fontSize:11,color:C.gold,marginTop:4,fontWeight:600}}>Next ad = 5 Sunday Spins! 🎰</div>}</div>
+            :<Btn label={isSkip?"⚡ Clear Cooldown":`🎉 Claim +${curAd.pts} pts${isSunday&&(sunAds+1)%5===0?" + 5 Spins 🎰":""}`} onClick={claimAd} full style={{marginBottom:9,padding:15,fontSize:14}}/>}
+          {!adReady&&<Btn label="Close" onClick={()=>setShowAd(false)} full variant="ghost" style={{padding:11,fontSize:12}}/>}
+        </div>
+      </div>}
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════
    ██   ROOT
