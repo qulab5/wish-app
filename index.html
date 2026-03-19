@@ -1017,14 +1017,252 @@ function AdminPanel({user,onExit,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   MAIN APP (simplified - replace with your full version)
+   MAIN APP
 ═══════════════════════════════════════════════ */
 function MainApp({user,onLogout,lang,setLang}){
-  return <div style={{padding:20,color:"white"}}>
-    <h1>Welcome, {user.name}!</h1>
-    <p>Points: {user.pts}</p>
-    <button onClick={onLogout}>Logout</button>
-  </div>;
+  const [tab,setTab]       = useState("home");
+  const [u,setU]           = useState({...user});
+  const [logoutDlg,setLD]  = useState(false);
+  const [tasksDone,setTD]  = useState({});
+  const [joinsDone,setJD]  = useState({});
+  const [adLeft,setAL]     = useState(5);
+  const [adShowing,setAS]  = useState(false);
+  const [adData,setAD]     = useState(null);
+  const [spinning,setSpin] = useState(false);
+  const [spinResult,setSR] = useState(null);
+  const [mineT,setMineT]   = useState(MINING_CYCLE);
+  const [mineReady,setMR]  = useState(false);
+  const [langMenu,setLM]   = useState(false);
+  const L = k => t$(lang,k);
+  const dir = (LANGS[lang]||LANGS.en).dir;
+
+  useEffect(()=>{
+    const iv=setInterval(()=>setMineT(t=>{if(t<=1){setMR(true);return 0;}return t-1;}),1000);
+    return()=>clearInterval(iv);
+  },[]);
+
+  const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
+  const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
+  const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
+  const claimAd=()=>{addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);};
+  const doSpin=()=>{if(spinning)return;setSpin(true);setSR(null);setTimeout(()=>{const i=Math.floor(Math.random()*SPIN_PTS.length);addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});setSpin(false);},1500);};
+  const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
+  const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
+  const claimMining=()=>{if(!mineReady)return;addPts(500);setMineT(MINING_CYCLE);setMR(false);};
+  const PE={YouTube:"▶️",Facebook:"📘",Twitter:"🐦",Instagram:"📸",TikTok:"🎵",LinkedIn:"💼",Telegram:"✈️",WhatsApp:"💬"};
+
+  const TAB={
+    home:(
+      <div style={{padding:"0 16px 16px"}}>
+        <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:"20px",marginBottom:16,position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",top:-20,right:-20,fontSize:80,opacity:.1}}>⭐</div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:52,height:52,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:800,border:"2px solid rgba(255,255,255,.4)"}}>{u.name[0].toUpperCase()}</div>
+            <div>
+              <div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{u.name}</div>
+              <div style={{fontSize:13,color:"rgba(255,255,255,.7)"}}>{u.country} · {u.joined}</div>
+            </div>
+            <div style={{marginLeft:"auto",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"4px 10px",fontSize:12,color:"#fff"}}>✓ {L("verified")}</div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:`$${u.usd.toFixed(2)}`,icon:"💵"},{label:L("adsLeft"),val:adLeft,icon:"📺"}].map(s=>(
+            <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:22}}>{s.icon}</div>
+              <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:1}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+          <button onClick={()=>setTab("earn")} style={{background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>📺 {L("watchAd")}</button>
+          <button onClick={()=>setTab("tasks")} style={{background:`linear-gradient(135deg,${C.cyan},${C.brand})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>✅ {L("tasks")}</button>
+        </div>
+        <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.brandLt,marginBottom:10}}>🏆 {L("leaders")}</div>
+          {FAKE_LEADERS.slice(0,3).map((l,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<2?`1px solid ${C.border}`:"none"}}>
+              <div style={{fontSize:18}}>{"🥇🥈🥉"[i]}</div>
+              <div style={{flex:1,fontSize:14,color:C.white}}>{l.country} {l.name}</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    earn:(
+      <div style={{padding:"0 16px 16px"}}>
+        <div style={{background:C.s2,borderRadius:16,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:4}}>📺 {L("watchAd")}</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:12}}>{adLeft} {L("adsLeft")}</div>
+          <button onClick={watchAd} disabled={adLeft<=0} style={{width:"100%",background:adLeft>0?`linear-gradient(135deg,${C.brand},${C.pink})`:"rgba(255,255,255,.1)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:adLeft>0?"pointer":"not-allowed",opacity:adLeft>0?1:.5}}>
+            {adLeft>0?"Watch Ad (+20–40 pts)":"No Ads Left Today"}
+          </button>
+        </div>
+        <div style={{background:C.s2,borderRadius:16,padding:16,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:4}}>🎡 {L("spinNow")}</div>
+          <div style={{fontSize:13,color:C.muted,marginBottom:12}}>Win up to 500 pts</div>
+          <div style={{textAlign:"center",fontSize:64,marginBottom:12,filter:spinning?"blur(2px)":"none",transition:"filter .3s"}}>🎰</div>
+          {spinResult&&!spinning&&<div style={{textAlign:"center",background:`rgba(139,92,246,.15)`,borderRadius:10,padding:10,marginBottom:10,color:C.brandLt,fontWeight:700}}>🎉 +{spinResult.pts} pts & +${spinResult.usd.toFixed(2)}!</div>}
+          <button onClick={doSpin} disabled={spinning} style={{width:"100%",background:spinning?"rgba(255,255,255,.1)":`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:spinning?"not-allowed":"pointer"}}>
+            {spinning?L("spinning"):L("spinNow")}
+          </button>
+        </div>
+      </div>
+    ),
+    tasks:(
+      <div style={{padding:"0 16px 16px"}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>SOCIAL TASKS</div>
+        {CURRENT_TASKS.map(t=>(
+          <div key={t.id} style={{background:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:10,border:`1px solid ${tasksDone[t.id]?C.green:C.border}`,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,background:(PL[t.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{PE[t.platform]}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:600,color:C.white}}>{t.platform}</div>
+              <div style={{fontSize:12,color:C.muted}}>{t.action}</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{t.pts}</div>
+              <button onClick={()=>doneTask(t.id,t.pts)} disabled={!!tasksDone[t.id]} style={{marginTop:4,background:tasksDone[t.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:tasksDone[t.id]?"default":"pointer"}}>{tasksDone[t.id]?"✓ Done":"Do"}</button>
+            </div>
+          </div>
+        ))}
+        <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,marginTop:6,letterSpacing:1}}>JOIN & EARN</div>
+        {SOCIAL_JOINS.map(j=>(
+          <div key={j.id} style={{background:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:10,border:`1px solid ${joinsDone[j.id]?C.green:C.border}`,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,background:(PL[j.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{PE[j.platform]}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:600,color:C.white}}>{j.platform}</div>
+              <div style={{fontSize:12,color:C.muted}}>Join our channel</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{j.pts}</div>
+              <button onClick={()=>doneJoin(j.id,j.pts)} disabled={!!joinsDone[j.id]} style={{marginTop:4,background:joinsDone[j.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:joinsDone[j.id]?"default":"pointer"}}>{joinsDone[j.id]?"✓ Joined":"Join"}</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
+    leaders:(
+      <div style={{padding:"0 16px 16px"}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>TOP EARNERS</div>
+        {[...FAKE_LEADERS.slice(0,-1),{...FAKE_LEADERS[FAKE_LEADERS.length-1],name:u.name,pts:u.pts,country:u.country,isMe:true}].map((l,i)=>(
+          <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
+            <div style={{fontSize:22}}>{l.country}</div>
+            <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
+            <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+    ),
+    mining:(
+      <div style={{padding:"0 16px 16px"}}>
+        <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16}}>
+          <div style={{fontSize:48,marginBottom:8}}>⛏️</div>
+          <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>{L("miningTitle")}</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:16}}>{L("season")} 1 · 500 pts per cycle</div>
+          {mineReady
+            ?<button onClick={claimMining} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 32px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer"}}>🎁 Claim 500 pts!</button>
+            :<><div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:8}}>{L("miningNext")}</div><div style={{fontSize:36,fontWeight:800,color:C.gold,fontFamily:"monospace"}}>{fmtTime(mineT)}</div></>
+          }
+        </div>
+        <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.brandLt,marginBottom:8}}>How Mining Works</div>
+          <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>Mining rewards you 500 pts every 8 hours. Come back regularly to claim your rewards and grow your balance!</div>
+        </div>
+      </div>
+    ),
+    wallet:(
+      <div style={{padding:"0 16px 16px"}}>
+        <div style={{background:`linear-gradient(135deg,${C.s3},${C.s2})`,borderRadius:20,padding:24,marginBottom:16,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:13,color:C.muted,marginBottom:4}}>Total Balance</div>
+          <div style={{fontSize:36,fontWeight:800,color:C.white}}>${u.usd.toFixed(2)}</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:4}}>{u.pts.toLocaleString()} pts</div>
+        </div>
+        <div style={{background:C.s2,borderRadius:16,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:12}}>💱 {L("exchange")}</div>
+          {[["Points",u.pts.toLocaleString()],["Rate","1000 pts = $1.00"]].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+              <span style={{color:C.muted,fontSize:13}}>{k}</span>
+              <span style={{color:C.white,fontWeight:700}}>{v}</span>
+            </div>
+          ))}
+          <div style={{height:1,background:C.border,margin:"12px 0"}}/>
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span style={{color:C.muted,fontSize:13}}>USD Value</span>
+            <span style={{color:C.green,fontWeight:800,fontSize:16}}>${(u.pts*USD_PER_POINT).toFixed(2)}</span>
+          </div>
+        </div>
+        <div style={{background:C.s2,borderRadius:16,padding:16,border:`1px solid ${C.border}`,textAlign:"center"}}>
+          <div style={{fontSize:32,marginBottom:8}}>🏦</div>
+          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:6}}>{L("withdrawal")}</div>
+          <div style={{fontSize:13,color:C.muted}}>USDT, EasyPaisa & JazzCash — coming soon</div>
+        </div>
+      </div>
+    ),
+  };
+
+  const NAV=[
+    {id:"home",icon:"🏠",label:L("home")},
+    {id:"earn",icon:"📺",label:L("earn")},
+    {id:"tasks",icon:"✅",label:L("tasks")},
+    {id:"leaders",icon:"🏆",label:L("leaders")},
+    {id:"mining",icon:"⛏️",label:L("mining")},
+    {id:"wallet",icon:"💰",label:L("wallet")},
+  ];
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,color:C.white,fontFamily:"'DM Sans',sans-serif",maxWidth:480,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",direction:dir}}>
+      <div style={{padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",background:C.s1,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:10}}>
+        <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{position:"relative"}}>
+            <button onClick={()=>setLM(p=>!p)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.white,fontSize:13,cursor:"pointer"}}>{(LANGS[lang]||LANGS.en).flag} {lang.toUpperCase()}</button>
+            {langMenu&&(
+              <div style={{position:"absolute",right:0,top:"110%",background:C.s2,border:`1px solid ${C.border}`,borderRadius:10,zIndex:99,minWidth:140,overflow:"hidden"}}>
+                {Object.entries(LANGS).map(([k,v])=>(
+                  <button key={k} onClick={()=>{setLang(k);setLM(false);}} style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",color:lang===k?C.brandLt:C.white,cursor:"pointer",textAlign:"left",fontSize:13}}>{v.flag} {v.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={()=>setLD(true)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.red,fontSize:13,cursor:"pointer",fontWeight:600}}>{L("logout")}</button>
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:"auto",paddingTop:16,paddingBottom:80}}>{TAB[tab]}</div>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.s1,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:10}}>
+        {NAV.map(n=>(
+          <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",color:tab===n.id?C.brandLt:C.muted,cursor:"pointer",textAlign:"center"}}>
+            <div style={{fontSize:20}}>{n.icon}</div>
+            <div style={{fontSize:10,fontWeight:tab===n.id?700:400,marginTop:1}}>{n.label}</div>
+          </button>
+        ))}
+      </div>
+      {adShowing&&adData&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:60,marginBottom:8}}>{adData.emoji}</div>
+            <div style={{fontSize:18,fontWeight:700,color:C.white,marginBottom:4}}>{adData.cat} Ad</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to earn {adData.pts} pts</div>
+            <div style={{background:C.faint,borderRadius:12,padding:"16px",marginBottom:16,fontSize:13,color:C.muted}}>📢 Sponsored content</div>
+            <button onClick={claimAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>✓ Claim +{adData.pts} pts</button>
+          </div>
+        </div>
+      )}
+      {logoutDlg&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:320,width:"100%",textAlign:"center",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:36,marginBottom:12}}>👋</div>
+            <div style={{fontSize:16,fontWeight:700,color:C.white,marginBottom:20}}>{L("logoutQ")}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setLD(false)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:"11px",color:C.white,fontWeight:600,cursor:"pointer"}}>{L("cancel")}</button>
+              <button onClick={onLogout} style={{background:C.red,border:"none",borderRadius:12,padding:"11px",color:"#fff",fontWeight:700,cursor:"pointer"}}>{L("yes")}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════
