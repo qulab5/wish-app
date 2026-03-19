@@ -6,6 +6,10 @@
       "dest": "/api/send-otp.js"
     },
     {
+      "src": "/api/verify-otp",
+      "dest": "/api/verify-otp.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

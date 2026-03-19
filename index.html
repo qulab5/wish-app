@@ -636,6 +636,7 @@ function AuthScreen({onLogin,lang}){
   const [resendT,setResendT]    = useState(60);
   const [canResend,setCanResend] = useState(false);
   const [pendingUser,setPU]     = useState(null);
+  const [otpToken,setOtpToken]  = useState(null);
   const otpRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
 
   const f=(k)=>v=>setForm(p=>({...p,[k]:v}));
@@ -698,7 +699,8 @@ function AuthScreen({onLogin,lang}){
       
       if (data.success) {
         console.log('7. Success!');
-        setOtpErr(""); // Clear any errors
+        setOtpToken(data.token);
+        setOtpErr("");
       } else {
         console.log('7. Error received:', data.error);
         // FIXED: Convert error object to string safely
@@ -750,6 +752,7 @@ function AuthScreen({onLogin,lang}){
       
       if (data.success) {
         setOtpErr("");
+        setOtpToken(data.token);
         setResendT(60);
         setCanResend(false);
       } else {
@@ -781,14 +784,29 @@ function AuthScreen({onLogin,lang}){
     if(e.key==="Backspace"&&!otpInput[idx]&&idx>0)otpRefs[idx-1].current.focus();
   };
 
-  const verifyOtp=()=>{
+  const verifyOtp=async()=>{
     const entered=otpInput.join("");
     if(entered.length<6){setOtpErr("Please enter 6-digit code");return;}
-    
-    // For demo purposes, accept any 6-digit code
-    // In production, you would verify with your backend
-    setUsers(p=>[...p,pendingUser]);
-    onLogin(pendingUser);
+    if(!otpToken){setOtpErr("Session expired. Please request a new code.");return;}
+    setOtpSending(true);
+    try{
+      const res=await fetch(`${window.location.origin}/api/verify-otp`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({token:otpToken,otp:entered})
+      });
+      const data=await res.json();
+      if(data.success){
+        setUsers(p=>[...p,pendingUser]);
+        onLogin(pendingUser);
+      } else {
+        setOtpErr(typeof data.error==='string'?data.error:'Invalid code');
+      }
+    } catch(err){
+      setOtpErr('Network error. Please try again.');
+    } finally {
+      setOtpSending(false);
+    }
   };
 
   const validate=()=>{
