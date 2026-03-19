@@ -19,7 +19,6 @@ export default async function handler(req, res) {
   try {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expiry = Date.now() + 10 * 60 * 1000;
-
     const secret = process.env.OTP_SECRET || 'wish-app-otp-secret-change-in-production';
     const payload = `${email}|${otp}|${expiry}`;
     const signature = crypto.createHmac('sha256', secret).update(payload).digest('hex');
