@@ -1,10 +1,5 @@
 {
   "version": 2,
-  "functions": {
-    "api/send-otp.js": {
-      "runtime": "nodejs@18.x"
-    }
-  },
   "routes": [
     {
       "src": "/api/send-otp",
