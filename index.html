@@ -656,6 +656,7 @@ function AuthScreen({onLogin,lang}){
     return()=>clearInterval(iv);
   },[otpStep]);
 
+  /* ===== UPDATED sendOtp FUNCTION WITH DEBUGGING ===== */
   const sendOtp = async (nu) => {
     setPU(nu);
     setOtpStep(true);
@@ -664,26 +665,54 @@ function AuthScreen({onLogin,lang}){
     setOtpSending(true);
     
     try {
-      const res = await fetch('/api/send-otp', {
+      console.log('1. Starting OTP send for:', nu.email);
+      
+      const baseUrl = window.location.origin;
+      const apiUrl = `${baseUrl}/api/send-otp`;
+      console.log('2. Fetching from:', apiUrl);
+      
+      const res = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ email: nu.email })
       });
       
-      const data = await res.json();
+      console.log('3. Response status:', res.status);
+      console.log('4. Response headers:', [...res.headers.entries()]);
+      
+      const text = await res.text();
+      console.log('5. Raw response:', text);
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+        console.log('6. Parsed data:', data);
+      } catch (e) {
+        console.error('7. JSON parse error:', e);
+        setOtpErr(`Server returned: ${text.substring(0, 50)}`);
+        setOtpSending(false);
+        return;
+      }
       
       if (data.success) {
+        console.log('8. Success!');
         setOtpErr("");
       } else {
-        setOtpErr("Failed to send code. Please try again.");
+        console.log('8. Error:', data.error);
+        setOtpErr(data.error || "Failed to send code");
       }
     } catch (err) {
-      setOtpErr("Network error. Please try again.");
+      console.error('9. Fetch error:', err);
+      setOtpErr(`Network error: ${err.message}`);
     } finally {
       setOtpSending(false);
       setTimeout(() => otpRefs[0].current?.focus(), 100);
     }
   };
+  /* ===== END OF UPDATED sendOtp FUNCTION ===== */
 
   const resendOtp = async () => {
     if (!canResend) return;
@@ -692,23 +721,34 @@ function AuthScreen({onLogin,lang}){
     setOtpSending(true);
     
     try {
-      const res = await fetch('/api/send-otp', {
+      const baseUrl = window.location.origin;
+      const apiUrl = `${baseUrl}/api/send-otp`;
+      
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: pendingUser.email })
       });
       
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        setOtpErr("Invalid server response");
+        setOtpSending(false);
+        return;
+      }
       
       if (data.success) {
         setOtpErr("");
         setResendT(60);
         setCanResend(false);
       } else {
-        setOtpErr("Failed to resend code.");
+        setOtpErr(data.error || "Failed to resend code");
       }
     } catch (err) {
-      setOtpErr("Network error.");
+      setOtpErr("Network error");
     } finally {
       setOtpSending(false);
       setTimeout(() => otpRefs[0].current?.focus(), 100);
@@ -951,7 +991,7 @@ function AuthScreen({onLogin,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   ADMIN PANEL (simplified for brevity - keep your existing)
+   ADMIN PANEL (simplified - replace with your full version)
 ═══════════════════════════════════════════════ */
 function AdminPanel({user,onExit,lang}){
   return <div style={{padding:20,color:"white"}}>
@@ -961,7 +1001,7 @@ function AdminPanel({user,onExit,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   MAIN APP (simplified for brevity - keep your existing)
+   MAIN APP (simplified - replace with your full version)
 ═══════════════════════════════════════════════ */
 function MainApp({user,onLogout,lang,setLang}){
   return <div style={{padding:20,color:"white"}}>
