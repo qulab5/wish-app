@@ -1048,16 +1048,24 @@ function MainApp({user,onLogout,lang,setLang}){
   const [adData,setAD]     = useState(null);
   const [spinning,setSpin] = useState(false);
   const [spinResult,setSR] = useState(null);
-  const [mineT,setMineT]   = useState(MINING_CYCLE);
-  const [mineReady,setMR]  = useState(false);
-  const [langMenu,setLM]   = useState(false);
+  const [mineT,setMineT]      = useState(MINING_CYCLE);
+  const [mineReady,setMR]     = useState(false);
+  const [mineStarted,setMS]   = useState(false);
+  const [mineAdShow,setMAd]   = useState(false);
+  const [langMenu,setLM]      = useState(false);
+  const [avatarPick,setAP]    = useState(false);
+  const [editName,setEN]      = useState(user.name);
+  const [editEmail,setEE]     = useState(user.email);
+  const [editPass,setEP]      = useState("");
+  const [profileMsg,setPMsg]  = useState("");
   const L = k => t$(lang,k);
   const dir = (LANGS[lang]||LANGS.en).dir;
 
   useEffect(()=>{
+    if(!mineStarted)return;
     const iv=setInterval(()=>setMineT(t=>{if(t<=1){setMR(true);return 0;}return t-1;}),1000);
     return()=>clearInterval(iv);
-  },[]);
+  },[mineStarted]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
@@ -1066,7 +1074,8 @@ function MainApp({user,onLogout,lang,setLang}){
   const doSpin=()=>{if(spinning)return;setSpin(true);setSR(null);setTimeout(()=>{const i=Math.floor(Math.random()*SPIN_PTS.length);addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});setSpin(false);},1500);};
   const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
-  const claimMining=()=>{if(!mineReady)return;addPts(500);setMineT(MINING_CYCLE);setMR(false);};
+  const claimMining=()=>{if(!mineReady)return;addPts(500);setMineT(MINING_CYCLE);setMR(false);setMS(false);};
+  const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
   const PE={YouTube:"▶️",Facebook:"📘",Twitter:"🐦",Instagram:"📸",TikTok:"🎵",LinkedIn:"💼",Telegram:"✈️",WhatsApp:"💬"};
 
   const TAB={
@@ -1176,17 +1185,22 @@ function MainApp({user,onLogout,lang,setLang}){
     mining:(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16}}>
-          <div style={{fontSize:48,marginBottom:8}}>⛏️</div>
+          <div style={{fontSize:48,marginBottom:8,animation:mineStarted?"rotate 4s linear infinite":"none"}}>⛏️</div>
           <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>{L("miningTitle")}</div>
           <div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:16}}>{L("season")} 1 · 500 pts per cycle</div>
-          {mineReady
-            ?<button onClick={claimMining} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 32px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer"}}>🎁 Claim 500 pts!</button>
-            :<><div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:8}}>{L("miningNext")}</div><div style={{fontSize:36,fontWeight:800,color:C.gold,fontFamily:"monospace"}}>{fmtTime(mineT)}</div></>
+          {!mineStarted
+            ?<>
+              <div style={{fontSize:13,color:"rgba(255,255,255,.8)",marginBottom:16,background:"rgba(0,0,0,.2)",borderRadius:10,padding:"10px 16px"}}>Watch a short ad to activate your mining session</div>
+              <button onClick={()=>setMAd(true)} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 36px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.4)"}}>▶ Start Mining</button>
+            </>
+            :mineReady
+              ?<button onClick={claimMining} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 32px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer"}}>🎁 Claim 500 pts!</button>
+              :<><div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:8}}>{L("miningNext")}</div><div style={{fontSize:36,fontWeight:800,color:C.gold,fontFamily:"monospace"}}>{fmtTime(mineT)}</div><div style={{marginTop:8,fontSize:12,color:"rgba(255,255,255,.5)"}}>⚡ Mining active</div></>
           }
         </div>
         <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
           <div style={{fontSize:14,fontWeight:700,color:C.brandLt,marginBottom:8}}>How Mining Works</div>
-          <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>Mining rewards you 500 pts every 8 hours. Come back regularly to claim your rewards and grow your balance!</div>
+          <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>Watch a short ad to start mining. Earn 500 pts every 8 hours. After claiming, start a new session anytime!</div>
         </div>
       </div>
     ),
@@ -1218,15 +1232,83 @@ function MainApp({user,onLogout,lang,setLang}){
         </div>
       </div>
     ),
+    profile:(
+      <div style={{padding:"0 16px 16px"}}>
+        {/* Profile Header */}
+        <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16,position:"relative"}}>
+          <div onClick={()=>setAP(p=>!p)} style={{width:84,height:84,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:u.avatar?44:34,fontWeight:800,border:"3px solid rgba(255,255,255,.5)",margin:"0 auto 12px",cursor:"pointer",position:"relative",boxShadow:"0 0 20px rgba(0,0,0,.3)"}}>
+            {u.avatar||u.name[0].toUpperCase()}
+            <div style={{position:"absolute",bottom:0,right:0,width:26,height:26,borderRadius:"50%",background:C.gold,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,border:"2px solid #fff"}}>✏️</div>
+          </div>
+          {avatarPick&&(
+            <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:12,background:"rgba(0,0,0,.3)",borderRadius:12,padding:12}}>
+              {["👤","🦊","🐯","🦁","🐻","🐼","🐨","🦋","🦄","🐸","👾","🤖","👻","🧙","🦸","🎭","🧑","👩","👨","🧒"].map(e=>(
+                <button key={e} onClick={()=>{setU(p=>({...p,avatar:e}));setAP(false);}} style={{background:u.avatar===e?"rgba(245,158,11,.4)":"rgba(255,255,255,.1)",border:`2px solid ${u.avatar===e?C.gold:"transparent"}`,borderRadius:8,padding:6,fontSize:22,cursor:"pointer"}}>{e}</button>
+              ))}
+            </div>
+          )}
+          <div style={{fontSize:20,fontWeight:800,color:"#fff"}}>{u.name}</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginTop:2}}>{u.email}</div>
+          <div style={{marginTop:8,display:"inline-block",background:"rgba(255,255,255,.15)",borderRadius:8,padding:"3px 12px",fontSize:12,color:"#fff"}}>✓ {L("verified")} · {u.country}</div>
+        </div>
+
+        {/* Edit Form */}
+        <div style={{background:C.s2,borderRadius:16,padding:16,marginBottom:12,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:15,fontWeight:700,color:C.brandLt,marginBottom:14}}>✏️ Edit Profile</div>
+
+          {/* Name */}
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Display Name</div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={editName} onChange={e=>setEN(e.target.value)} style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="Your name"/>
+              <button onClick={()=>{if(editName.trim()){setU(p=>({...p,name:editName.trim()}));setPMsg("Name updated!");}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.brand,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Save</button>
+            </div>
+          </div>
+
+          {/* Email */}
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Email Address</div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={editEmail} onChange={e=>setEE(e.target.value)} type="email" style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="you@email.com"/>
+              <button onClick={()=>{if(editEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){setU(p=>({...p,email:editEmail}));setPMsg("Email updated!");}else setPMsg("Invalid email!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.brand,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Save</button>
+            </div>
+          </div>
+
+          {/* Password */}
+          <div>
+            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>New Password</div>
+            <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Min 6 characters"/>
+            <button onClick={()=>{if(editPass.length>=6){setU(p=>({...p,pass:editPass}));setEP("");setPMsg("Password updated!");}else setPMsg("Min 6 characters!");setTimeout(()=>setPMsg(""),2500);}} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>🔒 Update Password</button>
+          </div>
+
+          {profileMsg&&(
+            <div style={{marginTop:12,textAlign:"center",padding:"8px 12px",borderRadius:10,background:profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",color:profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?C.red:C.green,fontWeight:700,fontSize:13}}>
+              {profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?`⚠️ ${profileMsg}`:`✓ ${profileMsg}`}
+            </div>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div style={{background:C.s2,borderRadius:16,padding:16,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:15,fontWeight:700,color:C.brandLt,marginBottom:12}}>📊 Account Stats</div>
+          {[["Member Since",u.joined],["Country",u.country],["Points",u.pts.toLocaleString()+" pts"],["USD Balance","$"+u.usd.toFixed(2)]].map(([k,v],i)=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:i<3?`1px solid ${C.border}`:"none"}}>
+              <span style={{color:C.muted,fontSize:13}}>{k}</span>
+              <span style={{color:C.white,fontWeight:700,fontSize:13}}>{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
   };
 
   const NAV=[
     {id:"home",icon:"🏠",label:L("home")},
     {id:"earn",icon:"📺",label:L("earn")},
     {id:"tasks",icon:"✅",label:L("tasks")},
-    {id:"leaders",icon:"🏆",label:L("leaders")},
     {id:"mining",icon:"⛏️",label:L("mining")},
     {id:"wallet",icon:"💰",label:L("wallet")},
+    {id:"profile",icon:"👤",label:L("profile")},
   ];
 
   return(
@@ -1268,6 +1350,19 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to earn {adData.pts} pts</div>
             <div style={{background:C.faint,borderRadius:12,padding:"16px",marginBottom:16,fontSize:13,color:C.muted}}>📢 Sponsored content</div>
             <button onClick={claimAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>✓ Claim +{adData.pts} pts</button>
+          </div>
+        </div>
+      )}
+      {/* Mining Ad Modal */}
+      {mineAdShow&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:28,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border2}`}}>
+            <div style={{fontSize:64,marginBottom:12}}>⛏️</div>
+            <div style={{fontSize:20,fontWeight:800,color:C.white,marginBottom:6}}>Activate Mining</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.6}}>Watch a short sponsored ad to start your 8-hour mining session and earn <span style={{color:C.gold,fontWeight:700}}>500 pts</span>!</div>
+            <div style={{background:"rgba(139,92,246,.1)",borderRadius:12,padding:"14px",marginBottom:16,fontSize:13,color:C.muted,border:`1px solid ${C.border}`}}>📢 Sponsored content — supports the platform</div>
+            <button onClick={startMiningAfterAd} style={{width:"100%",background:`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.3)"}}>⛏️ Start Mining Now</button>
+            <button onClick={()=>setMAd(false)} style={{marginTop:10,background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Maybe later</button>
           </div>
         </div>
       )}
