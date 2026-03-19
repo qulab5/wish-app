@@ -1,248 +1,1049 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wish App</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0a0818;
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        #app { width: 100%; max-width: 420px; padding: 20px; }
-        .card {
-            background: linear-gradient(135deg, #13102a, #1a1540);
-            border: 1px solid rgba(139,92,246,0.2);
-            border-radius: 24px;
-            padding: 32px;
-        }
-        .logo {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-        .logo-icon {
-            width: 72px; height: 72px;
-            background: linear-gradient(135deg, #8b5cf6, #ec4899);
-            border-radius: 20px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 36px;
-            margin: 0 auto 12px;
-        }
-        .logo h1 { font-size: 28px; font-weight: 700; }
-        .logo p { color: rgba(255,255,255,0.5); font-size: 14px; margin-top: 4px; }
-        label { display: block; font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
-        input {
-            width: 100%;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(139,92,246,0.3);
-            border-radius: 12px;
-            padding: 14px 16px;
-            color: white;
-            font-size: 16px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        input:focus { border-color: #8b5cf6; }
-        input::placeholder { color: rgba(255,255,255,0.25); }
-        button {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #8b5cf6, #ec4899);
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 8px;
-            transition: opacity 0.2s;
-        }
-        button:hover { opacity: 0.9; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .field { margin-bottom: 20px; }
-        .error { color: #ef4444; font-size: 13px; margin-top: 8px; }
-        .info { color: rgba(255,255,255,0.5); font-size: 13px; text-align: center; margin-top: 12px; }
-    </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>Wish — Earn & Reward Platform</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;background:#0d0b1e;font-family:'Plus Jakarta Sans',sans-serif;}
+  #root{height:100%;}
+  input,button,select,textarea{font-family:inherit;}
+  input[type=range]{-webkit-appearance:none;height:5px;border-radius:3px;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#8b5cf6;cursor:pointer;}
+  
+  /* New enhanced animations */
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+    100% { transform: translateY(0px); }
+  }
+  @keyframes pulse-glow {
+    0% { box-shadow: 0 0 0 0 rgba(139,92,246,0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(139,92,246,0); }
+    100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+  }
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: rgba(19,16,42,0.7);
+    border: 1px solid rgba(139,92,246,0.2);
+  }
+  .gradient-border {
+    position: relative;
+    border: double 1px transparent;
+    border-radius: 20px;
+    background-image: linear-gradient(#13102a, #13102a), 
+                      linear-gradient(135deg, #8b5cf6, #ec4899, #06b6d4);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+  }
+  /* Country dropdown styles */
+  .country-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    cursor: pointer;
+  }
+  .country-select option {
+    background: #13102a;
+    color: white;
+    padding: 10px;
+  }
+</style>
 </head>
 <body>
-<div id="app"></div>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
 
-<script>
-    let otpToken = null;
+/* ═══════════════════════════════════════════════
+   COUNTRY CODES DATA with FLAGS
+═══════════════════════════════════════════════ */
+const COUNTRIES = [
+  { code: "+1", country: "USA", flag: "🇺🇸", name: "United States" },
+  { code: "+1", country: "CAN", flag: "🇨🇦", name: "Canada" },
+  { code: "+44", country: "UK", flag: "🇬🇧", name: "United Kingdom" },
+  { code: "+61", country: "AUS", flag: "🇦🇺", name: "Australia" },
+  { code: "+49", country: "GER", flag: "🇩🇪", name: "Germany" },
+  { code: "+33", country: "FRA", flag: "🇫🇷", name: "France" },
+  { code: "+39", country: "ITA", flag: "🇮🇹", name: "Italy" },
+  { code: "+34", country: "ESP", flag: "🇪🇸", name: "Spain" },
+  { code: "+31", country: "NED", flag: "🇳🇱", name: "Netherlands" },
+  { code: "+46", country: "SWE", flag: "🇸🇪", name: "Sweden" },
+  { code: "+47", country: "NOR", flag: "🇳🇴", name: "Norway" },
+  { code: "+45", country: "DEN", flag: "🇩🇰", name: "Denmark" },
+  { code: "+358", country: "FIN", flag: "🇫🇮", name: "Finland" },
+  { code: "+353", country: "IRE", flag: "🇮🇪", name: "Ireland" },
+  { code: "+41", country: "SUI", flag: "🇨🇭", name: "Switzerland" },
+  { code: "+43", country: "AUT", flag: "🇦🇹", name: "Austria" },
+  { code: "+32", country: "BEL", flag: "🇧🇪", name: "Belgium" },
+  { code: "+351", country: "POR", flag: "🇵🇹", name: "Portugal" },
+  { code: "+30", country: "GRE", flag: "🇬🇷", name: "Greece" },
+  { code: "+90", country: "TUR", flag: "🇹🇷", name: "Turkey" },
+  { code: "+7", country: "RUS", flag: "🇷🇺", name: "Russia" },
+  { code: "+48", country: "POL", flag: "🇵🇱", name: "Poland" },
+  { code: "+420", country: "CZE", flag: "🇨🇿", name: "Czech Republic" },
+  { code: "+36", country: "HUN", flag: "🇭🇺", name: "Hungary" },
+  { code: "+40", country: "ROM", flag: "🇷🇴", name: "Romania" },
+  { code: "+359", country: "BUL", flag: "🇧🇬", name: "Bulgaria" },
+  { code: "+381", country: "SRB", flag: "🇷🇸", name: "Serbia" },
+  { code: "+86", country: "CHN", flag: "🇨🇳", name: "China" },
+  { code: "+91", country: "IND", flag: "🇮🇳", name: "India" },
+  { code: "+81", country: "JPN", flag: "🇯🇵", name: "Japan" },
+  { code: "+82", country: "KOR", flag: "🇰🇷", name: "South Korea" },
+  { code: "+84", country: "VIE", flag: "🇻🇳", name: "Vietnam" },
+  { code: "+66", country: "THA", flag: "🇹🇭", name: "Thailand" },
+  { code: "+60", country: "MAL", flag: "🇲🇾", name: "Malaysia" },
+  { code: "+65", country: "SIN", flag: "🇸🇬", name: "Singapore" },
+  { code: "+62", country: "IDN", flag: "🇮🇩", name: "Indonesia" },
+  { code: "+63", country: "PHI", flag: "🇵🇭", name: "Philippines" },
+  { code: "+92", country: "PAK", flag: "🇵🇰", name: "Pakistan" },
+  { code: "+94", country: "SRI", flag: "🇱🇰", name: "Sri Lanka" },
+  { code: "+880", country: "BAN", flag: "🇧🇩", name: "Bangladesh" },
+  { code: "+977", country: "NEP", flag: "🇳🇵", name: "Nepal" },
+  { code: "+98", country: "IRN", flag: "🇮🇷", name: "Iran" },
+  { code: "+964", country: "IRQ", flag: "🇮🇶", name: "Iraq" },
+  { code: "+966", country: "KSA", flag: "🇸🇦", name: "Saudi Arabia" },
+  { code: "+971", country: "UAE", flag: "🇦🇪", name: "UAE" },
+  { code: "+972", country: "ISR", flag: "🇮🇱", name: "Israel" },
+  { code: "+20", country: "EGY", flag: "🇪🇬", name: "Egypt" },
+  { code: "+27", country: "RSA", flag: "🇿🇦", name: "South Africa" },
+  { code: "+234", country: "NGA", flag: "🇳🇬", name: "Nigeria" },
+  { code: "+254", country: "KEN", flag: "🇰🇪", name: "Kenya" },
+  { code: "+55", country: "BRA", flag: "🇧🇷", name: "Brazil" },
+  { code: "+52", country: "MEX", flag: "🇲🇽", name: "Mexico" },
+  { code: "+54", country: "ARG", flag: "🇦🇷", name: "Argentina" },
+  { code: "+56", country: "CHI", flag: "🇨🇱", name: "Chile" },
+  { code: "+57", country: "COL", flag: "🇨🇴", name: "Colombia" },
+  { code: "+51", country: "PER", flag: "🇵🇪", name: "Peru" },
+  { code: "+58", country: "VEN", flag: "🇻🇪", name: "Venezuela" },
+  { code: "+593", country: "ECU", flag: "🇪🇨", name: "Ecuador" },
+  { code: "+64", country: "NZL", flag: "🇳🇿", name: "New Zealand" },
+  { code: "+689", country: "PYF", flag: "🇵🇫", name: "French Polynesia" },
+];
 
-    function showLogin() {
-        document.getElementById('app').innerHTML = `
-            <div class="card">
-                <div class="logo">
-                    <div class="logo-icon">✨</div>
-                    <h1>Wish App</h1>
-                    <p>Earn rewards every day</p>
-                </div>
-                <div class="field">
-                    <label>Phone Number</label>
-                    <input id="phone" type="tel" placeholder="+1234567890" />
-                </div>
-                <button onclick="sendOtp()" id="sendBtn">Send OTP</button>
-                <div id="loginError" class="error"></div>
-            </div>
-        `;
-    }
+/* ═══════════════════════════════════════════════
+   COLOUR PALETTE  — soft violet / warm purple
+   Easy on the eyes, premium feel
+═══════════════════════════════════════════════ */
+const C = {
+  bg:"#0d0b1e", s1:"#13102a", s2:"#191534", s3:"#211d42",
+  border:"rgba(139,92,246,.13)", border2:"rgba(139,92,246,.25)",
+  brand:"#8b5cf6", brandLt:"#a78bfa", brandDk:"#6d28d9",
+  pink:"#ec4899", cyan:"#06b6d4",
+  gold:"#f59e0b", goldLt:"#fbbf24",
+  green:"#10b981", greenLt:"#34d399",
+  red:"#ef4444",
+  muted:"rgba(255,255,255,.40)", faint:"rgba(139,92,246,.07)",
+  white:"#fff",
+};
 
-    async function sendOtp() {
-        const phone = document.getElementById('phone').value.trim();
-        const btn = document.getElementById('sendBtn');
-        const errEl = document.getElementById('loginError');
-        errEl.textContent = '';
+/* ═══════════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════════ */
+const APP_NAME       = "Wish";
+const APP_TAGLINE    = "Earn & Reward Platform";
+const USD_PER_POINT  = 0.001;
+const REFERRAL_BONUS = 300;
+const MINING_CYCLE   = 8 * 60 * 60;
+const SUN_CYCLE      = 4 * 60 * 60;
+const AD_COOLDOWN_S  = 5 * 60 * 60;
 
-        if (!phone) {
-            errEl.textContent = 'Please enter your phone number.';
-            return;
+const DAILY_PTS_MAP = {
+  1:80,2:55,3:70,4:45,5:90,6:60,7:120,8:50,9:75,10:65,
+  11:85,12:55,13:95,14:40,15:110,16:70,17:60,18:80,19:50,20:100,
+  21:45,22:75,23:65,24:90,25:55,26:85,27:70,28:60,29:95,30:80,31:115,
+};
+
+const now        = new Date();
+const todayDate  = now.getDate();
+const isSunday   = now.getDay() === 0;
+const dailyPts   = DAILY_PTS_MAP[todayDate] || 60;
+const MINING_S   = isSunday ? SUN_CYCLE : MINING_CYCLE;
+
+/* ═══════════════════════════════════════════════
+   DEMO USERS DATABASE  (in-memory)
+═══════════════════════════════════════════════ */
+const INITIAL_USERS = [
+  { id:"u1", name:"Ahmad Ali",   email:"ahmad@wish.com",   phone:"+92-300-1234567", pass:"ahmad123",  pts:48200, usd:48.20, joined:"Jan 2025", country:"🇵🇰", isAdmin:false, active:true },
+  { id:"u2", name:"Sara Khan",   email:"sara@wish.com",    phone:"+91-900-7654321", pass:"sara123",   pts:41500, usd:41.50, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, active:true },
+  { id:"u3", name:"Rahul Dev",   email:"rahul@wish.com",   phone:"+91-800-1111111", pass:"rahul123",  pts:35400, usd:35.40, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, active:true },
+  { id:"u4", name:"Zain Ahmed",  email:"zain@wish.com",    phone:"+92-333-9999999", pass:"zain123",   pts:29800, usd:29.80, joined:"Mar 2025", country:"🇵🇰", isAdmin:false, active:false },
+  { id:"admin", name:"Admin",    email:"admin@wish.com",   phone:"+1-000-0000000",  pass:"admin@123", pts:0,     usd:0,     joined:"Jan 2025", country:"🌍", isAdmin:true,  active:true },
+];
+
+/* ═══════════════════════════════════════════════
+   AD NETWORKS CONFIG  (default)
+═══════════════════════════════════════════════ */
+const DEFAULT_AD_CONFIG = {
+  activeNetwork: "admob",      // "admob" | "applovin" | "both" | "none"
+  admob: {
+    enabled: true,
+    appId:        "",
+    bannerUnitId: "",
+    interUnitId:  "",
+    rewardUnitId: "",
+    testMode:     true,
+  },
+  applovin: {
+    enabled: false,
+    sdkKey:       "",
+    bannerAdId:   "",
+    interAdId:    "",
+    rewardAdId:   "",
+    testMode:     true,
+  },
+  adFrequency:  5,      // show ad every N actions
+  adsPerDay:    15,
+  sundayAds:    20,
+  cooldownHours:5,
+};
+
+/* ═══════════════════════════════════════════════
+   MULTILINGUAL
+═══════════════════════════════════════════════ */
+const LANGS = {
+  en:{ name:"English",   flag:"🇬🇧", dir:"ltr" },
+  ur:{ name:"اردو",      flag:"🇵🇰", dir:"rtl" },
+  ar:{ name:"العربية",   flag:"🇸🇦", dir:"rtl" },
+  hi:{ name:"हिंदी",     flag:"🇮🇳", dir:"ltr" },
+  bn:{ name:"বাংলা",     flag:"🇧🇩", dir:"ltr" },
+  tr:{ name:"Türkçe",    flag:"🇹🇷", dir:"ltr" },
+  fr:{ name:"Français",  flag:"🇫🇷", dir:"ltr" },
+  id:{ name:"Indonesia", flag:"🇮🇩", dir:"ltr" },
+};
+const TR = {
+  en:{ login:"Login", register:"Register", email:"Email Address", phone:"Phone Number",
+       password:"Password", name:"Full Name", loginWith:"Login with", orLogin:"Or login with",
+       noAcc:"Don't have an account?", haveAcc:"Already have an account?",
+       signUp:"Create Account", signIn:"Sign In", continue:"Continue",
+       welcomeBack:"Welcome Back!", joinWish:"Join Wish Today",
+       home:"Home", earn:"Earn", tasks:"Tasks", leaders:"Leaders", mining:"Mining", wallet:"Wallet",
+       logout:"Logout", logoutQ:"Are you sure you want to logout?", yes:"Yes, Logout", cancel:"Cancel",
+       profile:"My Profile", exchange:"Exchange", soon:"SOON", language:"Language",
+       totalPts:"Total Points", usdBal:"USD Balance", adsLeft:"Ads Left",
+       spins:"Spins", season:"Season", watchAd:"Watch Ad & Earn",
+       spinNow:"Spin Now", spinning:"Spinning…",
+       miningTitle:"Mining Season", miningNext:"Next reward in",
+       withdrawal:"Withdrawal — Coming Soon", verified:"✓ Verified",
+       adminPanel:"Admin Panel", users:"Users", revenue:"Revenue",
+       adControl:"Ad Control", settings:"Settings",
+       admob:"Google AdMob", applovin:"AppLovin MAX",
+       adNetwork:"Active Ad Network", testMode:"Test Mode",
+       save:"Save", saved:"Saved!", required:"This field is required",
+       invalidEmail:"Invalid email address", invalidPhone:"Invalid phone number",
+       wrongPass:"Wrong password", userNotFound:"User not found",
+       userExists:"Account already exists",
+  },
+  ur:{ login:"لاگ ان", register:"رجسٹر", email:"ای میل", phone:"موبائل نمبر",
+       password:"پاس ورڈ", name:"پورا نام", loginWith:"سے لاگ ان", orLogin:"یا لاگ ان کریں",
+       noAcc:"اکاؤنٹ نہیں ہے؟", haveAcc:"پہلے سے اکاؤنٹ ہے؟",
+       signUp:"اکاؤنٹ بنائیں", signIn:"لاگ ان کریں", continue:"جاری رکھیں",
+       welcomeBack:"خوش آمدید!", joinWish:"Wish میں شامل ہوں",
+       home:"ہوم", earn:"کمائیں", tasks:"کام", leaders:"رہنما", mining:"مائننگ", wallet:"والٹ",
+       logout:"لاگ آؤٹ", logoutQ:"کیا آپ لاگ آؤٹ کرنا چاہتے ہیں؟", yes:"ہاں", cancel:"منسوخ",
+       profile:"میری پروفائل", exchange:"ایکسچینج", soon:"جلد", language:"زبان",
+       totalPts:"کل پوائنٹس", usdBal:"USD بیلنس", adsLeft:"باقی اشتہار",
+       spins:"اسپن", season:"سیزن", watchAd:"اشتہار دیکھیں",
+       spinNow:"اسپن کریں", spinning:"گھوم رہا ہے…",
+       miningTitle:"مائننگ سیزن", miningNext:"اگلا انعام",
+       withdrawal:"ادائیگی — جلد آ رہی ہے", verified:"✓ تصدیق شدہ",
+       adminPanel:"ایڈمن پینل", users:"صارفین", revenue:"آمدنی",
+       adControl:"اشتہار کنٹرول", settings:"ترتیبات",
+       admob:"گوگل ایڈموب", applovin:"ایپ لووِن",
+       adNetwork:"فعال نیٹ ورک", testMode:"ٹیسٹ موڈ",
+       save:"محفوظ کریں", saved:"محفوظ!", required:"ضروری فیلڈ",
+       invalidEmail:"غلط ای میل", invalidPhone:"غلط نمبر",
+       wrongPass:"غلط پاس ورڈ", userNotFound:"صارف نہیں ملا",
+       userExists:"اکاؤنٹ پہلے سے موجود ہے",
+  },
+};
+function t$(lang,key){ return (TR[lang]||TR.en)[key] || (TR.en)[key] || key; }
+
+/* ═══════════════════════════════════════════════
+   TASK / AD DATA
+═══════════════════════════════════════════════ */
+const TASK_SETS = [
+  [
+    {id:"t1",platform:"YouTube",  action:"Like a video",       type:"like",   pts:40},
+    {id:"t2",platform:"Facebook", action:"Share a post",       type:"share",  pts:60},
+    {id:"t3",platform:"Twitter",  action:"Retweet a post",     type:"share",  pts:50},
+    {id:"t4",platform:"Instagram",action:"Comment on a photo", type:"comment",pts:55},
+    {id:"t5",platform:"TikTok",   action:"Like & Share video", type:"like",   pts:45},
+  ],
+  [
+    {id:"t6",platform:"YouTube",  action:"Comment on video",   type:"comment",pts:55},
+    {id:"t7",platform:"Facebook", action:"Like a page",        type:"like",   pts:35},
+    {id:"t8",platform:"Twitter",  action:"Like & Reply",       type:"comment",pts:50},
+    {id:"t9",platform:"LinkedIn", action:"Share an article",   type:"share",  pts:70},
+    {id:"ta",platform:"TikTok",   action:"Follow an account",  type:"follow", pts:40},
+  ],
+];
+const SOCIAL_JOINS = [
+  {id:"sj1",platform:"Telegram", pts:100},
+  {id:"sj2",platform:"WhatsApp", pts:80},
+  {id:"sj3",platform:"YouTube",  pts:120},
+  {id:"sj4",platform:"Facebook", pts:90},
+  {id:"sj5",platform:"Instagram",pts:95},
+  {id:"sj6",platform:"TikTok",   pts:85},
+];
+const PL = {YouTube:"#FF0000",Facebook:"#1877F2",Twitter:"#111",Instagram:"#E1306C",TikTok:"#010101",LinkedIn:"#0A66C2",Telegram:"#2AABEE",WhatsApp:"#25D366"};
+const GENERIC_ADS=[{e:"🛒",c:"Shopping"},{e:"🎮",c:"Gaming"},{e:"🍔",c:"Food"},{e:"✈️",c:"Travel"},{e:"👗",c:"Fashion"},{e:"💻",c:"Tech"},{e:"🏋️",c:"Fitness"},{e:"📱",c:"Apps"}];
+function rndAd(){const a=GENERIC_ADS[Math.floor(Math.random()*GENERIC_ADS.length)];return{emoji:a.e,cat:a.c,pts:Math.floor(20+Math.random()*20),id:Date.now()};}
+const SPIN_PTS=[100,150,200,250,300,350,400,500];
+const SPIN_USD=[1,2,3,1,2,3,2,1];
+const CURRENT_TASKS=TASK_SETS[Math.floor(Date.now()/(10*24*60*60*1000))%TASK_SETS.length];
+const FAKE_LEADERS=[
+  {name:"Ahmad_786",pts:48200,country:"🇵🇰"},{name:"Sara_Wins",pts:41500,country:"🇮🇳"},
+  {name:"ZainEarner",pts:38900,country:"🇧🇩"},{name:"ProUser_99",pts:35400,country:"🇵🇰"},
+  {name:"CryptoKing",pts:32100,country:"🇮🇳"},{name:"EarnQueen",pts:29800,country:"🇧🇩"},
+  {name:"TopPlayer_X",pts:27300,country:"🇵🇰"},{name:"MasterEarn",pts:24600,country:"🇮🇳"},
+  {name:"DailyGrind",pts:22100,country:"🇧🇩"},{name:"You",pts:1250,country:"🇵🇰",isMe:true},
+];
+
+/* SVG Logos */
+const LOGOS={
+  YouTube:(<svg viewBox="0 0 24 24" w="20" h="20" width="20" height="20"><path fill="#FF0000" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8z"/><path fill="#fff" d="M9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>),
+  Facebook:(<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#1877F2" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3v-2.6c0-3 1.8-4.7 4.6-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>),
+  Twitter:(<svg viewBox="0 0 24 24" width="20" height="20"><rect width="24" height="24" rx="5" fill="#111"/><path fill="#fff" d="M18.9 4h3.7l-8 9.2L24 20h-7.4l-5.8-7.5L4.3 20H.6l8.6-9.8L0 4h7.6l5.2 6.9L18.9 4zm-1.3 14.4h2L6.5 5.5H4.3z"/></svg>),
+  Instagram:(<svg viewBox="0 0 24 24" width="20" height="20"><defs><radialGradient id="ig2" cx="30%" cy="107%" r="150%"><stop offset="0%" stopColor="#fdf497"/><stop offset="45%" stopColor="#fd5949"/><stop offset="60%" stopColor="#d6249f"/><stop offset="90%" stopColor="#285AEB"/></radialGradient></defs><rect width="24" height="24" rx="6" fill="url(#ig2)"/><circle cx="12" cy="12" r="4.5" fill="none" stroke="#fff" strokeWidth="2"/><circle cx="17.5" cy="6.5" r="1.2" fill="#fff"/></svg>),
+  TikTok:(<svg viewBox="0 0 24 24" width="20" height="20"><rect width="24" height="24" rx="6" fill="#010101"/><path fill="#25F4EE" d="M12.8 3.5v11a2.5 2.5 0 1 1-1.8-2.4V9.8a5.6 5.6 0 1 0 3.8 5.4V8A7.6 7.6 0 0 0 19.2 9V6.3a5.1 5.1 0 0 1-6.4-2.8z" opacity=".9"/><path fill="#FE2C55" d="M13 3.6v11A2.5 2.5 0 1 1 11 12V9.9A5.6 5.6 0 1 0 15 14.5V7.7A7.6 7.6 0 0 0 19.5 9V6.1A5.1 5.1 0 0 1 13 3.6z" opacity=".9"/><path fill="#fff" d="M12.9 3.5v11a2.5 2.5 0 1 1-1.9-2.4V9.8a5.6 5.6 0 1 0 3.9 5.4V8A7.6 7.6 0 0 0 19.3 9V6.3a5.1 5.1 0 0 1-6.4-2.8z"/></svg>),
+  LinkedIn:(<svg viewBox="0 0 24 24" width="20" height="20"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path fill="#fff" d="M6.5 9.5h-3v9h3v-9zM5 8a1.75 1.75 0 1 0 0-3.5A1.75 1.75 0 0 0 5 8zm15.5 4.5c0-2.8-1.5-4-3.5-4a3.5 3.5 0 0 0-3 1.6V9.5h-3v9h3v-5a1.5 1.5 0 0 1 1.5-1.6c1 0 1.5.7 1.5 1.8v4.8h3v-4z"/></svg>),
+  Telegram:(<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="12" fill="#2AABEE"/><path fill="#fff" d="M5.5 11.7l10.3-4c.5-.2.9.1.7.6l-1.8 8.3c-.1.5-.5.7-.9.4l-2.5-1.9-1.2 1.1c-.1.1-.3.2-.6.2l.2-2.7 5.2-4.7c.2-.2 0-.3-.3-.1l-6.4 4-.3-.2z"/></svg>),
+  WhatsApp:(<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="12" fill="#25D366"/><path fill="#fff" d="M12 5.5a6.5 6.5 0 0 0-5.4 10.1L5 19l3.5-1.6A6.5 6.5 0 1 0 12 5.5zm2.9 8.8c-.2-.1-.9-.5-1-.5-.2 0-.3.1-.4.2l-.6.7c-.1.1-.2.1-.3.1s-.4-.2-.8-.5a5 5 0 0 1-1.4-1.9c0-.2 0-.3.2-.4l.4-.5c.1-.1.1-.2.1-.4 0-.1-.3-.9-.5-1.2-.1-.2-.3-.3-.4-.3h-.3c-.1 0-.4.1-.6.3-.5.5-.7 1-.7 1.5 0 .8.5 1.7 1.2 2.5 1.2 1.5 2.5 2 3.5 2.3.5.1 1 .1 1.3-.1.4-.2.9-.8 1-1.3.1-.4 0-.8-.2-1z"/></svg>),
+};
+
+/* ═══════════════════════════════════════════════
+   MINI COMPONENTS
+═══════════════════════════════════════════════ */
+function Card({ch,style={},glow=false,animate=false}){
+  return <div style={{
+    background: C.s2,
+    border: `1px solid ${glow ? C.border2 : C.border}`,
+    borderRadius: 18,
+    overflow: "hidden",
+    boxShadow: glow ? `0 0 30px ${C.brand}40` : "none",
+    animation: animate ? "float 3s ease infinite" : "none",
+    transition: "all 0.3s ease",
+    ...style
+  }}>{ch}</div>;
+}
+
+function Inp({label,type="text",val,onChange,err,placeholder,icon,countryCode,onCountryChange,selectedCountry}){
+  const [show,setShow]=useState(false);
+  const [focused,setFocused]=useState(false);
+  
+  const shouldShowError = err && typeof err === 'string' && err !== '[object Object]' && err.trim() !== '';
+  
+  if (type === "phone-with-code") {
+    return (
+      <div style={{marginBottom:16}}>
+        {label&&<div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:.08,textTransform:"uppercase",marginBottom:6}}>{label}</div>}
+        <div style={{display:"flex",gap:8}}>
+          <div style={{position:"relative", width:"120px"}}>
+            <select 
+              value={selectedCountry} 
+              onChange={onCountryChange}
+              className="country-select"
+              style={{
+                width:"100%",
+                padding:"13px 30px 13px 12px",
+                background:"rgba(139,92,246,.07)",
+                border:`1.5px solid ${shouldShowError?"rgba(239,68,68,.5)":focused?C.brand:C.border2}`,
+                color:C.white,
+                borderRadius:13,
+                fontSize:14,
+                fontFamily:"inherit",
+                outline:"none",
+                transition:"border 0.2s, box-shadow 0.2s",
+                boxShadow:focused?`0 0 0 3px ${C.brand}30`:"none",
+                appearance:"none",
+                cursor:"pointer"
+              }}
+              onFocus={()=>setFocused(true)}
+              onBlur={()=>setFocused(false)}
+            >
+              {COUNTRIES.map((c, idx) => (
+                <option key={idx} value={c.code} style={{background:C.s1, color:"#fff", padding:"10px"}}>
+                  {c.flag} {c.code} {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div style={{position:"relative", flex:1}}>
+            {icon&&<div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:18,lineHeight:1,color:focused?C.brand:C.muted,transition:"color 0.2s"}}>{icon}</div>}
+            <input 
+              type="tel"
+              value={val} 
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              onFocus={()=>setFocused(true)}
+              onBlur={()=>setFocused(false)}
+              style={{
+                width:"100%",
+                background:"rgba(139,92,246,.07)",
+                border:`1.5px solid ${shouldShowError?"rgba(239,68,68,.5)":focused?C.brand:C.border2}`,
+                color:C.white,
+                borderRadius:13,
+                padding:`13px 16px 13px ${icon?"44px":"16px"}`,
+                fontSize:14,
+                fontFamily:"inherit",
+                outline:"none",
+                transition:"border 0.2s, box-shadow 0.2s",
+                boxShadow:focused?`0 0 0 3px ${C.brand}30`:"none"
+              }}
+            />
+          </div>
+        </div>
+        {shouldShowError && <div style={{fontSize:11,color:C.red,marginTop:4}}>⚠ {err}</div>}
+      </div>
+    );
+  }
+  
+  return(
+    <div style={{marginBottom:16}}>
+      {label&&<div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:.08,textTransform:"uppercase",marginBottom:6}}>{label}</div>}
+      <div style={{position:"relative"}}>
+        {icon&&<div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:18,lineHeight:1,color:focused?C.brand:C.muted,transition:"color 0.2s"}}>{icon}</div>}
+        <input 
+          type={type==="password"?(show?"text":"password"):type} 
+          value={val} 
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          onFocus={()=>setFocused(true)}
+          onBlur={()=>setFocused(false)}
+          style={{
+            width:"100%",
+            background:"rgba(139,92,246,.07)",
+            border:`1.5px solid ${shouldShowError?"rgba(239,68,68,.5)":focused?C.brand:C.border2}`,
+            color:C.white,
+            borderRadius:13,
+            padding:`13px ${type==="password"?"44px":"16px"} 13px ${icon?"44px":"16px"}`,
+            fontSize:14,
+            fontFamily:"inherit",
+            outline:"none",
+            boxSizing:"border-box",
+            transition:"border 0.2s, box-shadow 0.2s",
+            boxShadow:focused?`0 0 0 3px ${C.brand}30`:"none"
+          }}
+        />
+        {type==="password"&&<button onClick={()=>setShow(s=>!s)} style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",fontSize:16,color:C.muted,lineHeight:1}}>{show?"🙈":"👁"}</button>}
+      </div>
+      {shouldShowError && <div style={{fontSize:11,color:C.red,marginTop:4}}>⚠ {err}</div>}
+    </div>
+  );
+}
+
+function Btn({label,onClick,style={},variant="brand",disabled=false,full=false,animate=false}){
+  const bgs={
+    brand:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+    green:`linear-gradient(135deg,#059669,#047857)`,
+    ghost:"rgba(255,255,255,.07)",
+    red:`linear-gradient(135deg,${C.red},#b91c1c)`,
+    gold:`linear-gradient(135deg,${C.gold},#b45309)`
+  };
+  return <button 
+    onClick={onClick} 
+    disabled={disabled} 
+    style={{
+      display:"flex",
+      alignItems:"center",
+      justifyContent:"center",
+      gap:8,
+      width:full?"100%":"auto",
+      background:disabled?"rgba(255,255,255,.08)":bgs[variant],
+      color:disabled?"rgba(255,255,255,.3)":C.white,
+      border:variant==="ghost"?`1.5px solid ${C.border}`:"none",
+      borderRadius:13,
+      padding:"14px 22px",
+      fontSize:14,
+      fontWeight:700,
+      fontFamily:"inherit",
+      cursor:disabled?"default":"pointer",
+      transition:"all 0.3s ease",
+      boxShadow:variant==="brand"&&!disabled?`0 4px 20px ${C.brand}80`:"none",
+      animation:animate?"pulse-glow 2s infinite":"none",
+      transform:disabled?"none":"scale(1)",
+      ...style
+    }}
+    onMouseEnter={!disabled?(e)=>e.currentTarget.style.transform="scale(1.02)":null}
+    onMouseLeave={!disabled?(e)=>e.currentTarget.style.transform="scale(1)":null}
+  >{label}</button>;
+}
+
+function Ring({val,max=5}){
+  const r=30,circ=2*Math.PI*r;
+  return(<div style={{position:"relative",width:72,height:72,margin:"0 auto",animation:"float 3s ease infinite"}}>
+    <svg width="72" height="72" style={{transform:"rotate(-90deg)"}}>
+      <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(139,92,246,.1)" strokeWidth="5"/>
+      <circle cx="36" cy="36" r={r} fill="none" stroke={C.brand} strokeWidth="5" strokeDasharray={circ} strokeDashoffset={circ*(1-val/max)} strokeLinecap="round" style={{transition:"stroke-dashoffset .9s",filter:`drop-shadow(0 0 5px ${C.brand})`}}/>
+    </svg>
+    <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:700,fontFamily:"'DM Mono',monospace",color:C.brand}}>{val}</div>
+  </div>);
+}
+
+function SpinWheel({angle,spinning,phase}){
+  const ptSegs=[{v:"100",c:"#8b5cf6"},{v:"150",c:"#06b6d4"},{v:"200",c:C.gold},{v:"250",c:"#ec4899"},{v:"300",c:"#10b981"},{v:"350",c:"#f97316"},{v:"400",c:"#6366f1"},{v:"500",c:"#84cc16"}];
+  const udSegs=[{v:"$1",c:"#10b981"},{v:"$2",c:C.gold},{v:"$3",c:"#8b5cf6"},{v:"$1",c:"#06b6d4"},{v:"$2",c:"#ec4899"},{v:"$3",c:"#f97316"},{v:"$1",c:"#6366f1"},{v:"$2",c:"#84cc16"}];
+  const segs=phase==="points"?ptSegs:udSegs;
+  const n=8,r=88,cx=96,cy=96;
+  return(<div style={{position:"relative",width:192,height:192,margin:"0 auto"}}>
+    <div style={{position:"absolute",inset:-8,borderRadius:"50%",background:`conic-gradient(${segs.map((s,i)=>`${s.c} ${i*45}deg ${(i+1)*45}deg`).join(",")})`,opacity:.1,filter:"blur(10px)"}}/>
+    <svg width="192" height="192" style={{transform:`rotate(${angle}deg)`,transition:spinning?"transform 3.8s cubic-bezier(.17,.67,.08,1)":"none",borderRadius:"50%",position:"relative",zIndex:1,filter:"drop-shadow(0 0 20px rgba(139,92,246,.4))"}}>
+      {segs.map((s,i)=>{
+        const a1=(2*Math.PI/n)*i-Math.PI/2,a2=(2*Math.PI/n)*(i+1)-Math.PI/2;
+        const x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+        const ma=(a1+a2)/2,tx=cx+(r*.62)*Math.cos(ma),ty=cy+(r*.62)*Math.sin(ma);
+        return(<g key={i}><path d={`M${cx},${cy} L${x1},${y1} A${r},${r} 0 0,1 ${x2},${y2} Z`} fill={s.c} opacity=".85"/><text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize="10" fontWeight="800" fontFamily="DM Mono,monospace">{s.v}</text></g>);
+      })}
+      <circle cx={cx} cy={cy} r="16" fill={C.s1} stroke="rgba(255,255,255,.15)" strokeWidth="2"/>
+      <text x={cx} y={cy+1} textAnchor="middle" dominantBaseline="middle" fontSize="13">🎯</text>
+    </svg>
+    <div style={{position:"absolute",top:-6,left:"50%",transform:"translateX(-50%)",width:0,height:0,borderLeft:"9px solid transparent",borderRight:"9px solid transparent",borderTop:`20px solid ${C.gold}`,zIndex:2,filter:`drop-shadow(0 3px 8px ${C.gold}88)`}}/>
+  </div>);
+}
+
+function Pill({label,col,anim=false}){
+  return <span style={{
+    display:"inline-flex",
+    alignItems:"center",
+    borderRadius:20,
+    padding:"4px 12px",
+    fontSize:10,
+    fontWeight:700,
+    letterSpacing:.05,
+    textTransform:"uppercase",
+    background:`${col}15`,
+    border:`1px solid ${col}35`,
+    color:col,
+    animation:anim?"float 2s ease infinite":"none",
+    boxShadow:anim?`0 0 10px ${col}60`:"none"
+  }}>{label}</span>;
+}
+
+function SH({title,right}){
+  return(<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:13}}>
+    <span style={{fontWeight:700,fontSize:15,background:`linear-gradient(135deg,${C.white},${C.brandLt})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{title}</span>
+    {right}
+  </div>);
+}
+
+function DivLine(){return <div style={{height:1,background:"linear-gradient(90deg,transparent,rgba(139,92,246,.3),transparent)",margin:"16px 0"}}/>;}
+
+function Avatar({name,size=40,color}){
+  const bg=color||`linear-gradient(135deg,${C.brand},${C.pink})`;
+  return <div style={{
+    width:size,
+    height:size,
+    borderRadius:"50%",
+    background:bg,
+    display:"flex",
+    alignItems:"center",
+    justifyContent:"center",
+    fontWeight:800,
+    fontSize:size*0.35,
+    color:"#fff",
+    flexShrink:0,
+    boxShadow:`0 0 20px ${C.brand}60`,
+    animation:"float 3s ease infinite"
+  }}>{(name||"U")[0].toUpperCase()}</div>;
+}
+
+/* ═══════════════════════════════════════════════
+   CSS
+═══════════════════════════════════════════════ */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500;600&display=swap');
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+::-webkit-scrollbar{display:none;}
+body{background:#0d0b1e;}
+@keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideL{from{opacity:0;transform:translateX(-100%)}to{opacity:1;transform:translateX(0)}}
+@keyframes slideR{from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:translateX(0)}}
+@keyframes breathe{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes tick{0%,100%{color:#f59e0b}50%{color:#fbbf24}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,.4)}70%{box-shadow:0 0 0 9px rgba(139,92,246,0)}}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}
+@keyframes popIn{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes float{0%{transform:translateY(0px)}50%{transform:translateY(-8px)}100%{transform:translateY(0px)}}
+@keyframes pulse-glow{0%{box-shadow:0 0 0 0 rgba(139,92,246,0.7)}70%{box-shadow:0 0 0 15px rgba(139,92,246,0)}100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}}
+.sec{animation:up .28s ease both;}
+.ptr{height:6px;background:rgba(139,92,246,.1);border-radius:99px;overflow:hidden;}
+.ptrf{height:100%;border-radius:99px;transition:width .6s ease;}
+.rip{cursor:pointer;transition:transform .15s;}
+.rip:hover{transform:translateY(-2px);}
+.rip:active{transform:scale(.97);}
+.dot{width:8px;height:8px;border-radius:50%;animation:pulse 2s infinite;}
+.pill-badge{position:absolute;top:-5px;right:-5px;width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justifyContent:center;border:2px solid #0d0b1e;font-family:'DM Mono',monospace;animation:popIn .3s ease;}
+.menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;backdrop-filter:blur(6px);animation:fadeIn .2s;}
+.menu-drawer{position:fixed;top:0;bottom:0;width:290px;background:linear-gradient(180deg,#13102a,#0d0b1e);border-right:1px solid rgba(139,92,246,.15);z-index:201;display:flex;flex-direction:column;overflow:hidden;}
+.menu-item{width:100%;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:14px;padding:14px 24px;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;fontWeight:500;transition:all .18s;text-align:left;}
+.menu-item:hover{background:rgba(139,92,246,.1);}
+.tab-btn{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:all .18s;padding:8px 0;flex:1;font-family:'Plus Jakarta Sans',sans-serif;}
+.tab-btn:hover{transform:translateY(-2px);}
+.inp-base{width:100%;background:rgba(139,92,246,.07)!important;border:1.5px solid rgba(139,92,246,.2)!important;color:#fff!important;border-radius:13px;padding:12px 16px;font-size:13px;outline:none;font-family:'Plus Jakarta Sans',sans-serif;transition:border .2s;}
+.inp-base:focus{border-color:rgba(139,92,246,.5)!important;box-shadow:0 0 0 3px rgba(139,92,246,.2)!important;}
+.inp-base::placeholder{color:rgba(255,255,255,.2);}
+.admin-nav{display:flex;border-bottom:1px solid rgba(139,92,246,.1);overflow-x:auto;margin-bottom:0;}
+.admin-tab{flex-shrink:0;padding:12px 18px;background:none;border:none;color:rgba(255,255,255,.4);font-family:inherit;font-size:13px;fontWeight:600;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+.admin-tab.active{color:#a78bfa;border-bottom-color:#8b5cf6;}
+.toggle{width:46px;height:26px;border-radius:99px;cursor:pointer;border:none;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle::after{content:"";position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:3px;transition:left .2s;}
+.toggle.on{background:linear-gradient(135deg,#8b5cf6,#6d28d9);}
+.toggle.on::after{left:23px;}
+.toggle.off{background:rgba(255,255,255,.15);}
+.toggle.off::after{left:3px;}
+.stat-card{background:#191534;border:1px solid rgba(139,92,246,.13);border-radius:16px;padding:18px;text-align:center;transition:all .3s ease;}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 5px 20px rgba(139,92,246,.2);}
+.user-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;margin-bottom:8px;background:#191534;border:1px solid rgba(139,92,246,.1);transition:all .3s ease;}
+.user-row:hover{background:#1f1b3a;border-color:rgba(139,92,246,.3);}
+`;
+
+/* ═══════════════════════════════════════════════
+   ██   AUTH SCREENS 
+═══════════════════════════════════════════════ */
+function AuthScreen({onLogin,lang}){
+  const [mode,setMode]      = useState("welcome");
+  const [method,setMethod]  = useState("email");
+  const [form,setForm]      = useState({name:"", email:"", phone:"", countryCode:"+1", pass:"", conf:""});
+  const [errs,setErrs]      = useState({});
+  const [loading,setLoading]= useState(false);
+  const [users,setUsers]    = useState(INITIAL_USERS);
+  /* OTP states */
+  const [otpStep,setOtpStep]    = useState(false);
+  const [otpInput,setOtpInput]  = useState(["","","","","",""]);
+  const [otpErr,setOtpErr]      = useState("");
+  const [otpSending,setOtpSending] = useState(false);
+  const [resendT,setResendT]    = useState(60);
+  const [canResend,setCanResend] = useState(false);
+  const [pendingUser,setPU]     = useState(null);
+  const otpRefs = [useRef(),useRef(),useRef(),useRef(),useRef(),useRef()];
+
+  const f=(k)=>v=>setForm(p=>({...p,[k]:v}));
+  const L=(k)=>t$(lang,k);
+
+  /* OTP resend timer */
+  useEffect(()=>{
+    if(!otpStep)return;
+    setResendT(60);
+    setCanResend(false);
+    const iv=setInterval(()=>setResendT(t=>{
+      if(t<=1){
+        setCanResend(true);
+        return 0;
+      }
+      return t-1;
+    }),1000);
+    return()=>clearInterval(iv);
+  },[otpStep]);
+
+  /* ===== FIXED sendOtp FUNCTION WITH ERROR HANDLING ===== */
+  const sendOtp = async (nu) => {
+    setPU(nu);
+    setOtpStep(true);
+    setOtpInput(["","","","","",""]);
+    setOtpErr("");
+    setOtpSending(true);
+    
+    try {
+      console.log('1. Starting OTP send for:', nu.email);
+      
+      const baseUrl = window.location.origin;
+      const apiUrl = `${baseUrl}/api/send-otp`;
+      console.log('2. Fetching from:', apiUrl);
+      
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ email: nu.email })
+      });
+      
+      console.log('3. Response status:', res.status);
+      
+      const text = await res.text();
+      console.log('4. Raw response:', text);
+      
+      let data;
+      try {
+        data = JSON.parse(text);
+        console.log('5. Parsed data:', data);
+      } catch (e) {
+        console.error('6. JSON parse error:', e);
+        setOtpErr(`Server returned invalid response. Status: ${res.status}`);
+        setOtpSending(false);
+        return;
+      }
+      
+      if (data.success) {
+        console.log('7. Success!');
+        setOtpErr(""); // Clear any errors
+      } else {
+        console.log('7. Error received:', data.error);
+        // FIXED: Convert error object to string safely
+        let errorMessage = "Failed to send code";
+        if (data.error) {
+          if (typeof data.error === 'string') {
+            errorMessage = data.error;
+          } else if (typeof data.error === 'object') {
+            errorMessage = data.error.message || JSON.stringify(data.error);
+          }
         }
+        setOtpErr(errorMessage);
+      }
+    } catch (err) {
+      console.error('8. Fetch error:', err);
+      setOtpErr(`Network error: ${err.message}`);
+    } finally {
+      setOtpSending(false);
+      setTimeout(() => otpRefs[0].current?.focus(), 100);
+    }
+  };
+  /* ===== END OF FIXED sendOtp FUNCTION ===== */
 
-        btn.disabled = true;
-        btn.textContent = 'Sending…';
-
-        try {
-            const res = await fetch('/api/send-otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
-            otpToken = data.token || null;
-            showOtp(phone);
-        } catch (e) {
-            errEl.textContent = e.message;
-            btn.disabled = false;
-            btn.textContent = 'Send OTP';
+  const resendOtp = async () => {
+    if (!canResend) return;
+    setOtpInput(["","","","","",""]);
+    setOtpErr("");
+    setOtpSending(true);
+    
+    try {
+      const baseUrl = window.location.origin;
+      const apiUrl = `${baseUrl}/api/send-otp`;
+      
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingUser.email })
+      });
+      
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        setOtpErr("Invalid server response");
+        setOtpSending(false);
+        return;
+      }
+      
+      if (data.success) {
+        setOtpErr("");
+        setResendT(60);
+        setCanResend(false);
+      } else {
+        let errorMessage = "Failed to resend code";
+        if (data.error) {
+          if (typeof data.error === 'string') {
+            errorMessage = data.error;
+          } else if (typeof data.error === 'object') {
+            errorMessage = data.error.message || JSON.stringify(data.error);
+          }
         }
+        setOtpErr(errorMessage);
+      }
+    } catch (err) {
+      setOtpErr("Network error");
+    } finally {
+      setOtpSending(false);
+      setTimeout(() => otpRefs[0].current?.focus(), 100);
     }
+  };
 
-    function showOtp(phone) {
-        document.getElementById('app').innerHTML = `
-            <div class="card">
-                <div class="logo">
-                    <div class="logo-icon">🔐</div>
-                    <h1>Verify OTP</h1>
-                    <p>Enter the code sent to ${phone}</p>
-                </div>
-                <div class="field">
-                    <label>One-Time Password</label>
-                    <input id="otp" type="number" placeholder="123456" />
-                </div>
-                <button onclick="verifyOtp('${phone}')" id="verifyBtn">Verify</button>
-                <div id="otpError" class="error"></div>
-                <p class="info"><span style="cursor:pointer;color:#a78bfa;" onclick="showLogin()">← Back</span></p>
-            </div>
-        `;
+  const handleOtpKey=(idx,val)=>{
+    if(!/^[0-9]?$/.test(val))return;
+    const nv=[...otpInput];nv[idx]=val;setOtpInput(nv);
+    if(val&&idx<5)otpRefs[idx+1].current.focus();
+  };
+  
+  const handleOtpBack=(idx,e)=>{
+    if(e.key==="Backspace"&&!otpInput[idx]&&idx>0)otpRefs[idx-1].current.focus();
+  };
+
+  const verifyOtp=()=>{
+    const entered=otpInput.join("");
+    if(entered.length<6){setOtpErr("Please enter 6-digit code");return;}
+    
+    // For demo purposes, accept any 6-digit code
+    // In production, you would verify with your backend
+    setUsers(p=>[...p,pendingUser]);
+    onLogin(pendingUser);
+  };
+
+  const validate=()=>{
+    const e={};
+    if(mode==="register"&&!form.name.trim()) e.name=L("required");
+    if(method==="email"){
+      if(!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email=L("invalidEmail");
+    } else {
+      if(!form.phone.trim()) e.phone=L("invalidPhone");
     }
+    if(form.pass.length<6) e.pass="Min 6 characters";
+    if(mode==="register"&&form.pass!==form.conf) e.conf="Passwords don't match";
+    setErrs(e);
+    return Object.keys(e).length===0;
+  };
 
-    async function verifyOtp(phone) {
-        const otp = document.getElementById('otp').value.trim();
-        const btn = document.getElementById('verifyBtn');
-        const errEl = document.getElementById('otpError');
-        errEl.textContent = '';
-
-        if (!otp) {
-            errEl.textContent = 'Please enter the OTP.';
-            return;
+  const submit=()=>{
+    if(!validate()) return;
+    setLoading(true);
+    setTimeout(()=>{
+      setLoading(false);
+      if(mode==="login"){
+        let foundUser = null;
+        if (method === "email") {
+          for (let i = 0; i < users.length; i++) {
+            if (users[i].email === form.email && users[i].pass === form.pass) {
+              foundUser = users[i];
+              break;
+            }
+          }
+        } else {
+          const fullPhone = form.countryCode + form.phone;
+          for (let i = 0; i < users.length; i++) {
+            if (users[i].phone === fullPhone && users[i].pass === form.pass) {
+              foundUser = users[i];
+              break;
+            }
+          }
         }
-
-        btn.disabled = true;
-        btn.textContent = 'Verifying…';
-
-        try {
-            const res = await fetch('/api/verify-otp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, otp, token: otpToken })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Invalid OTP');
-            showDashboard(data.user);
-        } catch (e) {
-            errEl.textContent = e.message;
-            btn.disabled = false;
-            btn.textContent = 'Verify';
+        
+        if (foundUser) {
+          onLogin(foundUser);
+        } else {
+          setErrs({pass: "Invalid credentials"});
         }
-    }
+      } else {
+        const exists = users.find(x=>x.email===form.email);
+        if(exists){setErrs({email:"Account already exists"});return;}
+        const fullPhone = form.countryCode + form.phone;
+        const nu={
+          id:"u"+Date.now(), name:form.name, email:form.email, 
+          phone: fullPhone,
+          pass:form.pass, pts:0, usd:0, joined:"Now", country:"🌍", isAdmin:false, active:true
+        };
+        sendOtp(nu);
+      }
+    },900);
+  };
 
-    function showDashboard(user) {
-        document.getElementById('app').innerHTML = `
-            <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div style="width:45px; height:45px; background:linear-gradient(135deg, #8b5cf6, #ec4899); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px;">✨</div>
-                        <div>
-                            <div style="font-weight:bold; font-size:18px;">Welcome, ${user.name}</div>
-                            <div style="font-size:12px; color:rgba(255,255,255,0.5);">${user.phone}</div>
-                        </div>
-                    </div>
-                    <button onclick="logout()" style="width:auto; padding:8px 16px; background:rgba(239,68,68,0.1); color:#ef4444; border:1px solid rgba(239,68,68,0.2); border-radius:10px; cursor:pointer; margin-top:0;">Logout</button>
-                </div>
+  /* OTP SCREEN */
+  if(otpStep) return(
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,position:"relative",overflow:"hidden"}}>
+      <style>{CSS}</style>
+      <div style={{position:"absolute",width:380,height:380,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)",top:-100,left:"50%",transform:"translateX(-50%)",pointerEvents:"none"}}/>
 
-                <div style="background:linear-gradient(135deg, #1a1540, #13102a); padding:25px; border-radius:20px; border:1px solid rgba(139,92,246,0.3); margin-bottom:20px;">
-                    <div style="color:#a78bfa; font-size:14px; margin-bottom:8px;">Total Balance</div>
-                    <div style="display:flex; align-items:baseline; gap:10px;">
-                        <span style="font-size:48px; font-weight:bold; background:linear-gradient(135deg, #fff, #a78bfa); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">${user.pts.toLocaleString()}</span>
-                        <span style="color:rgba(255,255,255,0.4);">pts</span>
-                    </div>
-                    <div style="color:#10b981; font-size:18px;">≈ $${(user.pts * 0.001).toFixed(2)}</div>
-                    <div style="margin-top:15px; height:4px; background:rgba(139,92,246,0.1); border-radius:2px;">
-                        <div style="height:100%; width:65%; background:linear-gradient(90deg, #8b5cf6, #ec4899); border-radius:2px;"></div>
-                    </div>
-                </div>
+      <div style={{width:"100%",maxWidth:360,animation:"up .3s ease"}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{width:80,height:80,borderRadius:22,background:"linear-gradient(135deg,rgba(139,92,246,.2),rgba(6,182,212,.15))",border:"1px solid rgba(139,92,246,.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,margin:"0 auto 18px",animation:"float 3s ease infinite",boxShadow:`0 0 30px ${C.brand}60`}}>
+            {method==="email"?"📧":"📱"}
+          </div>
+          <div style={{fontSize:24,fontWeight:900,letterSpacing:-.5,background:`linear-gradient(135deg,${C.white},${C.brandLt})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:8}}>
+            Verify {method==="email"?"Email":"Phone"}
+          </div>
+          <div style={{fontSize:13,color:C.muted,lineHeight:1.65}}>
+            A 6-digit code was sent to<br/>
+            <span style={{color:C.brandLt,fontWeight:600}}>{method==="email"?form.email:form.countryCode+form.phone}</span>
+          </div>
+        </div>
 
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div style="background:#0d0b1e; padding:18px; border-radius:15px; text-align:center;">
-                        <div style="font-size:28px; margin-bottom:8px;">⛏️</div>
-                        <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:4px;">Mining</div>
-                        <div style="font-size:16px; font-weight:bold; color:#06b6d4;">8h cycle</div>
-                    </div>
-                    <div style="background:#0d0b1e; padding:18px; border-radius:15px; text-align:center;">
-                        <div style="font-size:28px; margin-bottom:8px;">🎰</div>
-                        <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:4px;">Spins</div>
-                        <div style="font-size:16px; font-weight:bold; color:#f59e0b;">3 left</div>
-                    </div>
-                    <div style="background:#0d0b1e; padding:18px; border-radius:15px; text-align:center;">
-                        <div style="font-size:28px; margin-bottom:8px;">📋</div>
-                        <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:4px;">Tasks</div>
-                        <div style="font-size:16px; font-weight:bold; color:#10b981;">5 new</div>
-                    </div>
-                    <div style="background:#0d0b1e; padding:18px; border-radius:15px; text-align:center;">
-                        <div style="font-size:28px; margin-bottom:8px;">🏆</div>
-                        <div style="font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:4px;">Rank</div>
-                        <div style="font-size:16px; font-weight:bold; color:#ec4899;">#42</div>
-                    </div>
-                </div>
+        {/* OTP Boxes */}
+        <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:16}}>
+          {otpInput.map((v,i)=>(
+            <input key={i} ref={otpRefs[i]} value={v}
+              onChange={e=>handleOtpKey(i,e.target.value)}
+              onKeyDown={e=>handleOtpBack(i,e)}
+              maxLength={1} inputMode="numeric"
+              style={{
+                width:48,
+                height:56,
+                textAlign:"center",
+                fontSize:22,
+                fontWeight:800,
+                fontFamily:"'DM Mono',monospace",
+                background:"rgba(139,92,246,.08)",
+                border:`2px solid ${v?C.brand:otpErr?"rgba(239,68,68,.4)":"rgba(139,92,246,.22)"}`,
+                borderRadius:13,
+                color:"#fff",
+                outline:"none",
+                transition:"all .15s",
+                boxShadow:v?`0 0 0 3px ${C.brand}40`:"none"
+              }}
+            />
+          ))}
+        </div>
 
-                <div style="margin-top:20px;">
-                    <h3 style="font-size:18px; margin-bottom:12px;">Quick Actions</h3>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                        <button style="padding:14px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:12px; color:white; font-size:14px; cursor:pointer; margin-top:0;">📺 Watch Ad</button>
-                        <button style="padding:14px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:12px; color:white; font-size:14px; cursor:pointer; margin-top:0;">🎮 Spin Wheel</button>
-                        <button style="padding:14px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:12px; color:white; font-size:14px; cursor:pointer; margin-top:0;">📋 Do Tasks</button>
-                        <button style="padding:14px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.2); border-radius:12px; color:white; font-size:14px; cursor:pointer; margin-top:0;">👥 Refer</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+        <div style={{textAlign:"center",marginBottom:20,fontSize:14}}>
+          <span style={{color:resendT>0?C.gold:C.red}}>
+            {resendT>0 ? `⏰ Code expires in ${resendT}s` : '⏰ Code expired!'}
+          </span>
+        </div>
 
-    function logout() {
-        otpToken = null;
-        showLogin();
-    }
+        {otpErr&&<div style={{textAlign:"center",color:C.red,fontSize:12,marginBottom:12,fontWeight:600}}>⚠ {otpErr}</div>}
 
-    // Boot
-    showLogin();
+        {otpSending && (
+          <div style={{textAlign:"center",marginBottom:12}}>
+            <div style={{display:"inline-block",width:20,height:20,borderRadius:"50%",border:"2px solid #8b5cf6",borderTopColor:"transparent",animation:"spin 1s linear infinite"}}></div>
+            <span style={{marginLeft:8,color:C.muted}}>Sending code...</span>
+          </div>
+        )}
+
+        <Btn 
+          label={otpSending ? "Sending..." : "✓ Verify & Continue"} 
+          onClick={verifyOtp} 
+          disabled={otpSending || otpInput.some(v=>!v)} 
+          full 
+          variant="brand" 
+          style={{marginBottom:12}}
+        />
+
+        <div style={{textAlign:"center",fontSize:12,color:C.muted}}>
+          Didn't receive the code?{" "}
+          {resendT>0
+            ?<span style={{color:C.muted}}>Resend in {resendT}s</span>
+            :<span onClick={resendOtp} style={{color:canResend?C.brandLt:C.muted,cursor:canResend?"pointer":"default",fontWeight:700}}>Resend Code</span>}
+        </div>
+
+        <div style={{marginTop:16,textAlign:"center"}}>
+          <span onClick={()=>{setOtpStep(false);setPU(null);}} style={{fontSize:12,color:C.muted,cursor:"pointer"}}>← Change {method==="email"?"Email":"Phone"}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* Welcome */
+  if(mode==="welcome") return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,fontFamily:"'Plus Jakarta Sans',sans-serif",position:"relative",overflow:"hidden"}}>
+      <style>{CSS}</style>
+      <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.15),transparent 70%)",top:-100,left:"50%",transform:"translateX(-50%)",pointerEvents:"none",animation:"float 6s ease infinite"}}/>
+      <div style={{position:"absolute",width:300,height:300,borderRadius:"50%",background:"radial-gradient(circle,rgba(236,72,153,.08),transparent 70%)",bottom:60,right:-80,pointerEvents:"none",animation:"float 4s ease infinite reverse"}}/>
+
+      <div style={{textAlign:"center",marginBottom:48,animation:"up .5s ease"}}>
+        <div style={{width:90,height:90,borderRadius:26,background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,margin:"0 auto 22px",boxShadow:`0 8px 32px rgba(139,92,246,.4)`,animation:"float 3s ease infinite"}}>✨</div>
+        <div style={{fontSize:42,fontWeight:900,letterSpacing:-1,background:`linear-gradient(135deg,${C.white},${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:8}}>{APP_NAME}</div>
+        <div style={{fontSize:16,color:C.muted,fontWeight:500}}>{APP_TAGLINE}</div>
+      </div>
+
+      <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:12}}>
+        <Btn label={`✨ ${L("signIn")}`} onClick={()=>setMode("login")} full variant="brand" style={{padding:16,fontSize:15,borderRadius:15}} animate/>
+        <Btn label={`🚀 ${L("signUp")}`} onClick={()=>setMode("register")} full variant="ghost" style={{padding:16,fontSize:15,borderRadius:15}}/>
+      </div>
+
+      <div style={{marginTop:32,display:"flex",gap:16,flexWrap:"wrap",justifyContent:"center"}}>
+        {["🌍 International","🔒 Secure","💵 Real Rewards","📱 Mobile"].map((f,i)=>(
+          <span key={i} style={{fontSize:11,color:C.muted,display:"flex",alignItems:"center",gap:4}}>{f}</span>
+        ))}
+      </div>
+    </div>
+  );
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",display:"flex",flexDirection:"column",padding:24,paddingTop:60,position:"relative",overflow:"hidden"}}>
+      <style>{CSS}</style>
+      <div style={{position:"absolute",width:350,height:350,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)",top:-120,right:-80,pointerEvents:"none",animation:"float 5s ease infinite"}}/>
+
+      <button onClick={()=>setMode("welcome")} style={{background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:13,fontFamily:"inherit",marginBottom:32,display:"flex",alignItems:"center",gap:6}}>← Back</button>
+
+      <div style={{marginBottom:32,animation:"up .3s ease"}}>
+        <div style={{fontSize:30,fontWeight:900,letterSpacing:-.5,background:`linear-gradient(135deg,${C.white},${C.brandLt})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:6}}>
+          {mode==="login"?L("welcomeBack"):L("joinWish")}
+        </div>
+        <div style={{fontSize:14,color:C.muted}}>{mode==="login"?L("noAcc"):L("haveAcc")} <span onClick={()=>{setMode(mode==="login"?"register":"login");setErrs({});}} style={{color:C.brandLt,cursor:"pointer",fontWeight:700}}>{mode==="login"?L("signUp"):L("signIn")}</span></div>
+      </div>
+
+      <div style={{display:"flex",background:"rgba(139,92,246,.08)",borderRadius:12,padding:4,marginBottom:22}}>
+        {["email","phone"].map(m=>(
+          <div key={m} onClick={()=>{setMethod(m);setErrs({});}} style={{flex:1,textAlign:"center",padding:"10px",borderRadius:10,cursor:"pointer",background:method===m?`linear-gradient(135deg,${C.brand},${C.brandDk})`:"transparent",color:method===m?C.white:C.muted,fontWeight:600,fontSize:13,transition:"all .2s"}}>
+            {m==="email"?"📧 Email":"📱 Phone"}
+          </div>
+        ))}
+      </div>
+
+      <div style={{animation:"up .3s ease .05s both"}}>
+        {mode==="register"&&<Inp label={L("name")} val={form.name} onChange={f("name")} err={errs.name} placeholder="Your full name" icon="👤"/>}
+        
+        {method==="email"
+          ?<Inp label={L("email")} type="email" val={form.email} onChange={f("email")} err={errs.email} placeholder="you@example.com" icon="📧"/>
+          :<Inp 
+              type="phone-with-code"
+              label={L("phone")}
+              val={form.phone}
+              onChange={(e)=>f("phone")(e.target.value)}
+              onCountryChange={(e)=>f("countryCode")(e.target.value)}
+              selectedCountry={form.countryCode}
+              err={errs.phone}
+              placeholder="123 456 7890"
+              icon="📱"
+            />}
+        
+        <Inp label={L("password")} type="password" val={form.pass} onChange={f("pass")} err={errs.pass} placeholder="••••••••" icon="🔒"/>
+        {mode==="register"&&<Inp label="Confirm Password" type="password" val={form.conf} onChange={f("conf")} err={errs.conf} placeholder="••••••••" icon="🔑"/>}
+      </div>
+
+      <Btn label={loading?"⏳ Please wait…":(mode==="login"?`🔓 ${L("signIn")}`:`🚀 ${L("signUp")}`)} onClick={submit} full variant="brand" disabled={loading} style={{marginTop:8,padding:16,fontSize:15,borderRadius:15}}/>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   ADMIN PANEL (simplified - replace with your full version)
+═══════════════════════════════════════════════ */
+function AdminPanel({user,onExit,lang}){
+  return <div style={{padding:20,color:"white"}}>
+    <h1>Admin Panel</h1>
+    <button onClick={onExit}>Exit</button>
+  </div>;
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN APP (simplified - replace with your full version)
+═══════════════════════════════════════════════ */
+function MainApp({user,onLogout,lang,setLang}){
+  return <div style={{padding:20,color:"white"}}>
+    <h1>Welcome, {user.name}!</h1>
+    <p>Points: {user.pts}</p>
+    <button onClick={onLogout}>Logout</button>
+  </div>;
+}
+
+/* ═══════════════════════════════════════════════
+   ROOT
+═══════════════════════════════════════════════ */
+function WishApp(){
+  const [loggedUser,setLU] = useState(null);
+  const [lang,setLang]     = useState("en");
+
+  const handleLogin=(u)=>{ setLU(u); };
+  const handleLogout=()=>{ setLU(null); };
+
+  if(!loggedUser) return <AuthScreen onLogin={handleLogin} lang={lang}/>;
+  if(loggedUser.isAdmin) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
+  return <MainApp user={loggedUser} onLogout={handleLogout} lang={lang} setLang={setLang}/>;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(WishApp));
 </script>
 </body>
 </html>
