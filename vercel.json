@@ -10,6 +10,10 @@
       "dest": "/api/verify-otp.js"
     },
     {
+      "src": "/api/user",
+      "dest": "/api/user.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

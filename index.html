@@ -803,6 +803,11 @@ function AuthScreen({onLogin,lang}){
       const data=await res.json();
       if(data.success){
         setUsers(p=>[...p,pendingUser]);
+        // Persist new user to MongoDB
+        try{
+          await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString()})});
+        }catch(e){}
         onLogin(pendingUser);
       } else {
         setOtpErr(typeof data.error==='string'?data.error:'Invalid code');
@@ -828,47 +833,42 @@ function AuthScreen({onLogin,lang}){
     return Object.keys(e).length===0;
   };
 
-  const submit=()=>{
+  const submit=async()=>{
     if(!validate()) return;
     setLoading(true);
-    setTimeout(()=>{
-      setLoading(false);
-      if(mode==="login"){
-        let foundUser = null;
-        if (method === "email") {
-          for (let i = 0; i < users.length; i++) {
-            if (users[i].email === form.email && users[i].pass === form.pass) {
-              foundUser = users[i];
-              break;
-            }
-          }
-        } else {
-          const fullPhone = form.countryCode + form.phone;
-          for (let i = 0; i < users.length; i++) {
-            if (users[i].phone === fullPhone && users[i].pass === form.pass) {
-              foundUser = users[i];
-              break;
-            }
-          }
-        }
-        
-        if (foundUser) {
-          onLogin(foundUser);
-        } else {
-          setErrs({pass: "Invalid credentials"});
-        }
+    if(mode==="login"){
+      let foundUser=null;
+      // Check demo/admin users first (in-memory)
+      if(method==="email"){
+        foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
       } else {
-        const exists = users.find(x=>x.email===form.email);
-        if(exists){setErrs({email:"Account already exists"});return;}
-        const fullPhone = form.countryCode + form.phone;
-        const nu={
-          id:"u"+Date.now(), name:form.name, email:form.email, 
-          phone: fullPhone,
-          pass:form.pass, pts:0, usd:0, joined:"Now", country:"🌍", isAdmin:false, active:true
-        };
-        sendOtp(nu);
+        const fp=form.countryCode+form.phone;
+        foundUser=users.find(u=>u.phone===fp&&u.pass===form.pass)||null;
       }
-    },900);
+      // Fall back to MongoDB for real registered users
+      if(!foundUser&&method==="email"){
+        try{
+          const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
+          const d=await r.json();
+          if(d.user&&d.user.pass===form.pass) foundUser=d.user;
+        }catch(e){}
+      }
+      setLoading(false);
+      if(foundUser) onLogin(foundUser);
+      else setErrs({pass:"Invalid credentials"});
+    } else {
+      // Register: check for duplicates in memory and MongoDB
+      if(users.find(x=>x.email===form.email)){setLoading(false);setErrs({email:"Account already exists"});return;}
+      try{
+        const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
+        const d=await r.json();
+        if(d.user){setLoading(false);setErrs({email:"Account already exists"});return;}
+      }catch(e){}
+      const fullPhone=form.countryCode+form.phone;
+      const nu={id:"u"+Date.now(),name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true};
+      setLoading(false);
+      sendOtp(nu);
+    }
   };
 
   /* OTP SCREEN */
@@ -1074,6 +1074,38 @@ function MainApp({user,onLogout,lang,setLang}){
     const iv=setInterval(()=>setMineT(t=>{if(t<=1){setMR(true);return 0;}return t-1;}),1000);
     return()=>clearInterval(iv);
   },[mineStarted]);
+
+  // Load saved progress from MongoDB on first mount
+  useEffect(()=>{
+    fetch(`/api/user?email=${encodeURIComponent(user.email)}`)
+      .then(r=>r.json())
+      .then(d=>{
+        if(!d.user) return;
+        const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa}=d.user;
+        setU(p=>({...p,
+          pts:pts??p.pts,
+          usd:usd??p.usd,
+          avatar:avatar||p.avatar,
+          name:name||p.name
+        }));
+        if(td) setTD(td);
+        const today=new Date().toDateString();
+        if(al!=null) setAL(adDate===today?al:5);
+        if(sa!=null) setSA(sa);
+      })
+      .catch(()=>{});
+  },[]);
+
+  // Auto-save progress to MongoDB (debounced 2s after last change)
+  useEffect(()=>{
+    const t=setTimeout(()=>{
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:u.email,name:u.name,pts:u.pts,usd:u.usd,avatar:u.avatar,
+          tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle})
+      }).catch(()=>{});
+    },2000);
+    return()=>clearTimeout(t);
+  },[u.pts,u.usd,u.avatar,u.name,tasksDone,adLeft,spinAngle]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
