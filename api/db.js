@@ -1,17 +1,7 @@
-import { MongoClient } from 'mongodb';
+import { createClient } from '@supabase/supabase-js';
 
-const uri = process.env.MONGODB_URI;
-if (!uri) throw new Error('MONGODB_URI is not set');
+const url = process.env.SUPABASE_URL;
+const key = process.env.SUPABASE_SERVICE_KEY;
+if (!url || !key) throw new Error('SUPABASE_URL or SUPABASE_SERVICE_KEY is not set');
 
-// Reuse connection across hot-reloads in dev; create fresh in prod (serverless)
-let clientPromise;
-if (process.env.NODE_ENV === 'development') {
-  if (!global._mongoClientPromise) {
-    global._mongoClientPromise = new MongoClient(uri).connect();
-  }
-  clientPromise = global._mongoClientPromise;
-} else {
-  clientPromise = new MongoClient(uri).connect();
-}
-
-export default clientPromise;
+export const supabase = createClient(url, key);
