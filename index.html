@@ -803,12 +803,21 @@ function AuthScreen({onLogin,lang}){
       const data=await res.json();
       if(data.success){
         setUsers(p=>[...p,pendingUser]);
-        // Persist new user to MongoDB
+        // Persist new user to Supabase
         try{
           const saveRes=await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
             body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString()})});
-          if(!saveRes.ok){const e=await saveRes.json();console.error('Failed to save user:',e);}
-        }catch(e){console.error('Failed to save user:',e);}
+          if(!saveRes.ok){
+            const e=await saveRes.json();
+            console.error('Failed to save user:',e);
+            setOtpErr('Account created but failed to save: '+(e.error||'DB error. Check Vercel env vars.'));
+            return;
+          }
+        }catch(e){
+          console.error('Failed to save user:',e);
+          setOtpErr('Account created but DB save failed. Check Vercel env vars (SUPABASE_URL, SUPABASE_SERVICE_KEY).');
+          return;
+        }
         onLogin(pendingUser);
       } else {
         setOtpErr(typeof data.error==='string'?data.error:'Invalid code');
