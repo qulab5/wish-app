@@ -805,9 +805,10 @@ function AuthScreen({onLogin,lang}){
         setUsers(p=>[...p,pendingUser]);
         // Persist new user to MongoDB
         try{
-          await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+          const saveRes=await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
             body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString()})});
-        }catch(e){}
+          if(!saveRes.ok){const e=await saveRes.json();console.error('Failed to save user:',e);}
+        }catch(e){console.error('Failed to save user:',e);}
         onLogin(pendingUser);
       } else {
         setOtpErr(typeof data.error==='string'?data.error:'Invalid code');
