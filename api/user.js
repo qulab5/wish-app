@@ -24,10 +24,10 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = req.body;
       if (!body?.email) return res.status(400).json({ error: 'email required' });
-      const { _id, id, ...data } = body;
+      const { _id, ...data } = body;
       const { error } = await supabase
         .from('users')
-        .upsert(data, { onConflict: 'email' });
+        .upsert(data, { onConflict: 'id' });
       if (error) throw error;
       return res.status(200).json({ success: true });
     }

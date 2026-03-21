@@ -1101,7 +1101,7 @@ function MainApp({user,onLogout,lang,setLang}){
   useEffect(()=>{
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:u.email,name:u.name,pts:u.pts,usd:u.usd,avatar:u.avatar,
+        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,avatar:u.avatar,
           tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle})
       }).catch(()=>{});
     },2000);
