@@ -1201,24 +1201,43 @@ function MainApp({user,onLogout,lang,setLang}){
     const totalSpins=(hasFree?1:0)+extraSpins;
     if(totalSpins<=0){setSAP(true);return;}
     setSpin(true);setSR(null);
-    // Consume a spin: free spin takes priority, then extra spins
-    if(hasFree) setSNF(now+24*60*60*1000);
-    else        setES(p=>p-1);
-    const spinsAfter=hasFree?extraSpins:extraSpins-1;
+    // Pre-compute post-spin values now, while state is fresh.
+    // The setTimeout closure below is stale w.r.t. setState calls, so we
+    // must capture these values here and pass them through the closure.
+    const newSnf=hasFree?now+24*60*60*1000:spinNextFree;
+    const newEs=hasFree?extraSpins:extraSpins-1;
+    if(hasFree) setSNF(newSnf);
+    else        setES(newEs);
     const i=Math.floor(Math.random()*SPIN_PTS.length);
     const targetOffset=(337.5-i*45+720)%360;
     const currentMod=spinAngle%360;
     const diff=(targetOffset-currentMod+360)%360;
-    setSA(spinAngle+5*360+diff);
+    const newAngle=spinAngle+5*360+diff;
+    setSA(newAngle);
     setTimeout(()=>{
+      const newPts=u.pts+SPIN_PTS[i];
+      const newUsd=+(u.usd+SPIN_USD[i]*0.01).toFixed(2);
       addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);
       setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});
       setSpin(false);
-      if(spinsAfter<=0) setSAP(true); // prompt to watch ad for next spin
+      // Persist immediately — don't rely on the 2s auto-save debounce which
+      // can be cancelled by a page refresh before it fires.
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,
+          spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs})
+      }).catch(()=>{});
+      if(newEs<=0) setSAP(true);
     },4200);
   };
   const watchSpinAd=()=>{
-    showRewardedAd(()=>{setES(p=>p+1);setSAP(false);});
+    showRewardedAd(()=>{
+      const newEs=extraSpins+1;
+      setES(newEs);setSAP(false);
+      // Persist the new spin count immediately
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,extraSpins:newEs})
+      }).catch(()=>{});
+    });
   };
   const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
