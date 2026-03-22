@@ -1133,39 +1133,36 @@ function MainApp({user,onLogout,lang,setLang}){
       .then(d=>{
         if(!d.user) return;
         const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
-               spinNextFree:snf,extraSpins:es,
-               mineStartedAt:msa,mineBoosts:mb}=d.user;
+               spinNextFree:snf,extraSpins:es}=d.user;
         setU(p=>({...p,
           pts:pts??p.pts,
           usd:usd??p.usd,
           avatar:avatar||p.avatar,
           name:name||p.name
         }));
-        if(td) setTD(td);
         const today=new Date().toDateString();
         if(al!=null) setAL(adDate===today?al:5);
         if(sa!=null) setSA(sa);
         if(snf!=null) setSNF(snf);
         if(es!=null)  setES(es);
-        // ── Restore mining session ──────────────────────────────────────────
-        // msa is the epoch-ms timestamp stored when the session was started.
-        // We derive elapsed time server-side so the session keeps running even
-        // while the user is signed out or the app is closed.
-        if(msa){
-          const elapsedMs = Date.now() - msa;
-          const elapsedS  = Math.floor(elapsedMs / 1000);
-          setMSAt(msa);
-          setMineBoosts(mb||0);
-          if(elapsedS >= MINE_SESSION_S){
-            // Session already finished while user was away
-            setMineT(0);
-            setMS(true);
-            setMR(true);
-          } else {
-            // Session still running — resume countdown from correct position
-            setMineT(MINE_SESSION_S - elapsedS);
-            setMS(true);
-            setMR(false);
+        // ── Restore task state + mining session ──────────────────────────────
+        // Mining session start time is stored as tasksDone.__mine_startedAt
+        // (a reserved JSONB key) so it persists without any schema migration.
+        if(td){
+          setTD(td);
+          const msa = td.__mine_startedAt;
+          const mb  = td.__mine_boosts || 0;
+          if(msa){
+            const elapsedS = Math.floor((Date.now() - msa) / 1000);
+            setMSAt(msa);
+            setMineBoosts(mb);
+            if(elapsedS >= MINE_SESSION_S){
+              // Session finished while user was away — ready to claim
+              setMineT(0); setMS(true); setMR(true);
+            } else {
+              // Session still running — resume from correct position
+              setMineT(MINE_SESSION_S - elapsedS); setMS(true); setMR(false);
+            }
           }
         }
       })
@@ -1177,12 +1174,11 @@ function MainApp({user,onLogout,lang,setLang}){
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,avatar:u.avatar,
-          tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins,
-          mineStartedAt:mineStartedAt||null,mineBoosts})
+          tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins})
       }).catch(()=>{});
     },2000);
     return()=>clearTimeout(t);
-  },[u.pts,u.usd,u.avatar,u.name,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins,mineStartedAt,mineBoosts]);
+  },[u.pts,u.usd,u.avatar,u.name,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
@@ -1228,11 +1224,14 @@ function MainApp({user,onLogout,lang,setLang}){
     if(!mineReady)return;
     const earned = mineAccum;
     addPts(earned, earned * USD_PER_POINT);
-    // Reset all session state
     setMSAt(0); setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
-    // Immediately clear the session in DB so it doesn't restore on next login
+    // Remove mine metadata from tasksDone and save immediately so the session
+    // doesn't re-appear on the next login.
+    // eslint-disable-next-line no-unused-vars
+    const {__mine_startedAt:_a, __mine_boosts:_b, ...cleanTD} = tasksDone;
+    setTD(cleanTD);
     fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:u.id,email:u.email,mineStartedAt:null,mineBoosts:0})
+      body:JSON.stringify({id:u.id,email:u.email,tasksDone:cleanTD})
     }).catch(()=>{});
   };
   const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
@@ -1249,15 +1248,18 @@ function MainApp({user,onLogout,lang,setLang}){
   };
 
   // Start a 4-hour mining session (requires watching a rewarded ad).
-  // mineStartedAt is saved to DB immediately so the session survives sign-out / app close.
+  // Session start time is stored in tasksDone.__mine_startedAt (existing JSONB column)
+  // so it survives sign-out and app close with no schema migration required.
   const startMiningWithAd = () => {
     if (mineStarted) return;
     showRewardedAd(() => {
       const now = Date.now();
       setMSAt(now);
       setMS(true); setMineT(MINE_SESSION_S); setMineBoosts(0); setMR(false);
+      const newTD = {...tasksDone, __mine_startedAt: now, __mine_boosts: 0};
+      setTD(newTD);
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,mineStartedAt:now,mineBoosts:0})
+        body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
       }).catch(()=>{});
     });
   };
@@ -1267,12 +1269,14 @@ function MainApp({user,onLogout,lang,setLang}){
   const boostMining = () => {
     if (!mineStarted || mineReady || mineBoosts >= MINE_MAX_BOOST) return;
     // Boost pts fold into mineAccum and transfer at claim.
-    // The new boost count is persisted immediately so it survives sign-out.
+    // Boost count is persisted immediately into tasksDone so it survives sign-out.
     showRewardedAd(() => {
       const nb = mineBoosts + 1;
       setMineBoosts(nb);
+      const newTD = {...tasksDone, __mine_boosts: nb};
+      setTD(newTD);
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,mineBoosts:nb})
+        body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
       }).catch(()=>{});
     });
   };
