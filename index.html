@@ -1094,9 +1094,12 @@ function MainApp({user,onLogout,lang,setLang}){
   const [adLeft,setAL]     = useState(5);
   const [adShowing,setAS]  = useState(false);
   const [adData,setAD]     = useState(null);
-  const [spinning,setSpin] = useState(false);
-  const [spinResult,setSR] = useState(null);
-  const [spinAngle,setSA] = useState(0);
+  const [spinning,setSpin]   = useState(false);
+  const [spinResult,setSR]   = useState(null);
+  const [spinAngle,setSA]    = useState(0);
+  const [spinNextFree,setSNF]= useState(0);   // epoch ms when next free spin is available
+  const [extraSpins,setES]   = useState(0);   // additional spins earned by watching ads
+  const [spinAdPopup,setSAP] = useState(false);
   const [mineT,setMineT]      = useState(MINE_SESSION_S);
   const [mineReady,setMR]     = useState(false);
   const [mineStarted,setMS]   = useState(false);
@@ -1128,7 +1131,7 @@ function MainApp({user,onLogout,lang,setLang}){
       .then(r=>r.json())
       .then(d=>{
         if(!d.user) return;
-        const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa}=d.user;
+        const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,spinNextFree:snf,extraSpins:es}=d.user;
         setU(p=>({...p,
           pts:pts??p.pts,
           usd:usd??p.usd,
@@ -1139,6 +1142,8 @@ function MainApp({user,onLogout,lang,setLang}){
         const today=new Date().toDateString();
         if(al!=null) setAL(adDate===today?al:5);
         if(sa!=null) setSA(sa);
+        if(snf!=null) setSNF(snf);
+        if(es!=null)  setES(es);
       })
       .catch(()=>{});
   },[]);
@@ -1148,26 +1153,41 @@ function MainApp({user,onLogout,lang,setLang}){
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,avatar:u.avatar,
-          tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle})
+          tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins})
       }).catch(()=>{});
     },2000);
     return()=>clearTimeout(t);
-  },[u.pts,u.usd,u.avatar,u.name,tasksDone,adLeft,spinAngle]);
+  },[u.pts,u.usd,u.avatar,u.name,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
   const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
   const claimAd=()=>{addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);};
   const doSpin=()=>{
-    if(spinning)return;
+    if(spinning) return;
+    const now=Date.now();
+    const hasFree=now>=spinNextFree;
+    const totalSpins=(hasFree?1:0)+extraSpins;
+    if(totalSpins<=0){setSAP(true);return;}
     setSpin(true);setSR(null);
+    // Consume a spin: free spin takes priority, then extra spins
+    if(hasFree) setSNF(now+24*60*60*1000);
+    else        setES(p=>p-1);
+    const spinsAfter=hasFree?extraSpins:extraSpins-1;
     const i=Math.floor(Math.random()*SPIN_PTS.length);
     const targetOffset=(337.5-i*45+720)%360;
     const currentMod=spinAngle%360;
     const diff=(targetOffset-currentMod+360)%360;
-    const newAngle=spinAngle+5*360+diff;
-    setSA(newAngle);
-    setTimeout(()=>{addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});setSpin(false);},4200);
+    setSA(spinAngle+5*360+diff);
+    setTimeout(()=>{
+      addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);
+      setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});
+      setSpin(false);
+      if(spinsAfter<=0) setSAP(true); // prompt to watch ad for next spin
+    },4200);
+  };
+  const watchSpinAd=()=>{
+    showRewardedAd(()=>{setES(p=>p+1);setSAP(false);});
   };
   const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
@@ -1226,7 +1246,7 @@ function MainApp({user,onLogout,lang,setLang}){
         </div>
         {/* Stats Grid */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:`$${u.usd.toFixed(2)}`,icon:"💵"},{label:L("adsLeft"),val:adLeft,icon:"📺"}].map(s=>(
+          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:`$${u.usd.toFixed(2)}`,icon:"💵"},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡"}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
               <div style={{fontSize:22}}>{s.icon}</div>
               <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
@@ -1328,18 +1348,24 @@ function MainApp({user,onLogout,lang,setLang}){
         </div>
       </div>
     ),
-    earn:(
+    earn:(()=>{
+      const now=Date.now();
+      const hasFree=now>=spinNextFree;
+      const spinsLeft=(hasFree?1:0)+extraSpins;
+      const msLeft=spinNextFree-now;
+      const hLeft=Math.floor(msLeft/3600000);
+      const mLeft=Math.floor((msLeft%3600000)/60000);
+      const freeLabel=hasFree?"🟢 Free spin ready!":
+        `🕐 Next free spin in ${hLeft}h ${mLeft}m`;
+      return(
       <div style={{padding:"0 16px 16px"}}>
-        <div style={{background:C.s2,borderRadius:16,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:4}}>📺 {L("watchAd")}</div>
-          <div style={{fontSize:13,color:C.muted,marginBottom:12}}>{adLeft} {L("adsLeft")}</div>
-          <button onClick={watchAd} disabled={adLeft<=0} style={{width:"100%",background:adLeft>0?`linear-gradient(135deg,${C.brand},${C.pink})`:"rgba(255,255,255,.1)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:adLeft>0?"pointer":"not-allowed",opacity:adLeft>0?1:.5}}>
-            {adLeft>0?"Watch Ad (+20–40 pts)":"No Ads Left Today"}
-          </button>
-        </div>
         <div style={{background:`linear-gradient(160deg,${C.s2},${C.s3})`,borderRadius:20,padding:20,border:`1px solid ${C.border}`,overflow:"hidden",position:"relative"}}>
           <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",background:`radial-gradient(circle,${C.brand}20,transparent 70%)`,pointerEvents:"none"}}/>
-          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:2}}>🎡 {L("spinNow")}</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
+            <div style={{fontSize:15,fontWeight:700,color:C.white}}>🎡 {L("spinNow")}</div>
+            <div style={{background:"rgba(139,92,246,.18)",borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:700,color:C.brandLt}}>{spinsLeft} spin{spinsLeft!==1?"s":""}</div>
+          </div>
+          <div style={{fontSize:12,color:hasFree?C.green:C.muted,marginBottom:4}}>{freeLabel}</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Win up to 500 pts & cash prizes!</div>
           <div style={{display:"flex",justifyContent:"center",marginBottom:16,transform:"scale(1.15)",transformOrigin:"center top"}}>
             <SpinWheel angle={spinAngle} spinning={spinning} phase="points"/>
@@ -1351,12 +1377,25 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:13,color:C.muted}}>& +${spinResult.usd.toFixed(2)} USD added!</div>
             </div>
           )}
-          <button onClick={doSpin} disabled={spinning} style={{width:"100%",background:spinning?"rgba(255,255,255,.08)":`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:spinning?"not-allowed":"pointer",boxShadow:spinning?"none":`0 4px 20px rgba(245,158,11,.35)`,transition:"all .3s"}}>
-            {spinning?"⏳ Spinning…":"🎰 Spin Now!"}
+          <button onClick={doSpin} disabled={spinning||spinsLeft<=0}
+            style={{width:"100%",border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,transition:"all .3s",
+              background:spinning?"rgba(255,255,255,.08)":spinsLeft>0?`linear-gradient(135deg,${C.gold},${C.pink})`:"rgba(255,255,255,.1)",
+              cursor:spinning||spinsLeft<=0?"not-allowed":"pointer",
+              boxShadow:spinning||spinsLeft<=0?"none":`0 4px 20px rgba(245,158,11,.35)`,
+              opacity:spinsLeft<=0&&!spinning?.5:1,
+            }}>
+            {spinning?"⏳ Spinning…":spinsLeft>0?"🎰 Spin Now!":"No Spins — Watch Ad to Play"}
           </button>
+          {!hasFree&&spinsLeft===0&&!spinning&&(
+            <button onClick={watchSpinAd}
+              style={{marginTop:10,width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"13px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",boxShadow:`0 3px 14px rgba(139,92,246,.28)`}}>
+              📺 Watch Ad → Get 1 Spin
+            </button>
+          )}
         </div>
       </div>
-    ),
+      );
+    })(),
     tasks:(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>SOCIAL TASKS</div>
@@ -1763,6 +1802,25 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
           <div style={{flex:1,overflowY:"auto"}}>
             <SecuritySettingsView user={u}/>
+          </div>
+        </div>
+      )}
+      {/* Spin Ad Popup — shown after free spin is consumed and no extra spins remain */}
+      {spinAdPopup&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:28,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border2}`,animation:"popIn .3s ease"}}>
+            <div style={{fontSize:60,marginBottom:10}}>🎡</div>
+            <div style={{fontSize:20,fontWeight:800,color:C.white,marginBottom:6}}>Out of Spins!</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.6}}>
+              Your free spin has been used.<br/>
+              Watch a short ad to get <span style={{color:C.gold,fontWeight:700}}>1 extra spin</span> right now,<br/>
+              or wait for your free spin to reset in 24 hours.
+            </div>
+            <div style={{background:"rgba(139,92,246,.08)",borderRadius:12,padding:"12px",marginBottom:16,fontSize:12,color:C.muted,border:`1px solid ${C.border}`}}>📢 Sponsored content — supports the platform</div>
+            <button onClick={watchSpinAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(139,92,246,.3)",marginBottom:10}}>
+              📺 Watch Ad → Get 1 Spin
+            </button>
+            <button onClick={()=>setSAP(false)} style={{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Maybe later</button>
           </div>
         </div>
       )}
