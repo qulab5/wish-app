@@ -1117,6 +1117,11 @@ function MainApp({user,onLogout,lang,setLang}){
   const [sidebarOpen, setSO]  = useState(false);
   const [sidebarView, setSV]  = useState(null);
   const [editingField, setEF] = useState(null);
+  // Guard: auto-save must not fire until the initial DB load has finished.
+  // Without this, the stale localStorage user (saved at login time) would be
+  // written back to the DB 2 seconds after every page refresh, overwriting any
+  // points/state that were saved to the DB since that last login.
+  const dbLoaded = React.useRef(false);
   const L = k => t$(lang,k);
   const dir = (LANGS[lang]||LANGS.en).dir;
 
@@ -1165,14 +1170,19 @@ function MainApp({user,onLogout,lang,setLang}){
             }
           }
         }
+        dbLoaded.current = true;  // ← unlock auto-save now that DB state is applied
       })
-      .catch(()=>{});
+      .catch(()=>{ dbLoaded.current = true; });  // unlock even on network error
   },[]);
 
   // Auto-save progress (debounced 2s after last change).
   // avatar is intentionally excluded — it is saved explicitly after upload
   // to avoid sending a huge base64 data-URL that exceeds Supabase's body limit.
   useEffect(()=>{
+    // Skip until the initial DB load has applied fresh server state.
+    // Without this guard the stale localStorage snapshot (saved at login time)
+    // would overwrite the DB 2 seconds after every page refresh.
+    if(!dbLoaded.current) return;
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
