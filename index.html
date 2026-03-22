@@ -1238,7 +1238,10 @@ function MainApp({user,onLogout,lang,setLang}){
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,
           spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs})
-      }).catch(()=>{});
+      })
+      .then(r=>r.json())
+      .then(d=>{ if(!d.success) console.error('[spin save]',d); })
+      .catch(e=>console.error('[spin save network]',e));
       if(newEs<=0) setSAP(true);
     },4200);
   };

@@ -24,20 +24,23 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = req.body;
       if (!body?.email) return res.status(400).json({ error: 'email required' });
-      const { _id, ...data } = body;
+      const { _id, id, ...fields } = body;
 
-      // Try UPDATE first (works for any schema — no constraint required).
-      // Select a minimal column back so we know whether a row was matched.
+      // UPDATE by email — never try to overwrite the id column itself,
+      // which would fail if the DB uses uuid/bigint while the client
+      // sends a string like "u1732...".
       const { data: updated, error: updErr } = await supabase
         .from('users')
-        .update(data)
-        .eq('email', data.email)
+        .update(fields)
+        .eq('email', fields.email)
         .select('email');
       if (updErr) throw updErr;
 
-      // No existing row (first save for a newly registered user) → INSERT.
+      // No existing row (brand-new registration) → INSERT with the client id.
       if (!updated || updated.length === 0) {
-        const { error: insErr } = await supabase.from('users').insert(data);
+        const { error: insErr } = await supabase
+          .from('users')
+          .insert(id ? { id, ...fields } : fields);
         if (insErr) throw insErr;
       }
 
