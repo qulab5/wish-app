@@ -1597,10 +1597,12 @@ function MainApp({user,onLogout,lang,setLang}){
                 {icon:"📢",label:"Announcement"},
                 {icon:"📄",label:"White Paper"},
                 {icon:"🎧",label:"Support Portal"},
+                {icon:"🔐",label:"Security"},
               ].map(item=>(
                 <button key={item.label} className="menu-item" onClick={()=>{
                   if(item.label==="Profile"){setSO(false);setSV("profile");}
                   else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
+                  else if(item.label==="Security"){setSO(false);setSV("security");}
                   else setSO(false);
                 }}>
                   <span style={{fontSize:20}}>{item.icon}</span>
@@ -1752,6 +1754,18 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
         </div>
       )}
+      {/* Security Settings Screen (from sidebar) */}
+      {sidebarView==="security"&&(
+        <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+          <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+            <div style={{fontSize:18,fontWeight:800,color:C.white}}>🔐 Security</div>
+          </div>
+          <div style={{flex:1,overflowY:"auto"}}>
+            <SecuritySettingsView user={u}/>
+          </div>
+        </div>
+      )}
       {/* Ad Modal */}
       {adShowing&&adData&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
@@ -1800,29 +1814,44 @@ function MainApp({user,onLogout,lang,setLang}){
    All keys stored under prefix "wish_" to avoid collisions.
 ═══════════════════════════════════════════════ */
 const Security = {
-  /* Hash PIN with SHA-256 + app salt via Web Crypto API.
-     Falls back to a fast djb2-style hash if SubtleCrypto is unavailable. */
+  /* SHA-256 PIN hash + app salt. Falls back to djb2 in environments without SubtleCrypto. */
   async hashPin(pin) {
     try {
       const enc = new TextEncoder().encode(pin + '\u2605wish\u2605v1');
       const buf = await crypto.subtle.digest('SHA-256', enc);
       return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
     } catch(_) {
-      // Fallback: djb2 (non-cryptographic, for dev/legacy environments)
       let h = 5381;
       for (const c of (pin + 'wish_salt')) h = ((h << 5) + h + c.charCodeAt(0)) | 0;
       return (h >>> 0).toString(16);
     }
   },
-  async verifyPin(pin, stored) {
-    return (await this.hashPin(pin)) === stored;
-  },
+  async verifyPin(pin, stored) { return (await this.hashPin(pin)) === stored; },
+
+  /* ── Global storage ── */
   save(k, v)  { try { localStorage.setItem('wish_'+k, JSON.stringify(v)); } catch(_){} },
   load(k, d=null) {
     try { const v=localStorage.getItem('wish_'+k); return v===null?d:JSON.parse(v); }
     catch(_){ return d; }
   },
   remove(k) { try { localStorage.removeItem('wish_'+k); } catch(_){} },
+
+  /* ── Per-user storage (key = "wish_uid_{userId}_{k}") ──
+     All security is scoped to a specific user ID so multiple users on the
+     same device each have fully independent PIN / biometric settings. */
+  _uk(uid,k) { return `uid_${uid}_${k}`; },
+  saveUser(uid,k,v)      { this.save(this._uk(uid,k),v); },
+  loadUser(uid,k,d=null) { return this.load(this._uk(uid,k),d); },
+  removeUser(uid,k)      { this.remove(this._uk(uid,k)); },
+
+  /* True once the user has completed the security-setup flow at least once */
+  hasSecuritySetup(uid) { return !!this.loadUser(uid,'security_done'); },
+
+  /* Web: checks PublicKeyCredential (Face ID / Touch ID in browser).
+     Native (Expo/RN): swap for LocalAuthentication.hasHardwareAsync() */
+  checkBioSupport() {
+    return typeof window!=='undefined' && 'PublicKeyCredential' in window;
+  },
 };
 
 /* ═══════════════════════════════════════════════
@@ -2090,202 +2119,243 @@ function SlideToOpen({ onUnlock }) {
 }
 
 /* ═══════════════════════════════════════════════
-   PIN SETUP — create & confirm a 4-digit PIN
+   SECURITY SETUP
+   Shown AFTER successful account creation / sign-in.
+   Tied to a specific user (user.id) — not a global lock.
+   Steps: choose methods → enter PIN → confirm PIN → done
 ═══════════════════════════════════════════════ */
-function PinSetup({ onComplete }) {
-  const [step, setStep]       = useState(1);   // 1=enter, 2=confirm
-  const [pin1, setPin1]       = useState('');
-  const [pin2, setPin2]       = useState('');
-  const [error, setError]     = useState('');
-  const [hint, setHint]       = useState('');
-  const [showHintBox, setSHB] = useState(false);
-  const [visible, setVis]     = useState(false);
-  const [saving, setSaving]   = useState(false);
-  const [shake, setShake]     = useState(false);
-  const [success, setSuccess] = useState(false);
+function SecuritySetup({ user, onComplete }) {
+  // step: 'choose' → 'pin' → 'pinConfirm' → 'done'
+  const [step, setStep]     = useState('choose');
+  const [methods, setM]     = useState({ pin:true, bio:false });
+  const [pin1, setPin1]     = useState('');
+  const [pin2, setPin2]     = useState('');
+  const [hint, setHint]     = useState('');
+  const [showHint, setSHB]  = useState(false);
+  const [visible, setVis]   = useState(false);
+  const [error, setError]   = useState('');
+  const [shake, setShake]   = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [bioSupp, setBioS]  = useState(false);
 
-  const current    = step===1 ? pin1 : pin2;
-  const setCurrent = step===1 ? setPin1 : setPin2;
-  const doShake    = ()=>{ setShake(true); setTimeout(()=>setShake(false),620); };
+  useEffect(()=>{ setBioS(Security.checkBioSupport()); },[]);
 
-  // Step 1 complete → move to confirm
+  const uid      = user?.id;
+  const doShake  = ()=>{ setShake(true); setTimeout(()=>setShake(false),620); };
+
+  const finalize = ()=>{
+    if (methods.bio) Security.saveUser(uid,'has_bio',true);
+    Security.saveUser(uid,'security_done',true);
+    Security.save('first_launch','1');
+    setStep('done');
+    setTimeout(onComplete, 900);
+  };
+
+  const handleChooseContinue = ()=>{
+    if (!methods.pin && !methods.bio){ setError('Select at least one security method.'); return; }
+    setError('');
+    methods.pin ? setStep('pin') : finalize();
+  };
+
+  // PIN step 1 → confirm
   useEffect(()=>{
-    if (step===1 && pin1.length===4) setTimeout(()=>setStep(2), 230);
+    if (step==='pin' && pin1.length===4) setTimeout(()=>setStep('pinConfirm'),230);
   },[pin1]);
 
-  // Step 2 complete → validate
+  // PIN confirm → validate & save
   useEffect(()=>{
-    if (step!==2 || pin2.length!==4 || saving) return;
+    if (step!=='pinConfirm'||pin2.length!==4||saving) return;
     setSaving(true);
-    if (pin1===pin2) {
+    if (pin1===pin2){
       Security.hashPin(pin1).then(hash=>{
-        Security.save('pin_hash', hash);
-        if (hint.trim()) Security.save('pin_hint', hint.trim());
-        Security.save('first_launch','1');
-        setPin1(''); setPin2(''); // clear sensitive data
-        setSuccess(true);
-        setTimeout(onComplete, 850);
+        Security.saveUser(uid,'pin_hash',hash);
+        if (hint.trim()) Security.saveUser(uid,'pin_hint',hint.trim());
+        setPin1(''); setPin2('');
+        finalize();
       });
     } else {
-      doShake();
-      setError('PINs do not match. Please try again.');
-      setTimeout(()=>{ setPin2(''); setError(''); setSaving(false); }, 1700);
+      doShake(); setError('PINs do not match. Try again.');
+      setTimeout(()=>{ setPin2(''); setError(''); setSaving(false); },1700);
     }
   },[pin2]);
 
-  const onKey = (k)=>{
-    if (saving||success) return;
-    if (k==='⌫'){ setCurrent(p=>p.slice(0,-1)); return; }
-    if (current.length<4) setCurrent(p=>p+k);
+  const onKey=(k)=>{
+    if (saving) return;
+    if (step==='pin'){
+      if(k==='⌫'){setPin1(p=>p.slice(0,-1));return;} if(pin1.length<4) setPin1(p=>p+k);
+    } else if (step==='pinConfirm'){
+      if(k==='⌫'){setPin2(p=>p.slice(0,-1));return;} if(pin2.length<4) setPin2(p=>p+k);
+    }
   };
 
-  const titles = ['Create your PIN','Confirm your PIN'];
-  const subs   = ['Choose a 4-digit PIN to secure your account','Enter the same PIN to confirm'];
+  const BG = {position:'fixed',inset:0,zIndex:9997,background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden'};
+  const ORBS = <>
+    <div style={{position:'absolute',top:'8%',right:'6%',width:200,height:200,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+    <div style={{position:'absolute',bottom:'10%',left:'5%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+  </>;
+  const ICON = <div style={{width:76,height:76,borderRadius:24,marginBottom:18,background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:'1px solid rgba(139,92,246,.32)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,boxShadow:'0 8px 32px rgba(139,92,246,.22)'}}>🔐</div>;
 
-  return (
-    <div style={{
-      position:'fixed',inset:0,zIndex:9997,
-      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
-      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-      fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden',
-    }}>
-      {/* Ambient */}
-      <div style={{position:'absolute',top:'8%',right:'6%',width:190,height:190,borderRadius:'50%',
-        background:'radial-gradient(circle,rgba(139,92,246,.14),transparent 68%)',
-        animation:'float 5s ease infinite',pointerEvents:'none'}}/>
-
-      {/* Step dots */}
-      <div style={{position:'absolute',top:52,display:'flex',gap:8}}>
-        {[1,2].map(s=>(
-          <div key={s} style={{
-            height:8,borderRadius:99,
-            width: s===step ? 28 : 8,
-            background: s<=step ? '#a78bfa' : 'rgba(255,255,255,.15)',
-            transition:'all .3s cubic-bezier(.34,1.56,.64,1)',
-          }}/>
-        ))}
+  /* ── Choose security methods ── */
+  if (step==='choose') return (
+    <div style={BG}>
+      {ORBS}
+      {ICON}
+      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>Secure Your Account</div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:28,textAlign:'center',lineHeight:1.6,maxWidth:280}}>
+        Choose how to protect your Wish account.<br/>Your security is stored per account, not per device.
       </div>
-
-      {/* Icon */}
-      {success ? (
-        <div style={{fontSize:76,marginBottom:18,animation:'pinSuccess .5s ease',
-          filter:'drop-shadow(0 0 22px rgba(16,185,129,.6))'}}>✅</div>
-      ):(
-        <div style={{
-          width:76,height:76,borderRadius:24,marginBottom:18,
-          background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',
-          border:'1px solid rgba(139,92,246,.32)',
-          display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,
-          boxShadow:'0 8px 32px rgba(139,92,246,.22)',
-        }}>🔐</div>
-      )}
-
-      <div style={{fontSize:23,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>
-        {success ? 'PIN Created!' : titles[step-1]}
-      </div>
-      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:38,textAlign:'center',lineHeight:1.6,maxWidth:280}}>
-        {success ? 'Your account is now secured.' : subs[step-1]}
-      </div>
-
-      {!success&&(<>
-        {/* Dots */}
-        <PinDots filled={current.length} shake={shake} visible={visible} raw={current}/>
-
-        {/* Error / toggle */}
-        {error ? (
-          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,
-            textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
-        ):(
-          <button onClick={()=>setVis(v=>!v)} style={{
-            marginTop:12,background:'none',border:'none',
-            color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit',
-            display:'flex',alignItems:'center',gap:5,
-          }}>{visible?'🙈 Hide PIN':'👁 Show PIN'}</button>
+      {/* Method cards */}
+      <div style={{width:'100%',maxWidth:340,display:'flex',flexDirection:'column',gap:10,marginBottom:22}}>
+        {[
+          {id:'pin', icon:'🔢', label:'PIN Code',              sub:'4-digit secret code'},
+          bioSupp && {id:'bio', icon:'👆', label:'Fingerprint / Face ID', sub:'Biometric authentication'},
+        ].filter(Boolean).map(m=>{
+          const sel = methods[m.id];
+          return (
+            <button key={m.id} onClick={()=>setM(p=>({...p,[m.id]:!p[m.id]}))} style={{
+              width:'100%',background:sel?'rgba(139,92,246,.18)':'rgba(255,255,255,.04)',
+              border:`1.5px solid ${sel?'rgba(139,92,246,.55)':'rgba(255,255,255,.1)'}`,
+              borderRadius:16,padding:'14px 18px',cursor:'pointer',textAlign:'left',
+              display:'flex',alignItems:'center',gap:14,transition:'all .2s',
+              boxShadow:sel?'0 0 20px rgba(139,92,246,.2)':'none',
+            }}>
+              <span style={{fontSize:28,flexShrink:0}}>{m.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700,color:sel?'#a78bfa':'#fff'}}>{m.label}</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,.38)',marginTop:2}}>{m.sub}</div>
+              </div>
+              <div style={{width:24,height:24,borderRadius:'50%',background:sel?'#8b5cf6':'rgba(255,255,255,.1)',border:`2px solid ${sel?'#8b5cf6':'rgba(255,255,255,.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:'#fff',transition:'all .2s'}}>{sel?'✓':''}</div>
+            </button>
+          );
+        })}
+        {methods.pin&&methods.bio&&(
+          <div style={{background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.25)',borderRadius:10,padding:'8px 14px',fontSize:12,color:'#f59e0b',textAlign:'center'}}>
+            ⭐ Recommended — maximum security with both methods
+          </div>
         )}
+      </div>
+      {error&&<div style={{marginBottom:12,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center'}}>⚠ {error}</div>}
+      <button onClick={handleChooseContinue} style={{width:'100%',maxWidth:340,background:'linear-gradient(135deg,#8b5cf6,#6d28d9)',border:'none',borderRadius:14,padding:'15px',color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',boxShadow:'0 6px 24px rgba(139,92,246,.4)'}}>
+        Continue →
+      </button>
+    </div>
+  );
 
-        {/* Optional hint (step 1 only) */}
-        {step===1&&(
+  /* ── PIN entry / confirm ── */
+  if (step==='pin'||step==='pinConfirm'){
+    const current = step==='pin' ? pin1 : pin2;
+    const titles  = {pin:'Create your PIN', pinConfirm:'Confirm your PIN'};
+    const subs    = {pin:'Choose a 4-digit PIN to secure your account', pinConfirm:'Enter the same PIN again to confirm'};
+    const stepIdx = {choose:0, pin:1, pinConfirm:2};
+    return (
+      <div style={BG}>
+        {ORBS}
+        {/* Step progress pills */}
+        <div style={{position:'absolute',top:52,display:'flex',gap:8}}>
+          {['choose','pin','pinConfirm'].map((s,i)=>(
+            <div key={s} style={{height:8,borderRadius:99,width:s===step?28:8,background:stepIdx[step]>=i?'#a78bfa':'rgba(255,255,255,.15)',transition:'all .3s cubic-bezier(.34,1.56,.64,1)'}}/>
+          ))}
+        </div>
+        <div style={{width:76,height:76,borderRadius:24,marginBottom:18,background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:'1px solid rgba(139,92,246,.32)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,boxShadow:'0 8px 32px rgba(139,92,246,.22)'}}>🔢</div>
+        <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>{titles[step]}</div>
+        <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:38,textAlign:'center',lineHeight:1.6,maxWidth:280}}>{subs[step]}</div>
+        <PinDots filled={current.length} shake={shake} visible={visible} raw={current}/>
+        {error?(
+          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
+        ):(
+          <button onClick={()=>setVis(v=>!v)} style={{marginTop:12,background:'none',border:'none',color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
+            {visible?'🙈 Hide PIN':'👁 Show PIN'}
+          </button>
+        )}
+        {step==='pin'&&(
           <div style={{marginTop:14,width:'100%',maxWidth:300}}>
-            {!showHintBox ? (
-              <button onClick={()=>setSHB(true)} style={{
-                background:'none',border:'none',color:'rgba(255,255,255,.22)',
-                fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'block',margin:'0 auto',
-              }}>+ Add a PIN hint (optional)</button>
+            {!showHint?(
+              <button onClick={()=>setSHB(true)} style={{background:'none',border:'none',color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'block',margin:'0 auto'}}>
+                + Add a PIN hint (optional)
+              </button>
             ):(
-              <input value={hint} onChange={e=>setHint(e.target.value)} maxLength={40}
-                placeholder="e.g. Favourite year, street no…"
-                style={{
-                  width:'100%',background:'rgba(139,92,246,.07)',
-                  border:'1px solid rgba(139,92,246,.22)',borderRadius:11,
-                  padding:'11px 14px',color:'#fff',fontSize:13,outline:'none',
-                  fontFamily:'inherit',textAlign:'center',
-                }}/>
+              <input value={hint} onChange={e=>setHint(e.target.value)} maxLength={40} placeholder="e.g. Favourite year, street no…"
+                style={{width:'100%',background:'rgba(139,92,246,.07)',border:'1px solid rgba(139,92,246,.22)',borderRadius:11,padding:'11px 14px',color:'#fff',fontSize:13,outline:'none',fontFamily:'inherit',textAlign:'center'}}/>
             )}
           </div>
         )}
+        <div style={{marginTop:26}}><PinKeypad onKey={onKey} disabled={saving}/></div>
+      </div>
+    );
+  }
 
-        {/* Keypad */}
-        <div style={{marginTop:26}}>
-          <PinKeypad onKey={onKey} disabled={saving}/>
-        </div>
-      </>)}
+  /* ── Done ── */
+  return (
+    <div style={BG}>
+      {ORBS}
+      <div style={{fontSize:76,marginBottom:18,animation:'pinSuccess .5s ease',filter:'drop-shadow(0 0 22px rgba(16,185,129,.6))'}}>✅</div>
+      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>Security Active!</div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',textAlign:'center',lineHeight:1.6,maxWidth:280}}>
+        Your account is now secured.{methods.bio?' Fingerprint / Face ID is enabled.':''}
+      </div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════
-   PIN UNLOCK — verify PIN for returning users
-   Enforces 5-attempt limit with 30s cooldown.
+   UNLOCK SCREEN
+   Shown when a returning user already has security set up.
+   Per-user: reads/writes Security.loadUser(uid, …).
+   Supports PIN keypad + Fingerprint / Face ID button.
+   Escalating lockout: 30s → 60s → 2m → 5m per wave.
 ═══════════════════════════════════════════════ */
-function PinUnlock({ onUnlock }) {
-  const [pin, setPin]         = useState('');
-  const [error, setError]     = useState('');
-  const [shake, setShake]     = useState(false);
-  const [verifying, setVfy]   = useState(false);
-  const [visible, setVis]     = useState(false);
-  const [showHint, setSH]     = useState(false);
-  const [failed, setFailed]   = useState(()=>Security.load('failed_pin',0));
-  const [lockUntil, setLU]    = useState(()=>Security.load('lock_until',0));
-  const [now, setNow]         = useState(()=>Date.now());
-  const hint                  = Security.load('pin_hint',null);
+function UnlockScreen({ user, onUnlock }) {
+  const uid    = user?.id;
+  const hasPin = uid && !!Security.loadUser(uid,'pin_hash',null);
+  const hasBio = uid &&  Security.loadUser(uid,'has_bio',false);
+  const hint   = uid ?   Security.loadUser(uid,'pin_hint',null) : null;
 
-  const isLocked   = lockUntil > now;
-  const secsLeft   = Math.max(0, Math.ceil((lockUntil - now)/1000));
+  const [pin, setPin]       = useState('');
+  const [error, setError]   = useState('');
+  const [shake, setShake]   = useState(false);
+  const [verifying, setVfy] = useState(false);
+  const [visible, setVis]   = useState(false);
+  const [showHint, setSH]   = useState(false);
+  const [bioMsg, setBioMsg] = useState('');
+  const [failed, setFailed] = useState(()=> uid ? Security.loadUser(uid,'failed_pin',0) : 0);
+  const [lockUntil, setLU]  = useState(()=> uid ? Security.loadUser(uid,'lock_until',0) : 0);
+  const [now, setNow]       = useState(()=>Date.now());
 
-  // Tick every 500ms while locked
+  const isLocked = lockUntil > now;
+  const secsLeft = Math.max(0, Math.ceil((lockUntil - now)/1000));
+
+  /* Escalating lockout durations (ms) */
+  const lockDur = (n) => n>=8?300000 : n>=7?120000 : n>=6?60000 : 30000;
+
+  /* Tick every 500ms while locked */
   useEffect(()=>{
     if (!isLocked) return;
     const iv=setInterval(()=>{
       const n=Date.now(); setNow(n);
       if (lockUntil<=n){
-        setFailed(0); Security.save('failed_pin',0);
-        setLU(0);     Security.save('lock_until',0);
+        setFailed(0); Security.saveUser(uid,'failed_pin',0);
+        setLU(0);     Security.saveUser(uid,'lock_until',0);
         setError('');
       }
     },500);
     return()=>clearInterval(iv);
   },[lockUntil,isLocked]);
 
-  // Auto-verify when 4 digits entered
+  /* Auto-verify at 4 digits */
   useEffect(()=>{
     if (pin.length!==4||verifying||isLocked) return;
     setVfy(true);
-    const stored = Security.load('pin_hash');
-    Security.verifyPin(pin, stored).then(ok=>{
+    Security.verifyPin(pin, Security.loadUser(uid,'pin_hash')).then(ok=>{
       if (ok){
-        Security.save('failed_pin',0); Security.save('lock_until',0);
-        setPin(''); setVfy(false);
-        onUnlock();
+        Security.saveUser(uid,'failed_pin',0); Security.saveUser(uid,'lock_until',0);
+        setPin(''); setVfy(false); onUnlock();
       } else {
-        const nf = failed+1;
-        setFailed(nf); Security.save('failed_pin',nf);
-        const msg = nf>=5
-          ? 'Too many attempts. Locked for 30s.'
+        const nf=failed+1;
+        setFailed(nf); Security.saveUser(uid,'failed_pin',nf);
+        const msg=nf>=5
+          ? 'Too many attempts. Temporarily locked.'
           : `Incorrect PIN. ${5-nf} attempt${5-nf===1?'':'s'} left.`;
-        if (nf>=5){
-          const until=Date.now()+30000;
-          setLU(until); Security.save('lock_until',until);
-        }
+        if (nf>=5){ const u2=Date.now()+lockDur(nf); setLU(u2); Security.saveUser(uid,'lock_until',u2); }
         setShake(true); setError(msg);
         setTimeout(()=>{ setShake(false); setPin(''); setError(''); setVfy(false); },1700);
       }
@@ -2298,167 +2368,308 @@ function PinUnlock({ onUnlock }) {
     if (pin.length<4) setPin(p=>p+k);
   };
 
+  /* Biometric trigger
+     TODO (native): import * as LA from 'expo-local-authentication';
+       const r = await LA.authenticateAsync({ promptMessage:'Unlock Wish' });
+       if (r.success) onUnlock();
+     TODO (web WebAuthn): implement PublicKeyCredential assertion flow.  */
+  const tryBiometric = ()=>{
+    setBioMsg('Biometric unlock is available on the native iOS / Android app. Use your PIN here.');
+    setTimeout(()=>setBioMsg(''),4000);
+  };
+
+  const BG={position:'fixed',inset:0,zIndex:9997,background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden'};
+
   return (
-    <div style={{
-      position:'fixed',inset:0,zIndex:9997,
-      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
-      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-      fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden',
-    }}>
-      {/* Ambient */}
-      <div style={{position:'absolute',top:'9%',left:'6%',width:210,height:210,borderRadius:'50%',
-        background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',
-        animation:'float 5s ease infinite',pointerEvents:'none'}}/>
-      <div style={{position:'absolute',bottom:'14%',right:'8%',width:160,height:160,borderRadius:'50%',
-        background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',
-        animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+    <div style={BG}>
+      {/* Ambient orbs */}
+      <div style={{position:'absolute',top:'9%',left:'6%',width:210,height:210,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',bottom:'14%',right:'8%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+
+      {/* User greeting */}
+      <div style={{marginBottom:22,textAlign:'center',animation:'splashFade .5s ease both'}}>
+        <div style={{width:58,height:58,borderRadius:'50%',background:'linear-gradient(135deg,#8b5cf6,#ec4899)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:800,color:'#fff',margin:'0 auto 10px',boxShadow:'0 4px 20px rgba(139,92,246,.4)'}}>
+          {user?.name?.[0]?.toUpperCase()||'U'}
+        </div>
+        <div style={{fontSize:15,fontWeight:700,color:'#fff'}}>Hi, {user?.name?.split(' ')[0]||'Welcome back'}!</div>
+      </div>
 
       {/* Lock icon */}
-      <div style={{
-        width:80,height:80,borderRadius:26,marginBottom:18,
-        background: isLocked
-          ? 'linear-gradient(135deg,rgba(239,68,68,.22),rgba(185,28,28,.14))'
-          : 'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',
-        border:`1px solid ${isLocked?'rgba(239,68,68,.3)':'rgba(139,92,246,.3)'}`,
-        display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,
-        boxShadow:`0 8px 32px ${isLocked?'rgba(239,68,68,.2)':'rgba(139,92,246,.2)'}`,
-        transition:'all .4s ease',
-      }}>{isLocked?'🔒':'🔓'}</div>
-
-      <div style={{fontSize:23,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>
-        {isLocked ? 'App Locked' : 'Enter your PIN'}
-      </div>
-      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:isLocked?20:36,
-        textAlign:'center',lineHeight:1.6,maxWidth:270}}>
-        {isLocked
-          ? `Too many failed attempts. Please wait.`
-          : 'Enter your 4-digit PIN to continue'}
+      <div style={{width:80,height:80,borderRadius:26,marginBottom:16,background:isLocked?'linear-gradient(135deg,rgba(239,68,68,.22),rgba(185,28,28,.14))':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:`1px solid ${isLocked?'rgba(239,68,68,.3)':'rgba(139,92,246,.3)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,boxShadow:`0 8px 32px ${isLocked?'rgba(239,68,68,.2)':'rgba(139,92,246,.2)'}`,transition:'all .4s ease'}}>
+        {isLocked?'🔒':'🔓'}
       </div>
 
-      {/* Cooldown timer */}
+      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>
+        {isLocked?'App Locked':'Enter your PIN'}
+      </div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:isLocked?20:30,textAlign:'center',lineHeight:1.6,maxWidth:270}}>
+        {isLocked?'Too many failed attempts.':'Enter your 4-digit PIN to continue'}
+      </div>
+
+      {/* Lockout countdown ring */}
       {isLocked&&(
-        <div style={{
-          width:88,height:88,borderRadius:'50%',marginBottom:28,
-          border:'3px solid rgba(239,68,68,.35)',
-          background:'rgba(239,68,68,.08)',
-          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-          boxShadow:'0 0 28px rgba(239,68,68,.2)',
-        }}>
+        <div style={{width:90,height:90,borderRadius:'50%',marginBottom:24,border:'3px solid rgba(239,68,68,.35)',background:'rgba(239,68,68,.08)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:'0 0 30px rgba(239,68,68,.2)'}}>
           <div style={{fontSize:28,fontWeight:800,color:'#ef4444',fontFamily:'monospace'}}>{secsLeft}</div>
           <div style={{fontSize:9,color:'rgba(239,68,68,.6)',letterSpacing:.5}}>SECONDS</div>
         </div>
       )}
 
-      {/* PIN input area */}
-      {!isLocked&&(<>
+      {/* ── PIN entry section ── */}
+      {!isLocked&&hasPin&&(<>
         <PinDots filled={pin.length} shake={shake} visible={visible} raw={pin}/>
 
-        {/* Error / controls row */}
         {error?(
-          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,
-            textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
+          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
         ):(
           <div style={{display:'flex',gap:18,marginTop:12,alignItems:'center'}}>
-            <button onClick={()=>setVis(v=>!v)} style={{background:'none',border:'none',
-              color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+            <button onClick={()=>setVis(v=>!v)} style={{background:'none',border:'none',color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
               {visible?'🙈 Hide':'👁 Show'}
             </button>
-            {hint&&(
-              <button onClick={()=>setSH(s=>!s)} style={{background:'none',border:'none',
-                color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
-                💡 Hint
-              </button>
-            )}
+            {hint&&<button onClick={()=>setSH(s=>!s)} style={{background:'none',border:'none',color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>💡 Hint</button>}
           </div>
         )}
+        {showHint&&hint&&<div style={{marginTop:10,background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.22)',borderRadius:11,padding:'8px 18px',fontSize:12,color:'#f59e0b',maxWidth:260,textAlign:'center'}}>💡 {hint}</div>}
 
-        {showHint&&hint&&(
-          <div style={{
-            marginTop:10,background:'rgba(245,158,11,.1)',
-            border:'1px solid rgba(245,158,11,.22)',
-            borderRadius:11,padding:'8px 18px',fontSize:12,
-            color:'#f59e0b',maxWidth:260,textAlign:'center',
-          }}>💡 {hint}</div>
-        )}
-
-        {/* Keypad */}
-        <div style={{marginTop:22}}>
-          <PinKeypad onKey={onKey} disabled={verifying}/>
-        </div>
+        <div style={{marginTop:20}}><PinKeypad onKey={onKey} disabled={verifying}/></div>
 
         {/* Failed attempt pips */}
         {failed>0&&failed<5&&(
-          <div style={{marginTop:18,display:'flex',gap:6,justifyContent:'center'}}>
+          <div style={{marginTop:16,display:'flex',gap:6,justifyContent:'center'}}>
             {[0,1,2,3,4].map(i=>(
-              <div key={i} style={{
-                width:9,height:9,borderRadius:'50%',
-                background:i<failed?'#ef4444':'rgba(255,255,255,.15)',
-                transition:'background .3s',
-              }}/>
+              <div key={i} style={{width:9,height:9,borderRadius:'50%',background:i<failed?'#ef4444':'rgba(255,255,255,.15)',transition:'background .3s'}}/>
             ))}
           </div>
         )}
       </>)}
+
+      {/* ── Biometric section ── */}
+      {!isLocked&&hasBio&&(<>
+        {hasPin&&(
+          <div style={{display:'flex',alignItems:'center',gap:12,width:'100%',maxWidth:280,margin:'18px 0 14px'}}>
+            <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
+            <span style={{fontSize:12,color:'rgba(255,255,255,.3)',letterSpacing:.5}}>or</span>
+            <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
+          </div>
+        )}
+        <button onClick={tryBiometric} style={{display:'flex',alignItems:'center',gap:12,background:'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.28)',borderRadius:18,padding:'15px 32px',color:'#a78bfa',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 4px 18px rgba(139,92,246,.18)',transition:'all .2s'}}>
+          <span style={{fontSize:30}}>👆</span>
+          Use Fingerprint / Face ID
+        </button>
+      </>)}
+
+      {/* Biometric info message */}
+      {bioMsg&&(
+        <div style={{marginTop:14,background:'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.2)',borderRadius:12,padding:'10px 16px',fontSize:12,color:'#a78bfa',maxWidth:300,textAlign:'center',animation:'splashFade .3s ease'}}>
+          ℹ️ {bioMsg}
+        </div>
+      )}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════
-   ROOT
+   SECURITY SETTINGS VIEW
+   Rendered inside the MainApp sidebar overlay.
+   Allows users to change PIN and toggle biometric.
+   Changing PIN requires verifying the current PIN first.
+═══════════════════════════════════════════════ */
+function SecuritySettingsView({ user }) {
+  const uid = user?.id;
+  const [hasPin, setHasPin] = useState(()=> uid&&!!Security.loadUser(uid,'pin_hash',null));
+  const [hasBio, setHasBio] = useState(()=> uid&&Security.loadUser(uid,'has_bio',false));
+  const [mode, setMode]     = useState('view');  // view|verifyPin|newPin|confirmPin
+  const [oldPin, setOP]     = useState('');
+  const [newPin, setNP]     = useState('');
+  const [confPin, setCP]    = useState('');
+  const [error, setError]   = useState('');
+  const [shake, setShake]   = useState(false);
+  const [msg, setMsg]       = useState('');
+  const [verifying, setVfy] = useState(false);
+
+  const doShake = ()=>{ setShake(true); setTimeout(()=>setShake(false),620); };
+  const showMsg = (m)=>{ setMsg(m); setTimeout(()=>setMsg(''),3000); };
+  const reset   = ()=>{ setMode('view'); setOP(''); setNP(''); setCP(''); setError(''); setVfy(false); };
+
+  const onKey=(k)=>{
+    if (verifying) return;
+    const map={verifyPin:[oldPin,setOP],newPin:[newPin,setNP],confirmPin:[confPin,setCP]};
+    const [val,setVal]=map[mode]||[];
+    if(!setVal) return;
+    if(k==='⌫'){setVal(p=>p.slice(0,-1));return;}
+    if(val.length<4) setVal(p=>p+k);
+  };
+
+  /* Verify current PIN */
+  useEffect(()=>{
+    if(mode!=='verifyPin'||oldPin.length!==4||verifying) return;
+    setVfy(true);
+    Security.verifyPin(oldPin, Security.loadUser(uid,'pin_hash')).then(ok=>{
+      if(ok){ setOP(''); setMode('newPin'); setError(''); setVfy(false); }
+      else{ doShake(); setError('Incorrect current PIN.'); setTimeout(()=>{setOP('');setError('');setVfy(false);},1700); }
+    });
+  },[oldPin]);
+
+  /* Auto-advance to confirm */
+  useEffect(()=>{
+    if(mode==='newPin'&&newPin.length===4) setTimeout(()=>setMode('confirmPin'),230);
+  },[newPin]);
+
+  /* Validate and save new PIN */
+  useEffect(()=>{
+    if(mode!=='confirmPin'||confPin.length!==4||verifying) return;
+    setVfy(true);
+    if(newPin===confPin){
+      Security.hashPin(newPin).then(hash=>{
+        Security.saveUser(uid,'pin_hash',hash);
+        setNP(''); setCP(''); setHasPin(true);
+        showMsg('PIN changed successfully!'); reset();
+      });
+    } else {
+      doShake(); setError('PINs do not match.');
+      setTimeout(()=>{setCP('');setError('');setVfy(false);},1700);
+    }
+  },[confPin]);
+
+  const currentPin={verifyPin:oldPin,newPin:newPin,confirmPin:confPin}[mode]||'';
+  const pinTitles={verifyPin:'Enter current PIN',newPin:'Enter new PIN',confirmPin:'Confirm new PIN'};
+
+  /* ── Inline PIN entry (change PIN flow) ── */
+  if (mode!=='view') return (
+    <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 24px 40px'}}>
+      <div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:32,textAlign:'center'}}>{pinTitles[mode]}</div>
+      <PinDots filled={currentPin.length} shake={shake} visible={false}/>
+      {error&&<div style={{marginTop:14,fontSize:13,color:C.red,fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>}
+      <div style={{marginTop:28}}><PinKeypad onKey={onKey} disabled={verifying}/></div>
+      <button onClick={reset} style={{marginTop:20,background:'none',border:'none',color:C.muted,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+    </div>
+  );
+
+  /* ── Settings view ── */
+  return (
+    <div style={{flex:1,overflowY:'auto',padding:'16px 16px 32px'}}>
+      {msg&&<div style={{background:'rgba(16,185,129,.15)',border:`1px solid rgba(16,185,129,.3)`,borderRadius:12,padding:'10px 16px',fontSize:13,color:C.green,marginBottom:16,textAlign:'center',fontWeight:600}}>✓ {msg}</div>}
+
+      {/* PIN section */}
+      <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.1,marginBottom:10}}>PIN Code</div>
+      <div style={{background:C.s2,borderRadius:16,marginBottom:20,border:`1px solid ${C.border}`,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:hasPin?12:0}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:C.white}}>4-Digit PIN</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>{hasPin?'Active — tap to change':'Not configured'}</div>
+          </div>
+          <div style={{fontSize:11,fontWeight:700,color:hasPin?C.green:C.red,background:hasPin?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)',borderRadius:6,padding:'3px 9px'}}>{hasPin?'✓ ON':'✗ OFF'}</div>
+        </div>
+        {hasPin&&(
+          <button onClick={()=>setMode('verifyPin')} style={{width:'100%',background:'rgba(139,92,246,.12)',border:`1px solid rgba(139,92,246,.25)`,borderRadius:10,padding:'10px',color:C.brandLt,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+            🔄 Change PIN
+          </button>
+        )}
+        {!hasPin&&(
+          <button onClick={()=>setMode('newPin')} style={{width:'100%',background:C.brand,border:'none',borderRadius:10,padding:'10px',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginTop:12}}>
+            + Set Up PIN
+          </button>
+        )}
+      </div>
+
+      {/* Biometric section */}
+      <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.1,marginBottom:10}}>Biometric</div>
+      <div style={{background:C.s2,borderRadius:16,marginBottom:20,border:`1px solid ${C.border}`,padding:'16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:15,fontWeight:700,color:C.white}}>Fingerprint / Face ID</div>
+          <div style={{fontSize:12,color:C.muted,marginTop:2}}>{hasBio?'Enabled on unlock screen':'Not enabled'}</div>
+        </div>
+        <button onClick={()=>{ const n=!hasBio; setHasBio(n); Security.saveUser(uid,'has_bio',n); }} style={{width:48,height:28,borderRadius:99,border:'none',cursor:'pointer',background:hasBio?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.15)',position:'relative',transition:'background .2s',flexShrink:0}}>
+          <div style={{position:'absolute',width:22,height:22,borderRadius:'50%',background:'#fff',top:3,left:hasBio?23:3,transition:'left .2s'}}/>
+        </button>
+      </div>
+
+      {/* Info footer */}
+      <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>
+          🔐 Your security settings are tied to your account (<strong style={{color:C.brandLt}}>{user?.name}</strong>) and stored only on this device. Logging out preserves your settings for your next login.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   ROOT  —  Corrected phase-based router
+   ─────────────────────────────────────────────
+   Correct flow:
+     splash → slide (1st launch) │ auth (returning, no session)
+                                 │ unlock (returning, session + security)
+                                 │ secSetup (returning, session, no security)
+     slide  → auth
+     auth   → secSetup (1st security setup) │ app (already secured)
+     secSetup → app
+     unlock → app
+     logout → auth
 ═══════════════════════════════════════════════ */
 function WishApp(){
-  // 'splash' → 'slide' | 'pinSetup' | 'pinUnlock' → 'app'
-  const [phase, setPhase]   = useState('splash');
-  const [loggedUser, setLU] = useState(null);
-  const [lang, setLang]     = useState('en');
+  // phase: 'splash'|'slide'|'auth'|'secSetup'|'unlock'|'app'
+  const [phase, setPhase]       = useState('splash');
+  const [loggedUser, setLU]     = useState(null);   // authenticated & unlocked user
+  const [pendingUser, setPU]    = useState(null);   // saved user waiting behind unlock
+  const [lang, setLang]         = useState('en');
 
-  /* After splash: decide which screen comes next */
-  const handleSplashDone = () => {
+  /* ── Splash done: branch on stored state ── */
+  const handleSplashDone = ()=>{
     const firstLaunch = !Security.load('first_launch');
-    const pinHash     =  Security.load('pin_hash');
-    if      (firstLaunch) setPhase('slide');
-    else if (pinHash)     setPhase('pinUnlock');
-    else                  setPhase('pinSetup');
+    const saved       =  Security.load('last_user');
+    if (firstLaunch){
+      setPhase('slide'); return;
+    }
+    if (saved){
+      if (Security.hasSecuritySetup(saved.id)){
+        setPU(saved);          // remember who's unlocking
+        setPhase('unlock');
+      } else {
+        setLU(saved);          // skip unlock, go straight to setup
+        setPhase('secSetup');
+      }
+    } else {
+      setPhase('auth');
+    }
   };
 
-  /* Slide complete → set up PIN */
-  const handleSlideComplete = () => setPhase('pinSetup');
+  /* Slide-to-open → sign in / sign up */
+  const handleSlideComplete = ()=> setPhase('auth');
 
-  /* PIN created → try to restore saved session, then enter app */
-  const handlePinSetupDone = () => {
-    const saved = Security.load('last_user');
-    if (saved) setLU(saved);
-    setPhase('app');
-  };
-
-  /* PIN unlocked → restore saved session */
-  const handlePinUnlock = () => {
-    const saved = Security.load('last_user');
-    if (saved) setLU(saved);
-    setPhase('app');
-  };
-
-  /* Login from AuthScreen → persist session */
-  const handleLogin = (u) => {
+  /* After AuthScreen login: set up security if not done yet */
+  const handleLogin = (u)=>{
     Security.save('last_user', u);
+    Security.save('first_launch','1');
     setLU(u);
+    setPhase(Security.hasSecuritySetup(u.id) ? 'app' : 'secSetup');
   };
 
-  /* Logout → clear session, re-lock behind PIN */
-  const handleLogout = () => {
+  /* Security setup completed → enter app */
+  const handleSecSetupDone = ()=> setPhase('app');
+
+  /* PIN/biometric unlock → restore pending user */
+  const handleUnlock = ()=>{
+    setLU(pendingUser);
+    setPU(null);
+    setPhase('app');
+  };
+
+  /* Logout: keep security settings, go to auth (user must re-sign-in) */
+  const handleLogout = ()=>{
     Security.save('last_user', null);
-    setLU(null);
-    setPhase(Security.load('pin_hash') ? 'pinUnlock' : 'pinSetup');
+    setLU(null); setPU(null);
+    setPhase('auth');
   };
 
-  if (phase==='splash')    return <SplashScreen onDone={handleSplashDone}/>;
-  if (phase==='slide')     return <SlideToOpen  onUnlock={handleSlideComplete}/>;
-  if (phase==='pinSetup')  return <PinSetup     onComplete={handlePinSetupDone}/>;
-  if (phase==='pinUnlock') return <PinUnlock    onUnlock={handlePinUnlock}/>;
+  if (phase==='splash')   return <SplashScreen  onDone={handleSplashDone}/>;
+  if (phase==='slide')    return <SlideToOpen    onUnlock={handleSlideComplete}/>;
+  if (phase==='auth')     return <AuthScreen     onLogin={handleLogin} lang={lang}/>;
+  if (phase==='secSetup') return <SecuritySetup  user={loggedUser}  onComplete={handleSecSetupDone}/>;
+  if (phase==='unlock')   return <UnlockScreen   user={pendingUser} onUnlock={handleUnlock}/>;
 
   // phase === 'app'
-  if (!loggedUser)         return <AuthScreen   onLogin={handleLogin} lang={lang}/>;
-  if (loggedUser.isAdmin)  return <AdminPanel   user={loggedUser} onExit={handleLogout} lang={lang}/>;
+  if (!loggedUser)          return <AuthScreen   onLogin={handleLogin} lang={lang}/>;
+  if (loggedUser.isAdmin)   return <AdminPanel   user={loggedUser} onExit={handleLogout} lang={lang}/>;
   return <MainApp user={loggedUser} onLogout={handleLogout} lang={lang} setLang={setLang}/>;
 }
 
