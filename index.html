@@ -44,6 +44,35 @@
     from { transform: rotate(0deg) translateX(56px) rotate(0deg); }
     to   { transform: rotate(360deg) translateX(56px) rotate(-360deg); }
   }
+  @keyframes swing {
+    0%   { transform: rotate(-18deg); }
+    30%  { transform: rotate(13deg);  }
+    55%  { transform: rotate(-7deg);  }
+    72%  { transform: rotate(4deg);   }
+    86%  { transform: rotate(-2deg);  }
+    95%  { transform: rotate(1deg);   }
+    100% { transform: rotate(0deg);   }
+  }
+  @keyframes dotPulse {
+    0%,100% { transform: scale(0.75); opacity: 0.35; }
+    50%     { transform: scale(1.25); opacity: 1;    }
+  }
+  @keyframes splashFade {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0);    }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0);   }
+    20%     { transform: translateX(-9px);}
+    40%     { transform: translateX(9px); }
+    60%     { transform: translateX(-5px);}
+    80%     { transform: translateX(5px); }
+  }
+  @keyframes pinSuccess {
+    0%   { transform: scale(0.6); opacity: 0; }
+    70%  { transform: scale(1.15); }
+    100% { transform: scale(1);   opacity: 1; }
+  }
   .glass-effect {
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -1766,17 +1795,670 @@ function MainApp({user,onLogout,lang,setLang}){
 }
 
 /* ═══════════════════════════════════════════════
+   SECURITY UTILITIES
+   Namespaced localStorage wrapper + SHA-256 PIN hashing.
+   All keys stored under prefix "wish_" to avoid collisions.
+═══════════════════════════════════════════════ */
+const Security = {
+  /* Hash PIN with SHA-256 + app salt via Web Crypto API.
+     Falls back to a fast djb2-style hash if SubtleCrypto is unavailable. */
+  async hashPin(pin) {
+    try {
+      const enc = new TextEncoder().encode(pin + '\u2605wish\u2605v1');
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    } catch(_) {
+      // Fallback: djb2 (non-cryptographic, for dev/legacy environments)
+      let h = 5381;
+      for (const c of (pin + 'wish_salt')) h = ((h << 5) + h + c.charCodeAt(0)) | 0;
+      return (h >>> 0).toString(16);
+    }
+  },
+  async verifyPin(pin, stored) {
+    return (await this.hashPin(pin)) === stored;
+  },
+  save(k, v)  { try { localStorage.setItem('wish_'+k, JSON.stringify(v)); } catch(_){} },
+  load(k, d=null) {
+    try { const v=localStorage.getItem('wish_'+k); return v===null?d:JSON.parse(v); }
+    catch(_){ return d; }
+  },
+  remove(k) { try { localStorage.removeItem('wish_'+k); } catch(_){} },
+};
+
+/* ═══════════════════════════════════════════════
+   PIN DOTS — visual indicator for entered digits
+═══════════════════════════════════════════════ */
+function PinDots({ filled, shake, visible, raw }) {
+  return (
+    <div style={{display:'flex',gap:18,justifyContent:'center',animation:shake?'shake .5s ease':'none'}}>
+      {[0,1,2,3].map(i=>{
+        const isFilled = i < filled;
+        return (
+          <div key={i} style={{
+            width:18, height:18, borderRadius:'50%',
+            background: isFilled ? `linear-gradient(135deg,#a78bfa,#ec4899)` : 'transparent',
+            border: `2.5px solid ${isFilled ? '#a78bfa' : 'rgba(255,255,255,.22)'}`,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:11, fontWeight:800, color:'#fff',
+            transition:'all .18s cubic-bezier(.34,1.56,.64,1)',
+            boxShadow: isFilled ? '0 0 10px rgba(167,139,250,.5)' : 'none',
+            transform: isFilled ? 'scale(1.1)' : 'scale(1)',
+          }}>
+            {visible && raw && i < raw.length ? raw[i] : ''}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   PIN KEYPAD — numeric 0-9 grid + backspace
+═══════════════════════════════════════════════ */
+function PinKeypad({ onKey, disabled }) {
+  const [activeKey, setAK] = useState(null);
+  const rows = [['1','2','3'],['4','5','6'],['7','8','9'],['','0','⌫']];
+  const press = (k) => {
+    if (!k || disabled) return;
+    setAK(k); setTimeout(()=>setAK(null), 140);
+    onKey(k);
+  };
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14,alignItems:'center',userSelect:'none'}}>
+      {rows.map((row,ri)=>(
+        <div key={ri} style={{display:'flex',gap:20}}>
+          {row.map((k,ki)=>{
+            const isBack = k==='⌫';
+            const isEmpty = k==='';
+            const isActive = activeKey===k;
+            return (
+              <button key={ki} onPointerDown={()=>press(k)} style={{
+                width:74, height:74, borderRadius:'50%',
+                background: isEmpty ? 'transparent'
+                  : isActive ? (isBack ? 'rgba(239,68,68,.3)' : 'rgba(139,92,246,.35)')
+                  : isBack ? 'rgba(239,68,68,.1)' : 'rgba(139,92,246,.1)',
+                border: isEmpty ? 'none'
+                  : isBack ? '1px solid rgba(239,68,68,.25)' : '1px solid rgba(139,92,246,.22)',
+                color: isEmpty ? 'transparent' : isBack ? '#ef4444' : '#fff',
+                fontSize: isBack ? 22 : 26,
+                fontWeight: 600,
+                cursor: isEmpty||disabled ? 'default' : 'pointer',
+                opacity: disabled ? .35 : 1,
+                transition: 'background .12s, transform .12s',
+                transform: isActive ? 'scale(0.93)' : 'scale(1)',
+                fontFamily:'inherit',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                WebkitTapHighlightColor:'transparent',
+                touchAction:'none',
+              }}>{k}</button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SPLASH SCREEN
+   Pendulum-swing logo, ambient orbs, dot loader.
+   Auto-navigates after 2.6s.
+═══════════════════════════════════════════════ */
+function SplashScreen({ onDone }) {
+  useEffect(()=>{ const t=setTimeout(onDone,2600); return()=>clearTimeout(t); },[]);
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9999,
+      background:'linear-gradient(160deg,#080616 0%,#13102a 52%,#0a0820 100%)',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",overflow:'hidden',
+    }}>
+      {/* Ambient orbs */}
+      <div style={{position:'absolute',top:'10%',left:'8%',width:240,height:240,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(139,92,246,.18),transparent 68%)',
+        animation:'float 4.5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',bottom:'16%',right:'6%',width:180,height:180,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(236,72,153,.13),transparent 68%)',
+        animation:'float 5.5s ease infinite reverse',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',top:'55%',left:'55%',width:320,height:320,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(6,182,212,.06),transparent 68%)',
+        transform:'translate(-30%,-40%)',pointerEvents:'none'}}/>
+
+      {/* Swinging logo block — transform-origin at top-center = pendulum pivot */}
+      <div style={{
+        animation:'swing 1.7s cubic-bezier(.36,.07,.19,.97) .15s both',
+        transformOrigin:'center top',
+        display:'flex',flexDirection:'column',alignItems:'center',gap:12,
+      }}>
+        <div style={{
+          fontSize:84,lineHeight:1,
+          filter:'drop-shadow(0 0 32px rgba(139,92,246,.7)) drop-shadow(0 0 14px rgba(236,72,153,.35))',
+        }}>⭐</div>
+        <div style={{
+          fontSize:48,fontWeight:900,letterSpacing:-2,
+          background:'linear-gradient(100deg,#c4b5fd 0%,#a78bfa 40%,#ec4899 100%)',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+        }}>Wish</div>
+      </div>
+
+      {/* Tagline */}
+      <div style={{
+        marginTop:16,fontSize:13,color:'rgba(255,255,255,.35)',fontWeight:500,
+        letterSpacing:2.5,textTransform:'uppercase',
+        animation:'splashFade .7s ease .95s both',
+      }}>Earn &amp; Reward Platform</div>
+
+      {/* Dot loader */}
+      <div style={{position:'absolute',bottom:76,display:'flex',gap:9}}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{
+            width:7,height:7,borderRadius:'50%',
+            background:'rgba(139,92,246,.65)',
+            animation:`dotPulse 1.15s ease ${i*.19}s infinite`,
+          }}/>
+        ))}
+      </div>
+
+      {/* Version tag */}
+      <div style={{
+        position:'absolute',bottom:34,fontSize:11,
+        color:'rgba(255,255,255,.15)',fontWeight:500,letterSpacing:.5,
+        animation:'splashFade .5s ease 1.5s both',
+      }}>v1.0.0 · Wish Platform</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SLIDE TO OPEN — iOS-style slide gesture for new users
+═══════════════════════════════════════════════ */
+function SlideToOpen({ onUnlock }) {
+  const [frac, setFrac]       = useState(0);   // 0–1 drag fraction
+  const [dragging, setDrag]   = useState(false);
+  const [done, setDone]       = useState(false);
+  const [fadeOut, setFO]      = useState(false);
+  const trackRef  = useRef(null);
+  const startRef  = useRef(null);
+  const THUMB = 64;
+
+  const getMax = () => Math.max(1, (trackRef.current?.offsetWidth||320) - THUMB - 8);
+
+  const onPD = (e) => {
+    if (done) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    startRef.current = e.clientX - frac * getMax();
+    setDrag(true);
+  };
+  const onPM = (e) => {
+    if (startRef.current===null||done) return;
+    const f = Math.max(0, Math.min(1, (e.clientX - startRef.current) / getMax()));
+    setFrac(f);
+    if (f >= 0.93 && !done) {
+      setDone(true); setFrac(1);
+      setTimeout(()=>{ setFO(true); setTimeout(onUnlock,380); }, 280);
+    }
+  };
+  const onPU = () => { if (!done) setFrac(0); startRef.current=null; setDrag(false); };
+
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9998,
+      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",overflow:'hidden',
+      opacity:fadeOut?0:1,transition:'opacity .38s ease',
+    }}>
+      {/* Ambient */}
+      <div style={{position:'absolute',top:'14%',right:'9%',width:210,height:210,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',
+        animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',bottom:'20%',left:'7%',width:170,height:170,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',
+        animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+
+      {/* Hero */}
+      <div style={{textAlign:'center',marginBottom:56,animation:'splashFade .6s ease .1s both'}}>
+        <div style={{fontSize:64,marginBottom:10,
+          filter:'drop-shadow(0 0 22px rgba(139,92,246,.55))'}}>⭐</div>
+        <div style={{fontSize:34,fontWeight:900,letterSpacing:-1,
+          background:'linear-gradient(100deg,#c4b5fd,#a78bfa,#ec4899)',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
+          Welcome to Wish
+        </div>
+        <div style={{fontSize:14,color:'rgba(255,255,255,.38)',fontWeight:500,lineHeight:1.6}}>
+          Your earning journey starts here
+        </div>
+      </div>
+
+      {/* Slide track */}
+      <div ref={trackRef} style={{
+        width:'78%',maxWidth:340,height:72,borderRadius:99,
+        background:'rgba(139,92,246,.07)',
+        border:'1px solid rgba(139,92,246,.2)',
+        position:'relative',overflow:'hidden',
+        boxShadow:'inset 0 2px 12px rgba(0,0,0,.3), 0 4px 24px rgba(0,0,0,.25)',
+        animation:'splashFade .6s ease .3s both',
+      }}>
+        {/* Progress fill */}
+        <div style={{
+          position:'absolute',top:0,left:0,bottom:0,
+          width:`calc(${frac*100}% + 36px)`,
+          background:`linear-gradient(90deg,rgba(139,92,246,.3),rgba(139,92,246,.1))`,
+          borderRadius:99,
+          transition:dragging?'none':'width .35s cubic-bezier(.34,1.56,.64,1)',
+        }}/>
+        {/* Label */}
+        <div style={{
+          position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+          fontSize:14,fontWeight:700,letterSpacing:.8,userSelect:'none',pointerEvents:'none',
+          color:`rgba(255,255,255,${Math.max(.15, .6 - frac*.7)})`,
+          transition:'color .1s',
+        }}>
+          {done?'Opening…':'Slide to Open  ›'}
+        </div>
+        {/* Thumb */}
+        <div
+          onPointerDown={onPD} onPointerMove={onPM}
+          onPointerUp={onPU}   onPointerCancel={onPU}
+          style={{
+            position:'absolute',left:4,top:4,
+            width:THUMB,height:THUMB,borderRadius:'50%',
+            background: done
+              ? 'linear-gradient(135deg,#10b981,#059669)'
+              : 'linear-gradient(135deg,#a78bfa,#8b5cf6)',
+            boxShadow: done
+              ? '0 4px 22px rgba(16,185,129,.55)'
+              : '0 4px 22px rgba(139,92,246,.55)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontSize:26,color:'#fff',fontWeight:700,
+            transform:`translateX(${frac*getMax()}px)`,
+            transition:dragging?'none':'transform .38s cubic-bezier(.34,1.56,.64,1), background .3s, box-shadow .3s',
+            cursor:done?'default':'grab',
+            touchAction:'none',userSelect:'none',
+            WebkitTapHighlightColor:'transparent',
+          }}
+        >{done?'✓':'›'}</div>
+      </div>
+
+      {/* Hint */}
+      <div style={{
+        marginTop:22,fontSize:12,color:'rgba(255,255,255,.22)',fontWeight:500,
+        animation:'splashFade .6s ease .55s both',
+      }}>Drag the button all the way to the right</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   PIN SETUP — create & confirm a 4-digit PIN
+═══════════════════════════════════════════════ */
+function PinSetup({ onComplete }) {
+  const [step, setStep]       = useState(1);   // 1=enter, 2=confirm
+  const [pin1, setPin1]       = useState('');
+  const [pin2, setPin2]       = useState('');
+  const [error, setError]     = useState('');
+  const [hint, setHint]       = useState('');
+  const [showHintBox, setSHB] = useState(false);
+  const [visible, setVis]     = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [shake, setShake]     = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const current    = step===1 ? pin1 : pin2;
+  const setCurrent = step===1 ? setPin1 : setPin2;
+  const doShake    = ()=>{ setShake(true); setTimeout(()=>setShake(false),620); };
+
+  // Step 1 complete → move to confirm
+  useEffect(()=>{
+    if (step===1 && pin1.length===4) setTimeout(()=>setStep(2), 230);
+  },[pin1]);
+
+  // Step 2 complete → validate
+  useEffect(()=>{
+    if (step!==2 || pin2.length!==4 || saving) return;
+    setSaving(true);
+    if (pin1===pin2) {
+      Security.hashPin(pin1).then(hash=>{
+        Security.save('pin_hash', hash);
+        if (hint.trim()) Security.save('pin_hint', hint.trim());
+        Security.save('first_launch','1');
+        setPin1(''); setPin2(''); // clear sensitive data
+        setSuccess(true);
+        setTimeout(onComplete, 850);
+      });
+    } else {
+      doShake();
+      setError('PINs do not match. Please try again.');
+      setTimeout(()=>{ setPin2(''); setError(''); setSaving(false); }, 1700);
+    }
+  },[pin2]);
+
+  const onKey = (k)=>{
+    if (saving||success) return;
+    if (k==='⌫'){ setCurrent(p=>p.slice(0,-1)); return; }
+    if (current.length<4) setCurrent(p=>p+k);
+  };
+
+  const titles = ['Create your PIN','Confirm your PIN'];
+  const subs   = ['Choose a 4-digit PIN to secure your account','Enter the same PIN to confirm'];
+
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9997,
+      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden',
+    }}>
+      {/* Ambient */}
+      <div style={{position:'absolute',top:'8%',right:'6%',width:190,height:190,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(139,92,246,.14),transparent 68%)',
+        animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+
+      {/* Step dots */}
+      <div style={{position:'absolute',top:52,display:'flex',gap:8}}>
+        {[1,2].map(s=>(
+          <div key={s} style={{
+            height:8,borderRadius:99,
+            width: s===step ? 28 : 8,
+            background: s<=step ? '#a78bfa' : 'rgba(255,255,255,.15)',
+            transition:'all .3s cubic-bezier(.34,1.56,.64,1)',
+          }}/>
+        ))}
+      </div>
+
+      {/* Icon */}
+      {success ? (
+        <div style={{fontSize:76,marginBottom:18,animation:'pinSuccess .5s ease',
+          filter:'drop-shadow(0 0 22px rgba(16,185,129,.6))'}}>✅</div>
+      ):(
+        <div style={{
+          width:76,height:76,borderRadius:24,marginBottom:18,
+          background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',
+          border:'1px solid rgba(139,92,246,.32)',
+          display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,
+          boxShadow:'0 8px 32px rgba(139,92,246,.22)',
+        }}>🔐</div>
+      )}
+
+      <div style={{fontSize:23,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>
+        {success ? 'PIN Created!' : titles[step-1]}
+      </div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:38,textAlign:'center',lineHeight:1.6,maxWidth:280}}>
+        {success ? 'Your account is now secured.' : subs[step-1]}
+      </div>
+
+      {!success&&(<>
+        {/* Dots */}
+        <PinDots filled={current.length} shake={shake} visible={visible} raw={current}/>
+
+        {/* Error / toggle */}
+        {error ? (
+          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,
+            textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
+        ):(
+          <button onClick={()=>setVis(v=>!v)} style={{
+            marginTop:12,background:'none',border:'none',
+            color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit',
+            display:'flex',alignItems:'center',gap:5,
+          }}>{visible?'🙈 Hide PIN':'👁 Show PIN'}</button>
+        )}
+
+        {/* Optional hint (step 1 only) */}
+        {step===1&&(
+          <div style={{marginTop:14,width:'100%',maxWidth:300}}>
+            {!showHintBox ? (
+              <button onClick={()=>setSHB(true)} style={{
+                background:'none',border:'none',color:'rgba(255,255,255,.22)',
+                fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'block',margin:'0 auto',
+              }}>+ Add a PIN hint (optional)</button>
+            ):(
+              <input value={hint} onChange={e=>setHint(e.target.value)} maxLength={40}
+                placeholder="e.g. Favourite year, street no…"
+                style={{
+                  width:'100%',background:'rgba(139,92,246,.07)',
+                  border:'1px solid rgba(139,92,246,.22)',borderRadius:11,
+                  padding:'11px 14px',color:'#fff',fontSize:13,outline:'none',
+                  fontFamily:'inherit',textAlign:'center',
+                }}/>
+            )}
+          </div>
+        )}
+
+        {/* Keypad */}
+        <div style={{marginTop:26}}>
+          <PinKeypad onKey={onKey} disabled={saving}/>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   PIN UNLOCK — verify PIN for returning users
+   Enforces 5-attempt limit with 30s cooldown.
+═══════════════════════════════════════════════ */
+function PinUnlock({ onUnlock }) {
+  const [pin, setPin]         = useState('');
+  const [error, setError]     = useState('');
+  const [shake, setShake]     = useState(false);
+  const [verifying, setVfy]   = useState(false);
+  const [visible, setVis]     = useState(false);
+  const [showHint, setSH]     = useState(false);
+  const [failed, setFailed]   = useState(()=>Security.load('failed_pin',0));
+  const [lockUntil, setLU]    = useState(()=>Security.load('lock_until',0));
+  const [now, setNow]         = useState(()=>Date.now());
+  const hint                  = Security.load('pin_hint',null);
+
+  const isLocked   = lockUntil > now;
+  const secsLeft   = Math.max(0, Math.ceil((lockUntil - now)/1000));
+
+  // Tick every 500ms while locked
+  useEffect(()=>{
+    if (!isLocked) return;
+    const iv=setInterval(()=>{
+      const n=Date.now(); setNow(n);
+      if (lockUntil<=n){
+        setFailed(0); Security.save('failed_pin',0);
+        setLU(0);     Security.save('lock_until',0);
+        setError('');
+      }
+    },500);
+    return()=>clearInterval(iv);
+  },[lockUntil,isLocked]);
+
+  // Auto-verify when 4 digits entered
+  useEffect(()=>{
+    if (pin.length!==4||verifying||isLocked) return;
+    setVfy(true);
+    const stored = Security.load('pin_hash');
+    Security.verifyPin(pin, stored).then(ok=>{
+      if (ok){
+        Security.save('failed_pin',0); Security.save('lock_until',0);
+        setPin(''); setVfy(false);
+        onUnlock();
+      } else {
+        const nf = failed+1;
+        setFailed(nf); Security.save('failed_pin',nf);
+        const msg = nf>=5
+          ? 'Too many attempts. Locked for 30s.'
+          : `Incorrect PIN. ${5-nf} attempt${5-nf===1?'':'s'} left.`;
+        if (nf>=5){
+          const until=Date.now()+30000;
+          setLU(until); Security.save('lock_until',until);
+        }
+        setShake(true); setError(msg);
+        setTimeout(()=>{ setShake(false); setPin(''); setError(''); setVfy(false); },1700);
+      }
+    });
+  },[pin]);
+
+  const onKey=(k)=>{
+    if (verifying||isLocked) return;
+    if (k==='⌫'){ setPin(p=>p.slice(0,-1)); setError(''); return; }
+    if (pin.length<4) setPin(p=>p+k);
+  };
+
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9997,
+      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden',
+    }}>
+      {/* Ambient */}
+      <div style={{position:'absolute',top:'9%',left:'6%',width:210,height:210,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',
+        animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',bottom:'14%',right:'8%',width:160,height:160,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',
+        animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+
+      {/* Lock icon */}
+      <div style={{
+        width:80,height:80,borderRadius:26,marginBottom:18,
+        background: isLocked
+          ? 'linear-gradient(135deg,rgba(239,68,68,.22),rgba(185,28,28,.14))'
+          : 'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',
+        border:`1px solid ${isLocked?'rgba(239,68,68,.3)':'rgba(139,92,246,.3)'}`,
+        display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,
+        boxShadow:`0 8px 32px ${isLocked?'rgba(239,68,68,.2)':'rgba(139,92,246,.2)'}`,
+        transition:'all .4s ease',
+      }}>{isLocked?'🔒':'🔓'}</div>
+
+      <div style={{fontSize:23,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>
+        {isLocked ? 'App Locked' : 'Enter your PIN'}
+      </div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:isLocked?20:36,
+        textAlign:'center',lineHeight:1.6,maxWidth:270}}>
+        {isLocked
+          ? `Too many failed attempts. Please wait.`
+          : 'Enter your 4-digit PIN to continue'}
+      </div>
+
+      {/* Cooldown timer */}
+      {isLocked&&(
+        <div style={{
+          width:88,height:88,borderRadius:'50%',marginBottom:28,
+          border:'3px solid rgba(239,68,68,.35)',
+          background:'rgba(239,68,68,.08)',
+          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+          boxShadow:'0 0 28px rgba(239,68,68,.2)',
+        }}>
+          <div style={{fontSize:28,fontWeight:800,color:'#ef4444',fontFamily:'monospace'}}>{secsLeft}</div>
+          <div style={{fontSize:9,color:'rgba(239,68,68,.6)',letterSpacing:.5}}>SECONDS</div>
+        </div>
+      )}
+
+      {/* PIN input area */}
+      {!isLocked&&(<>
+        <PinDots filled={pin.length} shake={shake} visible={visible} raw={pin}/>
+
+        {/* Error / controls row */}
+        {error?(
+          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,
+            textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
+        ):(
+          <div style={{display:'flex',gap:18,marginTop:12,alignItems:'center'}}>
+            <button onClick={()=>setVis(v=>!v)} style={{background:'none',border:'none',
+              color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+              {visible?'🙈 Hide':'👁 Show'}
+            </button>
+            {hint&&(
+              <button onClick={()=>setSH(s=>!s)} style={{background:'none',border:'none',
+                color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+                💡 Hint
+              </button>
+            )}
+          </div>
+        )}
+
+        {showHint&&hint&&(
+          <div style={{
+            marginTop:10,background:'rgba(245,158,11,.1)',
+            border:'1px solid rgba(245,158,11,.22)',
+            borderRadius:11,padding:'8px 18px',fontSize:12,
+            color:'#f59e0b',maxWidth:260,textAlign:'center',
+          }}>💡 {hint}</div>
+        )}
+
+        {/* Keypad */}
+        <div style={{marginTop:22}}>
+          <PinKeypad onKey={onKey} disabled={verifying}/>
+        </div>
+
+        {/* Failed attempt pips */}
+        {failed>0&&failed<5&&(
+          <div style={{marginTop:18,display:'flex',gap:6,justifyContent:'center'}}>
+            {[0,1,2,3,4].map(i=>(
+              <div key={i} style={{
+                width:9,height:9,borderRadius:'50%',
+                background:i<failed?'#ef4444':'rgba(255,255,255,.15)',
+                transition:'background .3s',
+              }}/>
+            ))}
+          </div>
+        )}
+      </>)}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    ROOT
 ═══════════════════════════════════════════════ */
 function WishApp(){
-  const [loggedUser,setLU] = useState(null);
-  const [lang,setLang]     = useState("en");
+  // 'splash' → 'slide' | 'pinSetup' | 'pinUnlock' → 'app'
+  const [phase, setPhase]   = useState('splash');
+  const [loggedUser, setLU] = useState(null);
+  const [lang, setLang]     = useState('en');
 
-  const handleLogin=(u)=>{ setLU(u); };
-  const handleLogout=()=>{ setLU(null); };
+  /* After splash: decide which screen comes next */
+  const handleSplashDone = () => {
+    const firstLaunch = !Security.load('first_launch');
+    const pinHash     =  Security.load('pin_hash');
+    if      (firstLaunch) setPhase('slide');
+    else if (pinHash)     setPhase('pinUnlock');
+    else                  setPhase('pinSetup');
+  };
 
-  if(!loggedUser) return <AuthScreen onLogin={handleLogin} lang={lang}/>;
-  if(loggedUser.isAdmin) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
+  /* Slide complete → set up PIN */
+  const handleSlideComplete = () => setPhase('pinSetup');
+
+  /* PIN created → try to restore saved session, then enter app */
+  const handlePinSetupDone = () => {
+    const saved = Security.load('last_user');
+    if (saved) setLU(saved);
+    setPhase('app');
+  };
+
+  /* PIN unlocked → restore saved session */
+  const handlePinUnlock = () => {
+    const saved = Security.load('last_user');
+    if (saved) setLU(saved);
+    setPhase('app');
+  };
+
+  /* Login from AuthScreen → persist session */
+  const handleLogin = (u) => {
+    Security.save('last_user', u);
+    setLU(u);
+  };
+
+  /* Logout → clear session, re-lock behind PIN */
+  const handleLogout = () => {
+    Security.save('last_user', null);
+    setLU(null);
+    setPhase(Security.load('pin_hash') ? 'pinUnlock' : 'pinSetup');
+  };
+
+  if (phase==='splash')    return <SplashScreen onDone={handleSplashDone}/>;
+  if (phase==='slide')     return <SlideToOpen  onUnlock={handleSlideComplete}/>;
+  if (phase==='pinSetup')  return <PinSetup     onComplete={handlePinSetupDone}/>;
+  if (phase==='pinUnlock') return <PinUnlock    onUnlock={handlePinUnlock}/>;
+
+  // phase === 'app'
+  if (!loggedUser)         return <AuthScreen   onLogin={handleLogin} lang={lang}/>;
+  if (loggedUser.isAdmin)  return <AdminPanel   user={loggedUser} onExit={handleLogout} lang={lang}/>;
   return <MainApp user={loggedUser} onLogout={handleLogout} lang={lang} setLang={setLang}/>;
 }
 
