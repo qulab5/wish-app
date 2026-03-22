@@ -1136,6 +1136,10 @@ function MainApp({user,onLogout,lang,setLang}){
     fetch(`/api/user?email=${encodeURIComponent(user.email)}`)
       .then(r=>r.json())
       .then(d=>{
+        // Always unlock auto-save, even when the user isn't in the DB yet
+        // (demo/in-memory users). Without this the flag stays false and saves
+        // are permanently blocked for those accounts.
+        dbLoaded.current = true;
         if(!d.user) return;
         const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
                spinNextFree:snf,extraSpins:es}=d.user;
@@ -1170,7 +1174,6 @@ function MainApp({user,onLogout,lang,setLang}){
             }
           }
         }
-        dbLoaded.current = true;  // ← unlock auto-save now that DB state is applied
       })
       .catch(()=>{ dbLoaded.current = true; });  // unlock even on network error
   },[]);

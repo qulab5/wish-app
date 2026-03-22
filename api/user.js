@@ -20,15 +20,27 @@ export default async function handler(req, res) {
       return res.status(200).json({ user: data || null });
     }
 
-    // ── POST /api/user  (upsert) ──────────────────────────────
+    // ── POST /api/user  (save / create) ──────────────────────
     if (req.method === 'POST') {
       const body = req.body;
       if (!body?.email) return res.status(400).json({ error: 'email required' });
       const { _id, ...data } = body;
-      const { error } = await supabase
+
+      // Try UPDATE first (works for any schema — no constraint required).
+      // Select a minimal column back so we know whether a row was matched.
+      const { data: updated, error: updErr } = await supabase
         .from('users')
-        .upsert(data, { onConflict: 'id' });
-      if (error) throw error;
+        .update(data)
+        .eq('email', data.email)
+        .select('email');
+      if (updErr) throw updErr;
+
+      // No existing row (first save for a newly registered user) → INSERT.
+      if (!updated || updated.length === 0) {
+        const { error: insErr } = await supabase.from('users').insert(data);
+        if (insErr) throw insErr;
+      }
+
       return res.status(200).json({ success: true });
     }
 
