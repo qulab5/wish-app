@@ -1161,6 +1161,14 @@ function MainApp({user,onLogout,lang,setLang}){
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
+
+  // Pts accumulated in the current mining session (updates every second as mineT ticks).
+  // elapsed-time pts + boost pts — transferred to balance only on Claim.
+  const mineElapsed = MINE_SESSION_S - mineT;
+  const mineAccum = mineStarted
+    ? Math.floor(mineElapsed * MINE_PTS_HOUR / 3600) + mineBoosts * MINE_BOOST_PTS
+    : 0;
+
   const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
   const claimAd=()=>{addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);};
   const doSpin=()=>{
@@ -1193,7 +1201,8 @@ function MainApp({user,onLogout,lang,setLang}){
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
   const claimMining=()=>{
     if(!mineReady)return;
-    const earned = MINE_PTS_HOUR * 4 + mineBoosts * MINE_BOOST_PTS; // 8000 base + boosts
+    // mineAccum is already computed above: elapsed-time pts + boost pts
+    const earned = mineAccum;
     addPts(earned, earned * USD_PER_POINT);
     setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
   };
@@ -1222,8 +1231,8 @@ function MainApp({user,onLogout,lang,setLang}){
   // TODO: each of the 5 boost slots calls this with its own ad unit if needed
   const boostMining = () => {
     if (!mineStarted || mineReady || mineBoosts >= MINE_MAX_BOOST) return;
+    // Boost pts are folded into mineAccum (via mineBoosts count) and transferred at claim — not added instantly.
     showRewardedAd(() => {
-      addPts(MINE_BOOST_PTS, MINE_BOOST_PTS * USD_PER_POINT);
       setMineBoosts(p => p + 1);
     });
   };
@@ -1276,9 +1285,9 @@ function MainApp({user,onLogout,lang,setLang}){
           {/* Reward info row */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
             <div style={{background:"rgba(139,92,246,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(139,92,246,.18)"}}>
-              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Session Reward</div>
-              <div style={{fontSize:20,fontWeight:800,color:C.brandLt}}>8,000 pts</div>
-              <div style={{fontSize:10,color:C.muted}}>base earnings</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>{mineStarted?"Earned So Far":"Session Reward"}</div>
+              <div style={{fontSize:20,fontWeight:800,color:C.brandLt,fontVariantNumeric:"tabular-nums"}}>{mineStarted?mineAccum.toLocaleString():"8,000"} pts</div>
+              <div style={{fontSize:10,color:C.muted}}>{mineStarted?`≈${(MINE_PTS_HOUR/3600).toFixed(2)} pts/sec`:"base earnings"}</div>
             </div>
             <div style={{background:"rgba(245,158,11,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(245,158,11,.18)"}}>
               <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Boost Bonus</div>
@@ -1293,8 +1302,11 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:34,fontWeight:800,color:C.gold,fontFamily:"monospace",letterSpacing:2}}>{fmtTime(mineT)}</div>
               <div style={{marginTop:10}}>
                 <div className="ptr">
-                  <div className="ptrf" style={{width:`${((MINE_SESSION_S-mineT)/MINE_SESSION_S)*100}%`,background:`linear-gradient(90deg,${C.gold},${C.brand})`}}/>
+                  <div className="ptrf" style={{width:`${(mineElapsed/MINE_SESSION_S)*100}%`,background:`linear-gradient(90deg,${C.gold},${C.brand})`}}/>
                 </div>
+              </div>
+              <div style={{marginTop:10,fontSize:12,color:C.brandLt,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>
+                +{mineAccum.toLocaleString()} pts accumulated
               </div>
             </div>
           )}
@@ -1303,7 +1315,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{textAlign:"center",marginBottom:16,background:"rgba(16,185,129,.1)",borderRadius:14,padding:"14px",border:"1px solid rgba(16,185,129,.25)"}}>
               <div style={{fontSize:22,marginBottom:4}}>🎉</div>
               <div style={{fontSize:14,fontWeight:800,color:C.green}}>Mining Complete!</div>
-              <div style={{fontSize:13,color:C.muted,marginTop:2}}>+{(MINE_PTS_HOUR*4 + mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts ready to claim</div>
+              <div style={{fontSize:13,color:C.muted,marginTop:2}}>+{mineAccum.toLocaleString()} pts ready to claim</div>
             </div>
           )}
           {/* Primary action button */}
@@ -1313,7 +1325,7 @@ function MainApp({user,onLogout,lang,setLang}){
             </button>
           ) : mineReady ? (
             <button onClick={claimMining} style={{width:"100%",background:"linear-gradient(135deg,#10b981,#059669)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 6px 24px rgba(16,185,129,.4)"}}>
-              🎁 Claim {(MINE_PTS_HOUR*4 + mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts
+              🎁 Claim {mineAccum.toLocaleString()} pts
             </button>
           ) : (
             <div style={{width:"100%",background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.2)",borderRadius:14,padding:"14px",color:C.muted,fontWeight:700,fontSize:14,textAlign:"center"}}>
