@@ -1847,10 +1847,64 @@ const Security = {
   /* True once the user has completed the security-setup flow at least once */
   hasSecuritySetup(uid) { return !!this.loadUser(uid,'security_done'); },
 
-  /* Web: checks PublicKeyCredential (Face ID / Touch ID in browser).
-     Native (Expo/RN): swap for LocalAuthentication.hasHardwareAsync() */
+  /* Web: checks PublicKeyCredential (Face ID / Touch ID in browser). */
   checkBioSupport() {
     return typeof window!=='undefined' && 'PublicKeyCredential' in window;
+  },
+
+  /* Check if device has platform biometric authenticator (async) */
+  async checkPlatformBio() {
+    if (!this.checkBioSupport()) return false;
+    try { return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }
+    catch(_) { return false; }
+  },
+
+  /* WebAuthn registration — creates a device-bound biometric credential and stores its ID.
+     Native equivalent: LocalAuthentication.authenticateAsync() / react-native-biometrics enroll */
+  async setupBiometric(uid) {
+    if (!this.checkBioSupport()) return { success:false, error:'not_supported' };
+    const avail = await this.checkPlatformBio();
+    if (!avail) return { success:false, error:'no_hardware' };
+    try {
+      /* User ID must be 1–64 bytes; pad/truncate the uid string */
+      const uid8 = new Uint8Array(16);
+      const enc  = new TextEncoder().encode(uid);
+      uid8.set(enc.slice(0,16));
+      const cred = await navigator.credentials.create({ publicKey:{
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp:  { name:'Wish App' },
+        user:{ id:uid8, name:uid, displayName:'Wish User' },
+        pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
+        authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required' },
+        timeout:60000,
+      }});
+      /* Store the credential ID (base64) so we can reference it later for auth */
+      const credId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+      this.saveUser(uid,'bio_cred_id',credId);
+      return { success:true };
+    } catch(e) {
+      return { success:false, error: e.name==='NotAllowedError'?'cancelled':(e.message||'unknown') };
+    }
+  },
+
+  /* WebAuthn assertion — prompts the native biometric dialog to authenticate.
+     Native equivalent: LocalAuthentication.authenticateAsync({ promptMessage:'Unlock Wish' }) */
+  async authenticateBiometric(uid) {
+    const credStr = this.loadUser(uid,'bio_cred_id',null);
+    if (!credStr) return { success:false, error:'no_credential' };
+    try {
+      const credBytes = Uint8Array.from(atob(credStr), c=>c.charCodeAt(0));
+      const assertion = await navigator.credentials.get({ publicKey:{
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rpId: window.location.hostname || 'localhost',
+        allowCredentials:[{ id:credBytes, type:'public-key', transports:['internal'] }],
+        userVerification:'required',
+        timeout:60000,
+      }});
+      return { success:!!assertion };
+    } catch(e) {
+      return { success:false, error: e.name==='NotAllowedError'?'cancelled':(e.message||'unknown') };
+    }
   },
 };
 
@@ -2121,178 +2175,240 @@ function SlideToOpen({ onUnlock }) {
 /* ═══════════════════════════════════════════════
    SECURITY SETUP
    Shown AFTER successful account creation / sign-in.
-   Tied to a specific user (user.id) — not a global lock.
-   Steps: choose methods → enter PIN → confirm PIN → done
+   Two independent sections: PIN Code + Fingerprint.
+   Each has a checkbox and a dedicated setup button.
+   Fingerprint uses WebAuthn platform authenticator.
+   All settings are per-user, keyed by user.id.
 ═══════════════════════════════════════════════ */
 function SecuritySetup({ user, onComplete }) {
-  // step: 'choose' → 'pin' → 'pinConfirm' → 'done'
-  const [step, setStep]     = useState('choose');
-  const [methods, setM]     = useState({ pin:true, bio:false });
-  const [pin1, setPin1]     = useState('');
-  const [pin2, setPin2]     = useState('');
-  const [hint, setHint]     = useState('');
-  const [showHint, setSHB]  = useState(false);
-  const [visible, setVis]   = useState(false);
-  const [error, setError]   = useState('');
-  const [shake, setShake]   = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [bioSupp, setBioS]  = useState(false);
+  const uid = user?.id;
 
-  useEffect(()=>{ setBioS(Security.checkBioSupport()); },[]);
+  /* ── What the user wants to enable (checkboxes) ── */
+  const [usePin, setUsePin]   = useState(false);
+  const [useBio, setUseBio]   = useState(false);
 
-  const uid      = user?.id;
-  const doShake  = ()=>{ setShake(true); setTimeout(()=>setShake(false),620); };
+  /* ── Completion state ── */
+  const [pinDone, setPinDone] = useState(false);
+  const [bioDone, setBioDone] = useState(false);
 
-  const finalize = ()=>{
-    if (methods.bio) Security.saveUser(uid,'has_bio',true);
-    Security.saveUser(uid,'security_done',true);
-    Security.save('first_launch','1');
-    setStep('done');
-    setTimeout(onComplete, 900);
-  };
+  /* ── Biometric device support: null=checking, true, false ── */
+  const [bioSupp, setBioSupp] = useState(null);
 
-  const handleChooseContinue = ()=>{
-    if (!methods.pin && !methods.bio){ setError('Select at least one security method.'); return; }
-    setError('');
-    methods.pin ? setStep('pin') : finalize();
-  };
+  /* ── PIN modal ── */
+  const [pinModal, setPinModal]   = useState(false);
+  const [pinStep,  setPinStep]    = useState('enter');  // 'enter' | 'confirm'
+  const [pin1,     setPin1]       = useState('');
+  const [pin2,     setPin2]       = useState('');
+  const [pinHint,  setPinHint]    = useState('');
+  const [showHintI,setShowHintI]  = useState(false);
+  const [pinShake, setPinShake]   = useState(false);
+  const [pinSaving,setPinSaving]  = useState(false);
+  const [pinErr,   setPinErr]     = useState('');
+  const [pinVis,   setPinVis]     = useState(false);
 
-  // PIN step 1 → confirm
+  /* ── Biometric setup ── */
+  const [bioLoading, setBioLoading] = useState(false);
+  const [bioMsg,     setBioMsg]     = useState('');
+  const [bioMsgType, setBioMsgType] = useState('info'); // 'success' | 'error'
+
+  /* ── General error ── */
+  const [error, setError] = useState('');
+
+  /* Async platform check on mount */
   useEffect(()=>{
-    if (step==='pin' && pin1.length===4) setTimeout(()=>setStep('pinConfirm'),230);
+    Security.checkPlatformBio().then(ok=>setBioSupp(ok)).catch(()=>setBioSupp(false));
+  },[]);
+
+  const doShake = ()=>{ setPinShake(true); setTimeout(()=>setPinShake(false),620); };
+
+  /* ── PIN Modal handlers ── */
+  const openPinModal = ()=>{
+    setPin1(''); setPin2(''); setPinStep('enter'); setPinErr(''); setPinSaving(false);
+    setPinModal(true);
+  };
+  const closePinModal = ()=>{
+    setPinModal(false); setPin1(''); setPin2(''); setPinStep('enter'); setPinErr('');
+  };
+  const onPinKey = (k)=>{
+    if (pinSaving) return;
+    if (pinStep==='enter'){
+      if(k==='⌫'){ setPin1(p=>p.slice(0,-1)); return; }
+      if(pin1.length<4) setPin1(p=>p+k);
+    } else {
+      if(k==='⌫'){ setPin2(p=>p.slice(0,-1)); return; }
+      if(pin2.length<4) setPin2(p=>p+k);
+    }
+  };
+  /* Auto-advance enter → confirm */
+  useEffect(()=>{
+    if(pinStep==='enter'&&pin1.length===4) setTimeout(()=>setPinStep('confirm'),230);
   },[pin1]);
-
-  // PIN confirm → validate & save
+  /* Auto-verify at 4 confirm digits */
   useEffect(()=>{
-    if (step!=='pinConfirm'||pin2.length!==4||saving) return;
-    setSaving(true);
-    if (pin1===pin2){
+    if(pinStep!=='confirm'||pin2.length!==4||pinSaving) return;
+    setPinSaving(true);
+    if(pin1===pin2){
       Security.hashPin(pin1).then(hash=>{
         Security.saveUser(uid,'pin_hash',hash);
-        if (hint.trim()) Security.saveUser(uid,'pin_hint',hint.trim());
-        setPin1(''); setPin2('');
-        finalize();
+        if(pinHint.trim()) Security.saveUser(uid,'pin_hint',pinHint.trim());
+        setPinSaving(false); setPinDone(true); closePinModal();
       });
     } else {
-      doShake(); setError('PINs do not match. Try again.');
-      setTimeout(()=>{ setPin2(''); setError(''); setSaving(false); },1700);
+      doShake(); setPinErr('PINs do not match. Try again.');
+      setTimeout(()=>{ setPin2(''); setPinErr(''); setPinSaving(false); },1700);
     }
   },[pin2]);
 
-  const onKey=(k)=>{
-    if (saving) return;
-    if (step==='pin'){
-      if(k==='⌫'){setPin1(p=>p.slice(0,-1));return;} if(pin1.length<4) setPin1(p=>p+k);
-    } else if (step==='pinConfirm'){
-      if(k==='⌫'){setPin2(p=>p.slice(0,-1));return;} if(pin2.length<4) setPin2(p=>p+k);
+  /* ── Biometric setup via WebAuthn ── */
+  const handleBioSetup = async ()=>{
+    setBioLoading(true); setBioMsg('');
+    const res = await Security.setupBiometric(uid);
+    setBioLoading(false);
+    if(res.success){
+      Security.saveUser(uid,'has_bio',true);
+      setBioDone(true);
+      setBioMsgType('success'); setBioMsg('Fingerprint set up successfully!');
+    } else {
+      setBioMsgType('error');
+      if(res.error==='cancelled')   setBioMsg('Setup cancelled. Tap again to retry.');
+      else if(res.error==='no_hardware') { setBioMsg('Your device does not support fingerprint authentication.'); setBioSupp(false); }
+      else setBioMsg('Fingerprint setup failed. Please try again.');
     }
   };
 
-  const BG = {position:'fixed',inset:0,zIndex:9997,background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden'};
-  const ORBS = <>
-    <div style={{position:'absolute',top:'8%',right:'6%',width:200,height:200,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
-    <div style={{position:'absolute',bottom:'10%',left:'5%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
-  </>;
-  const ICON = <div style={{width:76,height:76,borderRadius:24,marginBottom:18,background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:'1px solid rgba(139,92,246,.32)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,boxShadow:'0 8px 32px rgba(139,92,246,.22)'}}>🔐</div>;
+  /* ── Continue / finalize ── */
+  const handleContinue = ()=>{
+    if(usePin&&!pinDone){ setError('Please complete your PIN setup first.'); return; }
+    if(useBio&&!bioDone){ setError('Please complete fingerprint setup first.'); return; }
+    setError('');
+    Security.saveUser(uid,'security_done',true);
+    Security.save('first_launch','1');
+    onComplete();
+  };
 
-  /* ── Choose security methods ── */
-  if (step==='choose') return (
-    <div style={BG}>
-      {ORBS}
-      {ICON}
-      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>Secure Your Account</div>
-      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:28,textAlign:'center',lineHeight:1.6,maxWidth:280}}>
-        Choose how to protect your Wish account.<br/>Your security is stored per account, not per device.
-      </div>
-      {/* Method cards */}
-      <div style={{width:'100%',maxWidth:340,display:'flex',flexDirection:'column',gap:10,marginBottom:22}}>
-        {[
-          {id:'pin', icon:'🔢', label:'PIN Code',              sub:'4-digit secret code'},
-          bioSupp && {id:'bio', icon:'👆', label:'Fingerprint / Face ID', sub:'Biometric authentication'},
-        ].filter(Boolean).map(m=>{
-          const sel = methods[m.id];
-          return (
-            <button key={m.id} onClick={()=>setM(p=>({...p,[m.id]:!p[m.id]}))} style={{
-              width:'100%',background:sel?'rgba(139,92,246,.18)':'rgba(255,255,255,.04)',
-              border:`1.5px solid ${sel?'rgba(139,92,246,.55)':'rgba(255,255,255,.1)'}`,
-              borderRadius:16,padding:'14px 18px',cursor:'pointer',textAlign:'left',
-              display:'flex',alignItems:'center',gap:14,transition:'all .2s',
-              boxShadow:sel?'0 0 20px rgba(139,92,246,.2)':'none',
-            }}>
-              <span style={{fontSize:28,flexShrink:0}}>{m.icon}</span>
-              <div style={{flex:1}}>
-                <div style={{fontSize:15,fontWeight:700,color:sel?'#a78bfa':'#fff'}}>{m.label}</div>
-                <div style={{fontSize:12,color:'rgba(255,255,255,.38)',marginTop:2}}>{m.sub}</div>
-              </div>
-              <div style={{width:24,height:24,borderRadius:'50%',background:sel?'#8b5cf6':'rgba(255,255,255,.1)',border:`2px solid ${sel?'#8b5cf6':'rgba(255,255,255,.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,color:'#fff',transition:'all .2s'}}>{sel?'✓':''}</div>
-            </button>
-          );
-        })}
-        {methods.pin&&methods.bio&&(
-          <div style={{background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.25)',borderRadius:10,padding:'8px 14px',fontSize:12,color:'#f59e0b',textAlign:'center'}}>
-            ⭐ Recommended — maximum security with both methods
+  const BG = {position:'fixed',inset:0,zIndex:9997,background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'60px 24px 40px',overflow:'auto'};
+  const ORBS = <>
+    <div style={{position:'absolute',top:'6%',right:'5%',width:200,height:200,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+    <div style={{position:'absolute',bottom:'8%',left:'5%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+  </>;
+
+  /* ── PIN Modal overlay ── */
+  const PinModalEl = pinModal&&(
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.88)',display:'flex',alignItems:'center',justifyContent:'center',padding:24,backdropFilter:'blur(8px)'}}>
+      <div style={{background:'linear-gradient(160deg,#13102a,#0d0b1e)',border:'1px solid rgba(139,92,246,.3)',borderRadius:24,padding:'28px 20px',width:'100%',maxWidth:340,display:'flex',flexDirection:'column',alignItems:'center'}}>
+        {/* Modal header */}
+        <div style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <div style={{fontSize:16,fontWeight:800,color:'#fff'}}>{pinStep==='enter'?'Create PIN':'Confirm PIN'}</div>
+          <button onClick={closePinModal} style={{background:'none',border:'none',color:'rgba(255,255,255,.4)',fontSize:20,cursor:'pointer',lineHeight:1,fontFamily:'inherit'}}>✕</button>
+        </div>
+        {/* Step dots */}
+        <div style={{display:'flex',gap:8,marginBottom:20}}>
+          {['enter','confirm'].map((s,i)=>(
+            <div key={s} style={{height:6,borderRadius:99,width:pinStep===s?24:6,background:pinStep===s||i===0?'#a78bfa':'rgba(255,255,255,.15)',transition:'all .3s'}}/>
+          ))}
+        </div>
+        <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:24,textAlign:'center'}}>
+          {pinStep==='enter'?'Choose a 4-digit PIN to protect your account':'Re-enter the same PIN to confirm'}
+        </div>
+        <PinDots filled={pinStep==='enter'?pin1.length:pin2.length} shake={pinShake} visible={pinVis} raw={pinStep==='enter'?pin1:pin2}/>
+        {pinErr
+          ?<div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {pinErr}</div>
+          :<button onClick={()=>setPinVis(v=>!v)} style={{marginTop:12,background:'none',border:'none',color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+            {pinVis?'🙈 Hide PIN':'👁 Show PIN'}
+          </button>
+        }
+        {pinStep==='enter'&&(
+          <div style={{marginTop:14,width:'100%'}}>
+            {!showHintI
+              ?<button onClick={()=>setShowHintI(true)} style={{background:'none',border:'none',color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'block',margin:'0 auto'}}>+ Add PIN hint (optional)</button>
+              :<input value={pinHint} onChange={e=>setPinHint(e.target.value)} maxLength={40} placeholder="e.g. Favourite year…"
+                  style={{width:'100%',background:'rgba(139,92,246,.07)',border:'1px solid rgba(139,92,246,.22)',borderRadius:11,padding:'10px 14px',color:'#fff',fontSize:13,outline:'none',fontFamily:'inherit',textAlign:'center'}}/>
+            }
           </div>
         )}
+        <div style={{marginTop:22}}><PinKeypad onKey={onPinKey} disabled={pinSaving}/></div>
       </div>
-      {error&&<div style={{marginBottom:12,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center'}}>⚠ {error}</div>}
-      <button onClick={handleChooseContinue} style={{width:'100%',maxWidth:340,background:'linear-gradient(135deg,#8b5cf6,#6d28d9)',border:'none',borderRadius:14,padding:'15px',color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',boxShadow:'0 6px 24px rgba(139,92,246,.4)'}}>
-        Continue →
-      </button>
     </div>
   );
 
-  /* ── PIN entry / confirm ── */
-  if (step==='pin'||step==='pinConfirm'){
-    const current = step==='pin' ? pin1 : pin2;
-    const titles  = {pin:'Create your PIN', pinConfirm:'Confirm your PIN'};
-    const subs    = {pin:'Choose a 4-digit PIN to secure your account', pinConfirm:'Enter the same PIN again to confirm'};
-    const stepIdx = {choose:0, pin:1, pinConfirm:2};
-    return (
-      <div style={BG}>
-        {ORBS}
-        {/* Step progress pills */}
-        <div style={{position:'absolute',top:52,display:'flex',gap:8}}>
-          {['choose','pin','pinConfirm'].map((s,i)=>(
-            <div key={s} style={{height:8,borderRadius:99,width:s===step?28:8,background:stepIdx[step]>=i?'#a78bfa':'rgba(255,255,255,.15)',transition:'all .3s cubic-bezier(.34,1.56,.64,1)'}}/>
-          ))}
-        </div>
-        <div style={{width:76,height:76,borderRadius:24,marginBottom:18,background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:'1px solid rgba(139,92,246,.32)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,boxShadow:'0 8px 32px rgba(139,92,246,.22)'}}>🔢</div>
-        <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>{titles[step]}</div>
-        <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:38,textAlign:'center',lineHeight:1.6,maxWidth:280}}>{subs[step]}</div>
-        <PinDots filled={current.length} shake={shake} visible={visible} raw={current}/>
-        {error?(
-          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
-        ):(
-          <button onClick={()=>setVis(v=>!v)} style={{marginTop:12,background:'none',border:'none',color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',gap:5}}>
-            {visible?'🙈 Hide PIN':'👁 Show PIN'}
-          </button>
-        )}
-        {step==='pin'&&(
-          <div style={{marginTop:14,width:'100%',maxWidth:300}}>
-            {!showHint?(
-              <button onClick={()=>setSHB(true)} style={{background:'none',border:'none',color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'block',margin:'0 auto'}}>
-                + Add a PIN hint (optional)
-              </button>
-            ):(
-              <input value={hint} onChange={e=>setHint(e.target.value)} maxLength={40} placeholder="e.g. Favourite year, street no…"
-                style={{width:'100%',background:'rgba(139,92,246,.07)',border:'1px solid rgba(139,92,246,.22)',borderRadius:11,padding:'11px 14px',color:'#fff',fontSize:13,outline:'none',fontFamily:'inherit',textAlign:'center'}}/>
-            )}
-          </div>
-        )}
-        <div style={{marginTop:26}}><PinKeypad onKey={onKey} disabled={saving}/></div>
-      </div>
-    );
-  }
-
-  /* ── Done ── */
   return (
     <div style={BG}>
       {ORBS}
-      <div style={{fontSize:76,marginBottom:18,animation:'pinSuccess .5s ease',filter:'drop-shadow(0 0 22px rgba(16,185,129,.6))'}}>✅</div>
-      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>Security Active!</div>
-      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',textAlign:'center',lineHeight:1.6,maxWidth:280}}>
-        Your account is now secured.{methods.bio?' Fingerprint / Face ID is enabled.':''}
+      {PinModalEl}
+
+      {/* Header */}
+      <div style={{width:76,height:76,borderRadius:24,marginBottom:16,background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:'1px solid rgba(139,92,246,.32)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,boxShadow:'0 8px 32px rgba(139,92,246,.22)',flexShrink:0}}>🔐</div>
+      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>Secure Your Account</div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:28,textAlign:'center',lineHeight:1.6,maxWidth:290}}>
+        Add extra security to protect your account.<br/>Both options are optional.
       </div>
+
+      {/* ── PIN Code section ── */}
+      <div style={{width:'100%',maxWidth:340,display:'flex',flexDirection:'column',gap:14,marginBottom:24}}>
+        <div style={{background:'rgba(255,255,255,.04)',border:`1.5px solid ${usePin?'rgba(139,92,246,.45)':'rgba(255,255,255,.1)'}`,borderRadius:18,padding:'18px 20px',transition:'all .2s',boxShadow:usePin?'0 0 22px rgba(139,92,246,.15)':'none'}}>
+          {/* Checkbox row */}
+          <div style={{display:'flex',alignItems:'center',gap:12,cursor:'pointer',marginBottom:usePin?14:0}} onClick={()=>{ setUsePin(p=>!p); setError(''); }}>
+            <div style={{width:26,height:26,borderRadius:8,background:usePin?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.08)',border:`2px solid ${usePin?'#8b5cf6':'rgba(255,255,255,.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'#fff',transition:'all .2s',flexShrink:0}}>
+              {usePin?'✓':''}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:700,color:usePin?'#a78bfa':'#fff'}}>🔢 Use PIN Code</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,.35)',marginTop:2}}>4-digit secret code</div>
+            </div>
+            {pinDone&&<div style={{background:'rgba(16,185,129,.15)',border:'1px solid rgba(16,185,129,.3)',borderRadius:20,padding:'3px 10px',fontSize:11,color:'#34d399',fontWeight:700,flexShrink:0}}>✓ Set</div>}
+          </div>
+          {/* Set PIN button */}
+          {usePin&&(
+            <button onClick={openPinModal} style={{width:'100%',background:pinDone?'rgba(16,185,129,.1)':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(109,40,217,.22))',border:`1px solid ${pinDone?'rgba(16,185,129,.3)':'rgba(139,92,246,.35)'}`,borderRadius:13,padding:'13px',color:pinDone?'#34d399':'#a78bfa',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
+              {pinDone?'✓ PIN Configured — Change PIN':'Set PIN Code'}
+            </button>
+          )}
+        </div>
+
+        {/* ── Fingerprint section (only if device may support it) ── */}
+        {bioSupp!==false&&(
+          <div style={{background:'rgba(255,255,255,.04)',border:`1.5px solid ${useBio?'rgba(139,92,246,.45)':'rgba(255,255,255,.1)'}`,borderRadius:18,padding:'18px 20px',transition:'all .2s',boxShadow:useBio?'0 0 22px rgba(139,92,246,.15)':'none'}}>
+            {/* Checkbox row */}
+            <div style={{display:'flex',alignItems:'center',gap:12,cursor:bioSupp===null?'default':'pointer',marginBottom:useBio?14:0,opacity:bioSupp===null?.65:1}} onClick={()=>{ if(bioSupp) { setUseBio(p=>!p); setError(''); } }}>
+              <div style={{width:26,height:26,borderRadius:8,background:useBio?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.08)',border:`2px solid ${useBio?'#8b5cf6':'rgba(255,255,255,.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'#fff',transition:'all .2s',flexShrink:0}}>
+                {useBio?'✓':''}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700,color:useBio?'#a78bfa':'#fff'}}>👆 Use Fingerprint</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,.35)',marginTop:2}}>
+                  {bioSupp===null?'Checking device support…':'Fingerprint / Face ID'}
+                </div>
+              </div>
+              {bioDone&&<div style={{background:'rgba(16,185,129,.15)',border:'1px solid rgba(16,185,129,.3)',borderRadius:20,padding:'3px 10px',fontSize:11,color:'#34d399',fontWeight:700,flexShrink:0}}>✓ Set</div>}
+            </div>
+            {/* Set Up Fingerprint button */}
+            {useBio&&(
+              <>
+                <button onClick={handleBioSetup} disabled={bioLoading||bioDone}
+                  style={{width:'100%',background:bioDone?'rgba(16,185,129,.1)':bioLoading?'rgba(139,92,246,.07)':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(109,40,217,.22))',border:`1px solid ${bioDone?'rgba(16,185,129,.3)':bioLoading?'rgba(139,92,246,.2)':'rgba(139,92,246,.35)'}`,borderRadius:13,padding:'13px',color:bioDone?'#34d399':bioLoading?'rgba(255,255,255,.45)':'#a78bfa',fontSize:14,fontWeight:700,cursor:bioLoading||bioDone?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:8,transition:'all .2s'}}>
+                  {bioLoading&&<div style={{width:16,height:16,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite',flexShrink:0}}/>}
+                  {bioDone?'✓ Fingerprint Configured':bioLoading?'Waiting for biometric…':'Set Up Fingerprint'}
+                </button>
+                {bioMsg&&(
+                  <div style={{marginTop:10,padding:'8px 14px',borderRadius:10,background:bioMsgType==='success'?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)',border:`1px solid ${bioMsgType==='success'?'rgba(16,185,129,.25)':'rgba(239,68,68,.25)'}`,fontSize:12,color:bioMsgType==='success'?'#34d399':'#f87171',textAlign:'center'}}>
+                    {bioMsgType==='success'?'✓ ':'⚠ '}{bioMsg}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <div style={{textAlign:'center',fontSize:12,color:'rgba(255,255,255,.22)',marginTop:-4}}>
+          You can skip both options and add security later in Settings
+        </div>
+      </div>
+
+      {error&&<div style={{marginBottom:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .25s ease'}}>⚠ {error}</div>}
+
+      <button onClick={handleContinue} style={{width:'100%',maxWidth:340,background:'linear-gradient(135deg,#8b5cf6,#6d28d9)',border:'none',borderRadius:14,padding:'15px',color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',boxShadow:'0 6px 24px rgba(139,92,246,.4)',flexShrink:0}}>
+        Continue →
+      </button>
     </div>
   );
 }
@@ -2316,7 +2432,8 @@ function UnlockScreen({ user, onUnlock }) {
   const [verifying, setVfy] = useState(false);
   const [visible, setVis]   = useState(false);
   const [showHint, setSH]   = useState(false);
-  const [bioMsg, setBioMsg] = useState('');
+  const [bioMsg,     setBioMsg]     = useState('');
+  const [bioLoading, setBioLoading] = useState(false);
   const [failed, setFailed] = useState(()=> uid ? Security.loadUser(uid,'failed_pin',0) : 0);
   const [lockUntil, setLU]  = useState(()=> uid ? Security.loadUser(uid,'lock_until',0) : 0);
   const [now, setNow]       = useState(()=>Date.now());
@@ -2368,14 +2485,28 @@ function UnlockScreen({ user, onUnlock }) {
     if (pin.length<4) setPin(p=>p+k);
   };
 
-  /* Biometric trigger
-     TODO (native): import * as LA from 'expo-local-authentication';
+  /* Biometric unlock via WebAuthn platform authenticator.
+     Native (Expo): swap Security.authenticateBiometric() for:
+       import * as LA from 'expo-local-authentication';
        const r = await LA.authenticateAsync({ promptMessage:'Unlock Wish' });
-       if (r.success) onUnlock();
-     TODO (web WebAuthn): implement PublicKeyCredential assertion flow.  */
-  const tryBiometric = ()=>{
-    setBioMsg('Biometric unlock is available on the native iOS / Android app. Use your PIN here.');
-    setTimeout(()=>setBioMsg(''),4000);
+       if (r.success) onUnlock(); */
+  const tryBiometric = async ()=>{
+    if (bioLoading) return;
+    setBioMsg(''); setBioLoading(true);
+    const res = await Security.authenticateBiometric(uid);
+    setBioLoading(false);
+    if (res.success){
+      onUnlock();
+    } else if (res.error==='cancelled'){
+      setBioMsg('Authentication cancelled.');
+      setTimeout(()=>setBioMsg(''),3000);
+    } else if (res.error==='no_credential'){
+      setBioMsg('Biometric not configured. Please use your PIN.');
+      setTimeout(()=>setBioMsg(''),4000);
+    } else {
+      setBioMsg('Fingerprint not recognized. Please try again.');
+      setTimeout(()=>setBioMsg(''),3000);
+    }
   };
 
   const BG={position:'fixed',inset:0,zIndex:9997,background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden'};
@@ -2451,9 +2582,12 @@ function UnlockScreen({ user, onUnlock }) {
             <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
           </div>
         )}
-        <button onClick={tryBiometric} style={{display:'flex',alignItems:'center',gap:12,background:'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.28)',borderRadius:18,padding:'15px 32px',color:'#a78bfa',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit',boxShadow:'0 4px 18px rgba(139,92,246,.18)',transition:'all .2s'}}>
-          <span style={{fontSize:30}}>👆</span>
-          Use Fingerprint / Face ID
+        <button onClick={tryBiometric} disabled={bioLoading}
+          style={{display:'flex',alignItems:'center',gap:12,background:bioLoading?'rgba(139,92,246,.06)':'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.28)',borderRadius:18,padding:'15px 32px',color:'#a78bfa',fontSize:15,fontWeight:700,cursor:bioLoading?'default':'pointer',fontFamily:'inherit',boxShadow:'0 4px 18px rgba(139,92,246,.18)',transition:'all .2s',minWidth:240,justifyContent:'center'}}>
+          {bioLoading
+            ?<><div style={{width:20,height:20,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite',flexShrink:0}}/> Waiting…</>
+            :<><span style={{fontSize:28}}>👆</span> Use Fingerprint / Face ID</>
+          }
         </button>
       </>)}
 
@@ -2475,16 +2609,22 @@ function UnlockScreen({ user, onUnlock }) {
 ═══════════════════════════════════════════════ */
 function SecuritySettingsView({ user }) {
   const uid = user?.id;
-  const [hasPin, setHasPin] = useState(()=> uid&&!!Security.loadUser(uid,'pin_hash',null));
-  const [hasBio, setHasBio] = useState(()=> uid&&Security.loadUser(uid,'has_bio',false));
-  const [mode, setMode]     = useState('view');  // view|verifyPin|newPin|confirmPin
-  const [oldPin, setOP]     = useState('');
-  const [newPin, setNP]     = useState('');
-  const [confPin, setCP]    = useState('');
-  const [error, setError]   = useState('');
-  const [shake, setShake]   = useState(false);
-  const [msg, setMsg]       = useState('');
-  const [verifying, setVfy] = useState(false);
+  const [hasPin, setHasPin]   = useState(()=> uid&&!!Security.loadUser(uid,'pin_hash',null));
+  const [hasBio, setHasBio]   = useState(()=> uid&&Security.loadUser(uid,'has_bio',false));
+  const [mode, setMode]       = useState('view');  // view|verifyPin|newPin|confirmPin
+  const [oldPin, setOP]       = useState('');
+  const [newPin, setNP]       = useState('');
+  const [confPin, setCP]      = useState('');
+  const [error, setError]     = useState('');
+  const [shake, setShake]     = useState(false);
+  const [msg, setMsg]         = useState('');
+  const [verifying, setVfy]   = useState(false);
+  const [bioLoading, setBioL] = useState(false);
+  const [bioSupp, setBioSupp] = useState(null);
+
+  useEffect(()=>{
+    Security.checkPlatformBio().then(ok=>setBioSupp(ok)).catch(()=>setBioSupp(false));
+  },[]);
 
   const doShake = ()=>{ setShake(true); setTimeout(()=>setShake(false),620); };
   const showMsg = (m)=>{ setMsg(m); setTimeout(()=>setMsg(''),3000); };
@@ -2573,14 +2713,46 @@ function SecuritySettingsView({ user }) {
 
       {/* Biometric section */}
       <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.1,marginBottom:10}}>Biometric</div>
-      <div style={{background:C.s2,borderRadius:16,marginBottom:20,border:`1px solid ${C.border}`,padding:'16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div>
-          <div style={{fontSize:15,fontWeight:700,color:C.white}}>Fingerprint / Face ID</div>
-          <div style={{fontSize:12,color:C.muted,marginTop:2}}>{hasBio?'Enabled on unlock screen':'Not enabled'}</div>
+      <div style={{background:C.s2,borderRadius:16,marginBottom:20,border:`1px solid ${C.border}`,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:(hasBio||bioSupp===false)?0:12}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:C.white}}>Fingerprint / Face ID</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              {bioSupp===false?'Not supported on this device':hasBio?'Active — tap to disable':'Not configured'}
+            </div>
+          </div>
+          {bioSupp!==false&&(
+            <button onClick={()=>{ const n=!hasBio; setHasBio(n); Security.saveUser(uid,'has_bio',n); if(!n){Security.removeUser(uid,'bio_cred_id');} }} style={{width:48,height:28,borderRadius:99,border:'none',cursor:'pointer',background:hasBio?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.15)',position:'relative',transition:'background .2s',flexShrink:0}}>
+              <div style={{position:'absolute',width:22,height:22,borderRadius:'50%',background:'#fff',top:3,left:hasBio?23:3,transition:'left .2s'}}/>
+            </button>
+          )}
         </div>
-        <button onClick={()=>{ const n=!hasBio; setHasBio(n); Security.saveUser(uid,'has_bio',n); }} style={{width:48,height:28,borderRadius:99,border:'none',cursor:'pointer',background:hasBio?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.15)',position:'relative',transition:'background .2s',flexShrink:0}}>
-          <div style={{position:'absolute',width:22,height:22,borderRadius:'50%',background:'#fff',top:3,left:hasBio?23:3,transition:'left .2s'}}/>
-        </button>
+        {/* Register / re-register fingerprint via WebAuthn */}
+        {bioSupp!==false&&(
+          <button onClick={async ()=>{
+            setBioL(true);
+            const res = await Security.setupBiometric(uid);
+            setBioL(false);
+            if(res.success){
+              Security.saveUser(uid,'has_bio',true);
+              setHasBio(true);
+              showMsg(hasBio?'Fingerprint re-registered!':'Fingerprint enabled!');
+            } else if(res.error==='cancelled'){
+              showMsg('Setup cancelled.');
+            } else if(res.error==='no_hardware'){
+              setBioSupp(false);
+              showMsg('No biometric hardware detected.');
+            } else {
+              showMsg('Fingerprint setup failed. Please try again.');
+            }
+          }} disabled={bioLoading}
+            style={{marginTop:12,width:'100%',background:'rgba(139,92,246,.1)',border:`1px solid rgba(139,92,246,.25)`,borderRadius:10,padding:'10px',color:C.brandLt,fontSize:13,fontWeight:700,cursor:bioLoading?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+            {bioLoading
+              ?<><div style={{width:14,height:14,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite'}}/> Waiting for biometric…</>
+              :<>👆 {hasBio?'Re-register Fingerprint':'Register Fingerprint'}</>
+            }
+          </button>
+        )}
       </div>
 
       {/* Info footer */}
