@@ -18,6 +18,10 @@
       "dest": "/api/user.js"
     },
     {
+      "src": "/api/upload-avatar",
+      "dest": "/api/upload-avatar.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
