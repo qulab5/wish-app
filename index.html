@@ -1492,16 +1492,7 @@ function MainApp({user,onLogout,lang,setLang}){
       <div style={{padding:"0 16px 16px"}}>
         {/* Profile Header */}
         <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16,position:"relative"}}>
-          {/* Hidden file input — reused for both camera & gallery */}
-          <input ref={fileInputRef} type="file" accept="image/*" capture={picCapture?"user":undefined} style={{display:"none"}} onChange={e=>{
-            const f=e.target.files&&e.target.files[0];
-            if(!f)return;
-            const rd=new FileReader();
-            rd.onload=ev=>{ setU(p=>({...p,avatar:ev.target.result})); setAP(false); };
-            rd.readAsDataURL(f);
-            e.target.value="";
-          }}/>
-          <div onClick={()=>setAP(p=>!p)} style={{width:84,height:84,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,fontWeight:800,border:"3px solid rgba(255,255,255,.5)",margin:"0 auto 12px",cursor:"pointer",position:"relative",boxShadow:"0 0 20px rgba(0,0,0,.3)",overflow:"hidden"}}>
+<div onClick={()=>setAP(p=>!p)} style={{width:84,height:84,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,fontWeight:800,border:"3px solid rgba(255,255,255,.5)",margin:"0 auto 12px",cursor:"pointer",position:"relative",boxShadow:"0 0 20px rgba(0,0,0,.3)",overflow:"hidden"}}>
             {u.avatar&&u.avatar.startsWith("data:")
               ? <img src={u.avatar} style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:"50%"}} alt="avatar"/>
               : <span style={{fontSize:36}}>{u.name[0].toUpperCase()}</span>
@@ -1621,6 +1612,15 @@ function MainApp({user,onLogout,lang,setLang}){
           </button>
         ))}
       </div>
+      {/* Global hidden file input — reused for camera & gallery from any screen */}
+      <input ref={fileInputRef} type="file" accept="image/*" capture={picCapture?"user":undefined} style={{display:"none"}} onChange={e=>{
+        const f=e.target.files&&e.target.files[0];
+        if(!f)return;
+        const rd=new FileReader();
+        rd.onload=ev=>{ setU(p=>({...p,avatar:ev.target.result})); setAP(false); };
+        rd.readAsDataURL(f);
+        e.target.value="";
+      }}/>
       {/* Sidebar Overlay */}
       {sidebarOpen&&(
         <>
@@ -1675,6 +1675,116 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
           {/* Profile Content */}
           <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
+
+            {/* ── Profile Photo Card ── */}
+            <div style={{
+              background:"linear-gradient(160deg,rgba(139,92,246,.09),rgba(236,72,153,.05),rgba(6,182,212,.04))",
+              border:"1px solid rgba(139,92,246,.2)",
+              borderRadius:24,
+              padding:"28px 20px 20px",
+              marginBottom:20,
+              textAlign:"center",
+              position:"relative",
+              overflow:"hidden",
+            }}>
+              {/* Subtle ambient glow */}
+              <div style={{position:"absolute",top:-40,left:"50%",transform:"translateX(-50%)",width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)",pointerEvents:"none"}}/>
+
+              {/* Avatar with gradient ring */}
+              <div onClick={()=>setAP(p=>!p)} style={{
+                display:"inline-flex",alignItems:"center",justifyContent:"center",
+                width:96,height:96,borderRadius:"50%",
+                background:"linear-gradient(135deg,#8b5cf6,#ec4899,#06b6d4)",
+                padding:3,
+                margin:"0 auto 14px",
+                cursor:"pointer",
+                position:"relative",
+                boxShadow:"0 8px 32px rgba(139,92,246,.38),0 2px 10px rgba(0,0,0,.5)",
+                transition:"transform .18s ease,box-shadow .18s ease",
+              }}>
+                {/* Inner circle — clips photo */}
+                <div style={{
+                  width:"100%",height:"100%",borderRadius:"50%",
+                  overflow:"hidden",
+                  background:"#0a0818",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  position:"relative",
+                }}>
+                  {u.avatar&&u.avatar.startsWith("data:")
+                    ?<img src={u.avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="profile"/>
+                    :<span style={{fontSize:36,fontWeight:800,color:"#fff",lineHeight:1,userSelect:"none"}}>{u.name[0].toUpperCase()}</span>
+                  }
+                  {/* Hover scrim */}
+                  <div style={{position:"absolute",inset:0,borderRadius:"50%",background:"rgba(0,0,0,.0)",display:"flex",alignItems:"center",justifyContent:"center"}}/>
+                </div>
+                {/* Camera badge */}
+                <div style={{
+                  position:"absolute",bottom:0,right:0,
+                  width:30,height:30,borderRadius:"50%",
+                  background:"linear-gradient(135deg,#8b5cf6,#ec4899)",
+                  border:"2.5px solid #0a0818",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:14,
+                  boxShadow:"0 2px 10px rgba(139,92,246,.6)",
+                }}>📷</div>
+              </div>
+
+              {/* Name & hint */}
+              <div style={{fontSize:17,fontWeight:800,color:"#fff",marginBottom:3,position:"relative"}}>{u.name}</div>
+              <div style={{fontSize:12,color:C.muted,position:"relative"}}>
+                {avatarPick?"Choose an option below":"Tap photo to update"}
+              </div>
+
+              {/* ── Action sheet ── */}
+              {avatarPick&&(
+                <div style={{
+                  marginTop:20,
+                  background:"rgba(8,6,22,.94)",
+                  backdropFilter:"blur(20px)",
+                  borderRadius:20,
+                  border:"1px solid rgba(139,92,246,.22)",
+                  overflow:"hidden",
+                  animation:"splashFade .2s ease",
+                  position:"relative",
+                }}>
+                  <div style={{padding:"13px 16px 10px",fontSize:11,fontWeight:700,color:"rgba(255,255,255,.3)",textTransform:"uppercase",letterSpacing:.12}}>
+                    Profile Photo
+                  </div>
+
+                  {/* Take Photo */}
+                  <button
+                    onClick={()=>{setPC(true);setAP(false);setTimeout(()=>{fileInputRef.current&&fileInputRef.current.click();},50);}}
+                    style={{width:"100%",background:"none",border:"none",borderTop:"1px solid rgba(255,255,255,.06)",padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:"inherit"}}>
+                    <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,rgba(139,92,246,.22),rgba(139,92,246,.1))",border:"1px solid rgba(139,92,246,.32)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📷</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:700,color:"#fff",textAlign:"left"}}>Take Photo</div>
+                      <div style={{fontSize:12,color:C.muted,marginTop:1,textAlign:"left"}}>Open camera and capture</div>
+                    </div>
+                    <div style={{color:"rgba(255,255,255,.18)",fontSize:18,fontWeight:300}}>›</div>
+                  </button>
+
+                  {/* Choose from Gallery */}
+                  <button
+                    onClick={()=>{setPC(false);setAP(false);setTimeout(()=>{fileInputRef.current&&fileInputRef.current.click();},50);}}
+                    style={{width:"100%",background:"none",border:"none",borderTop:"1px solid rgba(255,255,255,.06)",padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:"inherit"}}>
+                    <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,rgba(6,182,212,.18),rgba(6,182,212,.08))",border:"1px solid rgba(6,182,212,.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🖼️</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:700,color:"#fff",textAlign:"left"}}>Choose from Gallery</div>
+                      <div style={{fontSize:12,color:C.muted,marginTop:1,textAlign:"left"}}>Select an existing photo</div>
+                    </div>
+                    <div style={{color:"rgba(255,255,255,.18)",fontSize:18,fontWeight:300}}>›</div>
+                  </button>
+
+                  {/* Cancel */}
+                  <button
+                    onClick={()=>setAP(false)}
+                    style={{width:"100%",background:"none",border:"none",borderTop:"1px solid rgba(255,255,255,.06)",padding:"13px 16px",color:"rgba(255,255,255,.28)",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Account Settings */}
             <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:10,padding:"0 4px"}}>Account Settings</div>
             <div style={{background:C.s2,borderRadius:16,marginBottom:16,border:`1px solid ${C.border}`,overflow:"hidden"}}>
