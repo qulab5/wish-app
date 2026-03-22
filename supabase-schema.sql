@@ -19,5 +19,15 @@ CREATE TABLE users (
   "adLeft"     integer DEFAULT 5,
   "adDate"     text,
   avatar       text,
-  "spinAngle"  numeric DEFAULT 0
+  "spinAngle"     numeric DEFAULT 0,
+  "spinNextFree"  bigint  DEFAULT 0,
+  "extraSpins"    integer DEFAULT 0,
+  "mineStartedAt" bigint  DEFAULT NULL,  -- epoch ms when current session began; NULL = no active session
+  "mineBoosts"    integer DEFAULT 0      -- boosts applied in current session
 );
+
+-- Migration SQL (run against existing DB instead of DROP/CREATE):
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "spinNextFree"  bigint  DEFAULT 0;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "extraSpins"    integer DEFAULT 0;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "mineStartedAt" bigint  DEFAULT NULL;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "mineBoosts"    integer DEFAULT 0;
