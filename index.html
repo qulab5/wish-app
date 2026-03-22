@@ -1169,16 +1169,18 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(()=>{});
   },[]);
 
-  // Auto-save progress to MongoDB (debounced 2s after last change)
+  // Auto-save progress (debounced 2s after last change).
+  // avatar is intentionally excluded — it is saved explicitly after upload
+  // to avoid sending a huge base64 data-URL that exceeds Supabase's body limit.
   useEffect(()=>{
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,avatar:u.avatar,
+        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
           tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins})
       }).catch(()=>{});
     },2000);
     return()=>clearTimeout(t);
-  },[u.pts,u.usd,u.avatar,u.name,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
+  },[u.pts,u.usd,u.name,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
@@ -1675,16 +1677,23 @@ function MainApp({user,onLogout,lang,setLang}){
             // 2. Show local preview immediately so the user sees feedback at once
             setU(p=>({...p,avatar:dataUrl}));
             setAP(false);
-            // 3. Upload to Supabase Storage — get back a permanent public URL
+            // 3. Upload to Supabase Storage — get back a permanent public URL,
+            //    then save it to the DB immediately (don't rely on auto-save,
+            //    which would send the huge data-URL and get rejected).
             fetch("/api/upload-avatar",{method:"POST",headers:{"Content-Type":"application/json"},
               body:JSON.stringify({userId:u.id,imageData:dataUrl,mimeType:"image/jpeg"})
             })
             .then(r=>r.json())
             .then(d=>{
-              // Swap preview data-URL for the real server URL so it works cross-device
-              if(d.url) setU(p=>({...p,avatar:d.url}));
+              if(!d.url) return;
+              // Swap preview for real URL in UI
+              setU(p=>({...p,avatar:d.url}));
+              // Persist URL to DB right now
+              fetch("/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({id:u.id,email:u.email,avatar:d.url})
+              }).catch(()=>{});
             })
-            .catch(()=>{/* preview remains; auto-save will retry the URL later */});
+            .catch(()=>{/* preview remains in UI; DB keeps previous avatar */});
           };
           img.src=ev.target.result;
         };
