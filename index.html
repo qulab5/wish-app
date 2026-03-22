@@ -172,6 +172,10 @@ const USD_PER_POINT  = 0.001;
 const REFERRAL_BONUS = 300;
 const MINING_CYCLE   = 8 * 60 * 60;
 const SUN_CYCLE      = 4 * 60 * 60;
+const MINE_SESSION_S = 4 * 60 * 60;   // 4-hour mining session
+const MINE_PTS_HOUR  = 2000;           // 2000 pts per hour → 8000 for full session
+const MINE_BOOST_PTS = 500;            // pts added per boost ad
+const MINE_MAX_BOOST = 5;              // max boosts per session
 const AD_COOLDOWN_S  = 5 * 60 * 60;
 
 const DAILY_PTS_MAP = {
@@ -1064,10 +1068,11 @@ function MainApp({user,onLogout,lang,setLang}){
   const [spinning,setSpin] = useState(false);
   const [spinResult,setSR] = useState(null);
   const [spinAngle,setSA] = useState(0);
-  const [mineT,setMineT]      = useState(MINING_CYCLE);
+  const [mineT,setMineT]      = useState(MINE_SESSION_S);
   const [mineReady,setMR]     = useState(false);
   const [mineStarted,setMS]   = useState(false);
   const [mineAdShow,setMAd]   = useState(false);
+  const [mineBoosts,setMineBoosts] = useState(0);
   const [langMenu,setLM]      = useState(false);
   const [avatarPick,setAP]    = useState(false);
   const fileInputRef          = React.useRef(null);
@@ -1137,13 +1142,48 @@ function MainApp({user,onLogout,lang,setLang}){
   };
   const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
-  const claimMining=()=>{if(!mineReady)return;addPts(500);setMineT(MINING_CYCLE);setMR(false);setMS(false);};
+  const claimMining=()=>{
+    if(!mineReady)return;
+    const earned = MINE_PTS_HOUR * 4 + mineBoosts * MINE_BOOST_PTS; // 8000 base + boosts
+    addPts(earned, earned * USD_PER_POINT);
+    setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
+  };
   const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
+
+  // ═══ AD INTEGRATION PLACEHOLDERS ═══════════════════════════════════════
+  // TODO: Replace showRewardedAd() with your actual ad network SDK call.
+  // e.g. AdMob: admob.showRewardedAd(adUnitId).then(onRewarded)
+  //      IronSource: ironSource.showRewardedVideo().then(onRewarded)
+  // onRewarded is called only after the user successfully watches the ad.
+  const showRewardedAd = (onRewarded) => {
+    // PLACEHOLDER — remove the line below and wire in your real ad SDK
+    console.log("[AD] showRewardedAd called — integrate your ad SDK here");
+    onRewarded(); // <-- remove this when real ad SDK is integrated
+  };
+
+  // Start a 4-hour mining session (requires watching a rewarded ad)
+  const startMiningWithAd = () => {
+    if (mineStarted) return;
+    showRewardedAd(() => {
+      setMS(true); setMineT(MINE_SESSION_S); setMineBoosts(0); setMR(false);
+    });
+  };
+
+  // Boost current session by 500 pts (requires watching a rewarded ad)
+  // TODO: each of the 5 boost slots calls this with its own ad unit if needed
+  const boostMining = () => {
+    if (!mineStarted || mineReady || mineBoosts >= MINE_MAX_BOOST) return;
+    showRewardedAd(() => {
+      addPts(MINE_BOOST_PTS, MINE_BOOST_PTS * USD_PER_POINT);
+      setMineBoosts(p => p + 1);
+    });
+  };
   const PE={YouTube:"▶️",Facebook:"📘",Twitter:"🐦",Instagram:"📸",TikTok:"🎵",LinkedIn:"💼",Telegram:"✈️",WhatsApp:"💬"};
 
   const TAB={
     home:(
       <div style={{padding:"0 16px 16px"}}>
+        {/* User Card */}
         <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:"20px",marginBottom:16,position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:-20,right:-20,fontSize:80,opacity:.1}}>⭐</div>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -1155,6 +1195,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{marginLeft:"auto",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"4px 10px",fontSize:12,color:"#fff"}}>✓ {L("verified")}</div>
           </div>
         </div>
+        {/* Stats Grid */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
           {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:`$${u.usd.toFixed(2)}`,icon:"💵"},{label:L("adsLeft"),val:adLeft,icon:"📺"}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
@@ -1164,19 +1205,97 @@ function MainApp({user,onLogout,lang,setLang}){
             </div>
           ))}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        {/* ═══ START MINING CARD ═══ */}
+        <div style={{background:"linear-gradient(145deg,rgba(19,16,42,.95),rgba(13,11,30,.98))",borderRadius:24,border:"1px solid rgba(139,92,246,.3)",padding:20,marginBottom:16,position:"relative",overflow:"hidden"}}>
+          {/* Ambient glow */}
+          <div style={{position:"absolute",top:-70,right:-70,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.18),transparent 70%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:-50,left:-50,width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(245,158,11,.1),transparent 70%)",pointerEvents:"none"}}/>
+          {/* Card header */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <div style={{width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,rgba(245,158,11,.25),rgba(139,92,246,.2))",border:"1px solid rgba(245,158,11,.35)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0,animation:mineStarted&&!mineReady?"mine-pulse 1.8s ease-in-out infinite":"pulse-glow 3s infinite"}}>⛏️</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>Start Mining</div>
+              <div style={{fontSize:12,color:C.muted}}>{MINE_PTS_HOUR.toLocaleString()} pts/hr · 4 hr session</div>
+            </div>
+            {mineStarted&&!mineReady&&(
+              <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.3)",borderRadius:8,padding:"4px 10px",flexShrink:0}}>
+                <div className="dot" style={{background:C.green}}/>
+                <span style={{fontSize:11,fontWeight:700,color:C.green}}>ACTIVE</span>
+              </div>
+            )}
+          </div>
+          {/* Reward info row */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+            <div style={{background:"rgba(139,92,246,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(139,92,246,.18)"}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Session Reward</div>
+              <div style={{fontSize:20,fontWeight:800,color:C.brandLt}}>8,000 pts</div>
+              <div style={{fontSize:10,color:C.muted}}>base earnings</div>
+            </div>
+            <div style={{background:"rgba(245,158,11,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(245,158,11,.18)"}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Boost Bonus</div>
+              <div style={{fontSize:20,fontWeight:800,color:C.gold}}>{(mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts</div>
+              <div style={{fontSize:10,color:C.muted}}>{mineBoosts}/{MINE_MAX_BOOST} boosts used</div>
+            </div>
+          </div>
+          {/* Timer (active, not ready) */}
+          {mineStarted&&!mineReady&&(
+            <div style={{textAlign:"center",marginBottom:16,background:"rgba(0,0,0,.25)",borderRadius:14,padding:"14px 12px",border:"1px solid rgba(255,255,255,.05)"}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:4,textTransform:"uppercase",letterSpacing:.08}}>Time Remaining</div>
+              <div style={{fontSize:34,fontWeight:800,color:C.gold,fontFamily:"monospace",letterSpacing:2}}>{fmtTime(mineT)}</div>
+              <div style={{marginTop:10}}>
+                <div className="ptr">
+                  <div className="ptrf" style={{width:`${((MINE_SESSION_S-mineT)/MINE_SESSION_S)*100}%`,background:`linear-gradient(90deg,${C.gold},${C.brand})`}}/>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* Ready to claim banner */}
+          {mineReady&&(
+            <div style={{textAlign:"center",marginBottom:16,background:"rgba(16,185,129,.1)",borderRadius:14,padding:"14px",border:"1px solid rgba(16,185,129,.25)"}}>
+              <div style={{fontSize:22,marginBottom:4}}>🎉</div>
+              <div style={{fontSize:14,fontWeight:800,color:C.green}}>Mining Complete!</div>
+              <div style={{fontSize:13,color:C.muted,marginTop:2}}>+{(MINE_PTS_HOUR*4 + mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts ready to claim</div>
+            </div>
+          )}
+          {/* Primary action button */}
+          {!mineStarted ? (
+            <button onClick={startMiningWithAd} style={{width:"100%",background:"linear-gradient(135deg,#f59e0b,#d97706)",border:"none",borderRadius:14,padding:"15px",color:"#000",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 6px 24px rgba(245,158,11,.45)",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all .2s"}}>
+              <span style={{fontSize:18}}>▶</span> Watch Ad to Start Mining
+            </button>
+          ) : mineReady ? (
+            <button onClick={claimMining} style={{width:"100%",background:"linear-gradient(135deg,#10b981,#059669)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 6px 24px rgba(16,185,129,.4)"}}>
+              🎁 Claim {(MINE_PTS_HOUR*4 + mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts
+            </button>
+          ) : (
+            <div style={{width:"100%",background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.2)",borderRadius:14,padding:"14px",color:C.muted,fontWeight:700,fontSize:14,textAlign:"center"}}>
+              ⛏️ Mining in Progress…
+            </div>
+          )}
+          {/* Boost buttons — only available during active session */}
+          {mineStarted&&!mineReady&&(
+            <div style={{marginTop:14}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,textTransform:"uppercase",letterSpacing:.08,display:"flex",alignItems:"center",gap:6}}>
+                <span>⚡ Boost Mining</span>
+                <span style={{color:C.gold}}>(+{MINE_BOOST_PTS} pts each, watch ad)</span>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                {[0,1,2,3,4].map(i=>{
+                  const used = i < mineBoosts;
+                  const next = i === mineBoosts;
+                  return(
+                    <button key={i} onClick={()=>next&&boostMining()} disabled={used||!next} style={{flex:1,background:used?"rgba(16,185,129,.2)":next?"rgba(139,92,246,.2)":"rgba(255,255,255,.04)",border:`1px solid ${used?"rgba(16,185,129,.4)":next?"rgba(139,92,246,.4)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"9px 0",color:used?C.green:next?C.brandLt:C.muted,fontSize:13,fontWeight:700,cursor:next?"pointer":"default",transition:"all .2s"}}>
+                      {used?"✓":"⚡"}<br/><span style={{fontSize:9,letterSpacing:.5}}>+500</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+        {/* Quick actions */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
           <button onClick={()=>setTab("earn")} style={{background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>📺 {L("watchAd")}</button>
           <button onClick={()=>setTab("tasks")} style={{background:`linear-gradient(135deg,${C.cyan},${C.brand})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>✅ {L("tasks")}</button>
-        </div>
-        <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:14,fontWeight:700,color:C.brandLt,marginBottom:10}}>🏆 {L("leaders")}</div>
-          {FAKE_LEADERS.slice(0,3).map((l,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<2?`1px solid ${C.border}`:"none"}}>
-              <div style={{fontSize:18}}>{"🥇🥈🥉"[i]}</div>
-              <div style={{flex:1,fontSize:14,color:C.white}}>{l.country} {l.name}</div>
-              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
-            </div>
-          ))}
         </div>
       </div>
     ),
@@ -1252,41 +1371,6 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
           </div>
         ))}
-      </div>
-    ),
-    mining:(
-      <div style={{padding:"0 16px 16px"}}>
-        <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16}}>
-          <div style={{position:"relative",width:110,height:110,margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {mineStarted&&<div style={{position:"absolute",width:"100%",height:"100%",borderRadius:"50%",border:"2px dashed rgba(245,158,11,.5)",animation:"rotate 8s linear infinite"}}/>}
-            {mineStarted&&<div style={{position:"absolute",width:10,height:10,borderRadius:"50%",background:C.gold,animation:"orbit 2s linear infinite",boxShadow:`0 0 8px ${C.gold}`}}/>}
-            <div style={{
-              width:90,height:90,borderRadius:"50%",
-              background:`radial-gradient(circle at 35% 35%,${C.gold}40,${C.brandDk}90)`,
-              border:`2.5px solid ${C.gold}80`,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:44,
-              animation:mineStarted?"mine-pulse 1.8s ease-in-out infinite":"pulse-glow 3s infinite",
-              boxShadow:mineStarted?`0 0 30px rgba(245,158,11,.7),0 0 60px rgba(139,92,246,.4)`:`0 0 18px rgba(139,92,246,.4)`,
-              transition:"all .5s ease",
-            }}>⛏️</div>
-          </div>
-          <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>{L("miningTitle")}</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:16}}>{L("season")} 1 · 500 pts per cycle</div>
-          {!mineStarted
-            ?<>
-              <div style={{fontSize:13,color:"rgba(255,255,255,.8)",marginBottom:16,background:"rgba(0,0,0,.2)",borderRadius:10,padding:"10px 16px"}}>Watch a short ad to activate your mining session</div>
-              <button onClick={()=>setMAd(true)} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 36px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.4)"}}>▶ Start Mining</button>
-            </>
-            :mineReady
-              ?<button onClick={claimMining} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 32px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer"}}>🎁 Claim 500 pts!</button>
-              :<><div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:8}}>{L("miningNext")}</div><div style={{fontSize:36,fontWeight:800,color:C.gold,fontFamily:"monospace"}}>{fmtTime(mineT)}</div><div style={{marginTop:8,fontSize:12,color:"rgba(255,255,255,.5)"}}>⚡ Mining active</div></>
-          }
-        </div>
-        <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:14,fontWeight:700,color:C.brandLt,marginBottom:8}}>How Mining Works</div>
-          <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>Watch a short ad to start mining. Earn 500 pts every 8 hours. After claiming, start a new session anytime!</div>
-        </div>
       </div>
     ),
     wallet:(
@@ -1417,7 +1501,6 @@ function MainApp({user,onLogout,lang,setLang}){
     {id:"home",icon:"🏠",label:L("home")},
     {id:"earn",icon:"📺",label:L("earn")},
     {id:"tasks",icon:"✅",label:L("tasks")},
-    {id:"mining",icon:"⛏️",label:L("mining")},
     {id:"wallet",icon:"💰",label:L("wallet")},
   ];
 
@@ -1488,6 +1571,7 @@ function MainApp({user,onLogout,lang,setLang}){
               ].map(item=>(
                 <button key={item.label} className="menu-item" onClick={()=>{
                   if(item.label==="Profile"){setSO(false);setSV("profile");}
+                  else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
                   else setSO(false);
                 }}>
                   <span style={{fontSize:20}}>{item.icon}</span>
@@ -1597,6 +1681,45 @@ function MainApp({user,onLogout,lang,setLang}){
             <button onClick={()=>setLD(true)} style={{width:"100%",background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",boxShadow:`0 4px 20px ${C.red}40`}}>
               👋 Logout
             </button>
+          </div>
+        </div>
+      )}
+      {/* Leaderboard Screen (from sidebar) */}
+      {sidebarView==="leaders"&&(
+        <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+          <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+            <div style={{fontSize:18,fontWeight:800,color:C.white}}>🏆 Leaderboard</div>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
+            {/* Top 3 podium */}
+            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:12,marginBottom:20,padding:"12px 0"}}>
+              {[1,0,2].map(pos=>{
+                const l=FAKE_LEADERS[pos]||{name:"—",pts:0,country:"🌍"};
+                const heights=["60px","80px","48px"];
+                const colors=[`linear-gradient(135deg,${C.gold},#d97706)`,`linear-gradient(135deg,#9ca3af,#6b7280)`,`linear-gradient(135deg,#cd7c32,#92400e)`];
+                const medals=["🥇","🥈","🥉"];
+                const displayPos=[2,1,3];
+                return(
+                  <div key={pos} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
+                    <div style={{fontSize:20}}>{medals[pos]}</div>
+                    <div style={{width:44,height:44,borderRadius:"50%",background:colors[pos],display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",border:"2px solid rgba(255,255,255,.3)"}}>{l.country}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:C.white,textAlign:"center",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.name}</div>
+                    <div style={{fontSize:11,color:C.gold,fontWeight:700}}>{l.pts.toLocaleString()}</div>
+                    <div style={{width:"100%",height:heights[pos],background:colors[pos],borderRadius:"8px 8px 0 0",opacity:.4}}/>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>ALL EARNERS</div>
+            {[...FAKE_LEADERS.slice(0,-1),{...FAKE_LEADERS[FAKE_LEADERS.length-1],name:u.name,pts:u.pts,country:u.country,isMe:true}].map((l,i)=>(
+              <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12,transition:"all .2s"}}>
+                <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
+                <div style={{fontSize:22}}>{l.country}</div>
+                <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
