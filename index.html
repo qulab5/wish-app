@@ -1076,6 +1076,9 @@ function MainApp({user,onLogout,lang,setLang}){
   const [editEmail,setEE]     = useState(user.email);
   const [editPass,setEP]      = useState("");
   const [profileMsg,setPMsg]  = useState("");
+  const [sidebarOpen, setSO]  = useState(false);
+  const [sidebarView, setSV]  = useState(null);
+  const [editingField, setEF] = useState(null);
   const L = k => t$(lang,k);
   const dir = (LANGS[lang]||LANGS.en).dir;
 
@@ -1416,14 +1419,20 @@ function MainApp({user,onLogout,lang,setLang}){
     {id:"tasks",icon:"✅",label:L("tasks")},
     {id:"mining",icon:"⛏️",label:L("mining")},
     {id:"wallet",icon:"💰",label:L("wallet")},
-    {id:"profile",icon:"👤",label:L("profile")},
   ];
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,color:C.white,fontFamily:"'DM Sans',sans-serif",maxWidth:480,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",direction:dir}}>
       {/* Header */}
       <div style={{padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",background:C.s1,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:10}}>
-        <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <button onClick={()=>setSO(true)} style={{background:"none",border:"none",cursor:"pointer",padding:"4px 2px",display:"flex",flexDirection:"column",gap:5,justifyContent:"center"}}>
+            <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
+            <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
+            <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
+          </button>
+          <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+        </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <div style={{position:"relative"}}>
             <button onClick={()=>setLM(p=>!p)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.white,fontSize:13,cursor:"pointer"}}>{(LANGS[lang]||LANGS.en).flag} {lang.toUpperCase()}</button>
@@ -1435,7 +1444,6 @@ function MainApp({user,onLogout,lang,setLang}){
               </div>
             )}
           </div>
-          <button onClick={()=>setLD(true)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.red,fontSize:13,cursor:"pointer",fontWeight:600}}>{L("logout")}</button>
         </div>
       </div>
       {/* Content */}
@@ -1449,6 +1457,148 @@ function MainApp({user,onLogout,lang,setLang}){
           </button>
         ))}
       </div>
+      {/* Sidebar Overlay */}
+      {sidebarOpen&&(
+        <>
+          <div className="menu-overlay" onClick={()=>setSO(false)}/>
+          <div className="menu-drawer" style={{animation:"slideL .25s ease both"}}>
+            {/* Sidebar Header */}
+            <div style={{padding:"20px 24px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid rgba(139,92,246,.15)`}}>
+              <div style={{fontSize:18,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+              <button onClick={()=>setSO(false)} style={{background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer",lineHeight:1,padding:4}}>✕</button>
+            </div>
+            {/* User info */}
+            <div style={{padding:"16px 24px",display:"flex",alignItems:"center",gap:12,borderBottom:`1px solid rgba(139,92,246,.1)`}}>
+              <div style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",flexShrink:0}}>{u.name[0].toUpperCase()}</div>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:C.white}}>{u.name}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>{u.email}</div>
+              </div>
+            </div>
+            {/* Menu Items */}
+            <div style={{flex:1,overflowY:"auto",paddingTop:8}}>
+              {[
+                {icon:"👤",label:"Profile"},
+                {icon:"🏆",label:"Leader Board"},
+                {icon:"👥",label:"Referral Team"},
+                {icon:"📢",label:"Announcement"},
+                {icon:"📄",label:"White Paper"},
+                {icon:"🎧",label:"Support Portal"},
+              ].map(item=>(
+                <button key={item.label} className="menu-item" onClick={()=>{
+                  if(item.label==="Profile"){setSO(false);setSV("profile");}
+                  else setSO(false);
+                }}>
+                  <span style={{fontSize:20}}>{item.icon}</span>
+                  <span>{item.label}</span>
+                  <span style={{marginLeft:"auto",color:C.muted,fontSize:18}}>›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+      {/* Profile Screen (from sidebar) */}
+      {sidebarView==="profile"&&(
+        <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+          {/* Profile Header */}
+          <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+            <div style={{fontSize:18,fontWeight:800,color:C.white}}>Account</div>
+          </div>
+          {/* Profile Content */}
+          <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
+            {/* Account Settings */}
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:10,padding:"0 4px"}}>Account Settings</div>
+            <div style={{background:C.s2,borderRadius:16,marginBottom:16,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+              {/* Change Name */}
+              <div style={{padding:"16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.white}}>Change Name</div>
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>Update your display name.</div>
+                  </div>
+                  <button onClick={()=>setEF(editingField==="name"?null:"name")} style={{background:editingField==="name"?"rgba(255,255,255,.1)":C.brand,border:editingField==="name"?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:editingField==="name"?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{editingField==="name"?"CANCEL":"CHANGE"}</button>
+                </div>
+                {editingField==="name"&&(
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input value={editName} onChange={e=>setEN(e.target.value)} style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="Your display name"/>
+                    <button onClick={()=>{if(editName.trim()){setU(p=>({...p,name:editName.trim()}));setPMsg("Name updated!");setEF(null);}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+                  </div>
+                )}
+              </div>
+              <div style={{height:1,background:C.border}}/>
+              {/* Change Email */}
+              <div style={{padding:"16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.white}}>Change Email</div>
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>Update your email address for account access.</div>
+                  </div>
+                  <button onClick={()=>setEF(editingField==="email"?null:"email")} style={{background:editingField==="email"?"rgba(255,255,255,.1)":C.brand,border:editingField==="email"?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:editingField==="email"?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{editingField==="email"?"CANCEL":"CHANGE"}</button>
+                </div>
+                {editingField==="email"&&(
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input value={editEmail} onChange={e=>setEE(e.target.value)} type="email" style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="you@email.com"/>
+                    <button onClick={()=>{if(editEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){setU(p=>({...p,email:editEmail}));setPMsg("Email updated!");setEF(null);}else setPMsg("Invalid email!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+                  </div>
+                )}
+              </div>
+              <div style={{height:1,background:C.border}}/>
+              {/* Change Password */}
+              <div style={{padding:"16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.white}}>Change Password</div>
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>Update your password to keep account secure.</div>
+                  </div>
+                  <button onClick={()=>setEF(editingField==="pass"?null:"pass")} style={{background:editingField==="pass"?"rgba(255,255,255,.1)":C.brand,border:editingField==="pass"?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:editingField==="pass"?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{editingField==="pass"?"CANCEL":"CHANGE"}</button>
+                </div>
+                {editingField==="pass"&&(
+                  <div style={{marginTop:12}}>
+                    <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Min 6 characters"/>
+                    <button onClick={()=>{if(editPass.length>=6){setU(p=>({...p,pass:editPass}));setEP("");setPMsg("Password updated!");setEF(null);}else setPMsg("Min 6 characters!");setTimeout(()=>setPMsg(""),2500);}} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE PASSWORD</button>
+                  </div>
+                )}
+              </div>
+            </div>
+            {profileMsg&&(
+              <div style={{marginBottom:16,textAlign:"center",padding:"10px 14px",borderRadius:12,background:profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",color:profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?C.red:C.green,fontWeight:700,fontSize:13}}>
+                {profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?`⚠️ ${profileMsg}`:`✓ ${profileMsg}`}
+              </div>
+            )}
+            {/* Account Verification */}
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:10,padding:"0 4px"}}>Account Verification</div>
+            <div style={{background:C.s2,borderRadius:16,marginBottom:24,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+              {/* Email Verify */}
+              <div style={{padding:"16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:15,fontWeight:700,color:C.white}}>Email</div>
+                  <div style={{fontSize:13,color:C.brandLt,marginTop:2}}>{u.email}</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:4}}>Link your email for communication and account recovery.</div>
+                </div>
+                <button style={{background:C.cyan,border:"none",borderRadius:8,padding:"7px 16px",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0,marginTop:2}}>VERIFY</button>
+              </div>
+              <div style={{height:1,background:C.border}}/>
+              {/* KYC */}
+              <div style={{padding:"16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:15,fontWeight:700,color:C.white}}>Identity Verification (KYC)</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:4}}>Secure your account with identity verification.</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,flexShrink:0}}>
+                  <button disabled style={{background:"rgba(255,255,255,.06)",border:`1px solid ${C.border}`,borderRadius:8,padding:"7px 14px",color:"rgba(255,255,255,.25)",fontWeight:700,fontSize:12,cursor:"default"}}>VERIFY</button>
+                  <span style={{fontSize:9,color:C.gold,fontWeight:700,background:"rgba(245,158,11,.15)",borderRadius:4,padding:"2px 7px",whiteSpace:"nowrap"}}>COMING SOON</span>
+                </div>
+              </div>
+            </div>
+            {/* Logout Button */}
+            <button onClick={()=>setLD(true)} style={{width:"100%",background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",boxShadow:`0 4px 20px ${C.red}40`}}>
+              👋 Logout
+            </button>
+          </div>
+        </div>
+      )}
       {/* Ad Modal */}
       {adShowing&&adData&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
