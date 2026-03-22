@@ -1946,24 +1946,28 @@ function PinKeypad({ onKey, disabled }) {
     setAK(k); setTimeout(()=>setAK(null), 140);
     onKey(k);
   };
+  /* Button size: cap at 72px but shrink on narrow viewports.
+     (100vw - 40px side padding - 2 × 16px gaps) / 3 columns */
+  const btnSize = 'min(72px, calc((100vw - 40px - 32px) / 3))';
+  const fontSize = 'min(26px, calc((100vw - 40px - 32px) / 3 * 0.38))';
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:14,alignItems:'center',userSelect:'none'}}>
+    <div style={{display:'flex',flexDirection:'column',gap:'min(14px,2.5vh)',alignItems:'center',userSelect:'none',width:'100%'}}>
       {rows.map((row,ri)=>(
-        <div key={ri} style={{display:'flex',gap:20}}>
+        <div key={ri} style={{display:'flex',gap:'min(16px,4vw)',width:'100%',justifyContent:'center'}}>
           {row.map((k,ki)=>{
             const isBack = k==='⌫';
             const isEmpty = k==='';
             const isActive = activeKey===k;
             return (
               <button key={ki} onPointerDown={()=>press(k)} style={{
-                width:74, height:74, borderRadius:'50%',
+                width:btnSize, height:btnSize, borderRadius:'50%', flexShrink:0,
                 background: isEmpty ? 'transparent'
                   : isActive ? (isBack ? 'rgba(239,68,68,.3)' : 'rgba(139,92,246,.35)')
                   : isBack ? 'rgba(239,68,68,.1)' : 'rgba(139,92,246,.1)',
                 border: isEmpty ? 'none'
                   : isBack ? '1px solid rgba(239,68,68,.25)' : '1px solid rgba(139,92,246,.22)',
                 color: isEmpty ? 'transparent' : isBack ? '#ef4444' : '#fff',
-                fontSize: isBack ? 22 : 26,
+                fontSize: isBack ? 'min(22px,5.5vw)' : fontSize,
                 fontWeight: 600,
                 cursor: isEmpty||disabled ? 'default' : 'pointer',
                 opacity: disabled ? .35 : 1,
@@ -2509,94 +2513,127 @@ function UnlockScreen({ user, onUnlock }) {
     }
   };
 
-  const BG={position:'fixed',inset:0,zIndex:9997,background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'0 28px',overflow:'hidden'};
-
   return (
-    <div style={BG}>
-      {/* Ambient orbs */}
-      <div style={{position:'absolute',top:'9%',left:'6%',width:210,height:210,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
-      <div style={{position:'absolute',bottom:'14%',right:'8%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+    <div style={{
+      position:'fixed',inset:0,zIndex:9997,
+      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",
+      overflowY:'auto',overflowX:'hidden',
+    }}>
+      {/* Ambient orbs — decorative only, pointer-events off */}
+      <div style={{position:'fixed',top:'8%',left:'5%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.14),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'fixed',bottom:'10%',right:'5%',width:120,height:120,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.09),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
 
-      {/* User greeting */}
-      <div style={{marginBottom:22,textAlign:'center',animation:'splashFade .5s ease both'}}>
-        <div style={{width:58,height:58,borderRadius:'50%',background:'linear-gradient(135deg,#8b5cf6,#ec4899)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:800,color:'#fff',margin:'0 auto 10px',boxShadow:'0 4px 20px rgba(139,92,246,.4)'}}>
-          {user?.name?.[0]?.toUpperCase()||'U'}
+      {/* Scrollable content column */}
+      <div style={{
+        minHeight:'100%',display:'flex',flexDirection:'column',alignItems:'center',
+        justifyContent:'center',padding:'24px 20px 32px',boxSizing:'border-box',
+      }}>
+
+        {/* ── Greeting row (avatar + name inline, compact) ── */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,animation:'splashFade .5s ease both'}}>
+          <div style={{width:40,height:40,borderRadius:'50%',background:'linear-gradient(135deg,#8b5cf6,#ec4899)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,fontWeight:800,color:'#fff',flexShrink:0,boxShadow:'0 3px 14px rgba(139,92,246,.4)'}}>
+            {user?.name?.[0]?.toUpperCase()||'U'}
+          </div>
+          <div style={{fontSize:14,fontWeight:700,color:'#fff'}}>Hi, {user?.name?.split(' ')[0]||'Welcome back'}!</div>
         </div>
-        <div style={{fontSize:15,fontWeight:700,color:'#fff'}}>Hi, {user?.name?.split(' ')[0]||'Welcome back'}!</div>
-      </div>
 
-      {/* Lock icon */}
-      <div style={{width:80,height:80,borderRadius:26,marginBottom:16,background:isLocked?'linear-gradient(135deg,rgba(239,68,68,.22),rgba(185,28,28,.14))':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:`1px solid ${isLocked?'rgba(239,68,68,.3)':'rgba(139,92,246,.3)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:40,boxShadow:`0 8px 32px ${isLocked?'rgba(239,68,68,.2)':'rgba(139,92,246,.2)'}`,transition:'all .4s ease'}}>
-        {isLocked?'🔒':'🔓'}
-      </div>
-
-      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>
-        {isLocked?'App Locked':'Enter your PIN'}
-      </div>
-      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:isLocked?20:30,textAlign:'center',lineHeight:1.6,maxWidth:270}}>
-        {isLocked?'Too many failed attempts.':'Enter your 4-digit PIN to continue'}
-      </div>
-
-      {/* Lockout countdown ring */}
-      {isLocked&&(
-        <div style={{width:90,height:90,borderRadius:'50%',marginBottom:24,border:'3px solid rgba(239,68,68,.35)',background:'rgba(239,68,68,.08)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:'0 0 30px rgba(239,68,68,.2)'}}>
-          <div style={{fontSize:28,fontWeight:800,color:'#ef4444',fontFamily:'monospace'}}>{secsLeft}</div>
-          <div style={{fontSize:9,color:'rgba(239,68,68,.6)',letterSpacing:.5}}>SECONDS</div>
+        {/* ── Lock icon + title ── */}
+        <div style={{
+          width:64,height:64,borderRadius:20,marginBottom:12,
+          background:isLocked?'linear-gradient(135deg,rgba(239,68,68,.22),rgba(185,28,28,.14))':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',
+          border:`1px solid ${isLocked?'rgba(239,68,68,.3)':'rgba(139,92,246,.3)'}`,
+          display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,
+          boxShadow:`0 6px 24px ${isLocked?'rgba(239,68,68,.2)':'rgba(139,92,246,.2)'}`,
+          transition:'all .4s ease',
+        }}>
+          {isLocked?'🔒':'🔓'}
         </div>
-      )}
 
-      {/* ── PIN entry section ── */}
-      {!isLocked&&hasPin&&(<>
-        <PinDots filled={pin.length} shake={shake} visible={visible} raw={pin}/>
+        <div style={{fontSize:20,fontWeight:800,color:'#fff',marginBottom:4,textAlign:'center'}}>
+          {isLocked?'App Locked':'Enter your PIN'}
+        </div>
+        <div style={{fontSize:12,color:'rgba(255,255,255,.38)',marginBottom:isLocked?14:18,textAlign:'center',lineHeight:1.5}}>
+          {isLocked?'Too many failed attempts — please wait':'Enter your 4-digit PIN to continue'}
+        </div>
 
-        {error?(
-          <div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>
-        ):(
-          <div style={{display:'flex',gap:18,marginTop:12,alignItems:'center'}}>
-            <button onClick={()=>setVis(v=>!v)} style={{background:'none',border:'none',color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
-              {visible?'🙈 Hide':'👁 Show'}
+        {/* ── Lockout countdown ── */}
+        {isLocked&&(
+          <div style={{width:80,height:80,borderRadius:'50%',marginBottom:20,border:'3px solid rgba(239,68,68,.35)',background:'rgba(239,68,68,.08)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:'0 0 26px rgba(239,68,68,.2)'}}>
+            <div style={{fontSize:26,fontWeight:800,color:'#ef4444',fontFamily:'monospace'}}>{secsLeft}</div>
+            <div style={{fontSize:9,color:'rgba(239,68,68,.6)',letterSpacing:.5}}>SEC</div>
+          </div>
+        )}
+
+        {/* ── PIN entry ── */}
+        {!isLocked&&hasPin&&(<>
+          <PinDots filled={pin.length} shake={shake} visible={visible} raw={pin}/>
+
+          {/* Error or show/hint toggles */}
+          <div style={{height:28,display:'flex',alignItems:'center',justifyContent:'center',gap:16,marginTop:6}}>
+            {error
+              ?<div style={{fontSize:12,color:'#ef4444',fontWeight:600,animation:'splashFade .3s ease'}}>⚠ {error}</div>
+              :<>
+                <button onClick={()=>setVis(v=>!v)} style={{background:'none',border:'none',color:'rgba(255,255,255,.3)',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>
+                  {visible?'🙈 Hide':'👁 Show'}
+                </button>
+                {hint&&<button onClick={()=>setSH(s=>!s)} style={{background:'none',border:'none',color:'rgba(255,255,255,.25)',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>💡 Hint</button>}
+              </>
+            }
+          </div>
+          {showHint&&hint&&(
+            <div style={{marginBottom:8,background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.22)',borderRadius:10,padding:'6px 14px',fontSize:11,color:'#f59e0b',textAlign:'center'}}>💡 {hint}</div>
+          )}
+
+          {/* Keypad — responsive button size via vw */}
+          <div style={{marginTop:14,width:'100%',maxWidth:300}}>
+            <PinKeypad onKey={onKey} disabled={verifying}/>
+          </div>
+
+          {/* Failed-attempt pips */}
+          {failed>0&&failed<5&&(
+            <div style={{marginTop:12,display:'flex',gap:6,justifyContent:'center'}}>
+              {[0,1,2,3,4].map(i=>(
+                <div key={i} style={{width:8,height:8,borderRadius:'50%',background:i<failed?'#ef4444':'rgba(255,255,255,.15)',transition:'background .3s'}}/>
+              ))}
+            </div>
+          )}
+        </>)}
+
+        {/* ── Biometric button ── */}
+        {!isLocked&&hasBio&&(
+          <>
+            {hasPin&&(
+              <div style={{display:'flex',alignItems:'center',gap:10,width:'100%',maxWidth:280,margin:'14px 0 10px'}}>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
+                <span style={{fontSize:11,color:'rgba(255,255,255,.28)',letterSpacing:.5}}>or</span>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
+              </div>
+            )}
+            <button onClick={tryBiometric} disabled={bioLoading}
+              style={{width:'100%',maxWidth:280,display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+                background:bioLoading?'rgba(139,92,246,.06)':'rgba(139,92,246,.1)',
+                border:'1px solid rgba(139,92,246,.28)',borderRadius:16,
+                padding:'13px 20px',color:'#a78bfa',fontSize:14,fontWeight:700,
+                cursor:bioLoading?'default':'pointer',fontFamily:'inherit',
+                boxShadow:'0 3px 14px rgba(139,92,246,.16)',transition:'all .2s',
+              }}>
+              {bioLoading
+                ?<><div style={{width:18,height:18,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite',flexShrink:0}}/> Waiting…</>
+                :<><span style={{fontSize:24}}>👆</span> Use Fingerprint / Face ID</>
+              }
             </button>
-            {hint&&<button onClick={()=>setSH(s=>!s)} style={{background:'none',border:'none',color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>💡 Hint</button>}
+          </>
+        )}
+
+        {/* Biometric status message */}
+        {bioMsg&&(
+          <div style={{marginTop:10,background:'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.2)',borderRadius:10,padding:'8px 14px',fontSize:11,color:'#a78bfa',maxWidth:280,textAlign:'center',animation:'splashFade .3s ease'}}>
+            ℹ️ {bioMsg}
           </div>
         )}
-        {showHint&&hint&&<div style={{marginTop:10,background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.22)',borderRadius:11,padding:'8px 18px',fontSize:12,color:'#f59e0b',maxWidth:260,textAlign:'center'}}>💡 {hint}</div>}
 
-        <div style={{marginTop:20}}><PinKeypad onKey={onKey} disabled={verifying}/></div>
-
-        {/* Failed attempt pips */}
-        {failed>0&&failed<5&&(
-          <div style={{marginTop:16,display:'flex',gap:6,justifyContent:'center'}}>
-            {[0,1,2,3,4].map(i=>(
-              <div key={i} style={{width:9,height:9,borderRadius:'50%',background:i<failed?'#ef4444':'rgba(255,255,255,.15)',transition:'background .3s'}}/>
-            ))}
-          </div>
-        )}
-      </>)}
-
-      {/* ── Biometric section ── */}
-      {!isLocked&&hasBio&&(<>
-        {hasPin&&(
-          <div style={{display:'flex',alignItems:'center',gap:12,width:'100%',maxWidth:280,margin:'18px 0 14px'}}>
-            <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
-            <span style={{fontSize:12,color:'rgba(255,255,255,.3)',letterSpacing:.5}}>or</span>
-            <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
-          </div>
-        )}
-        <button onClick={tryBiometric} disabled={bioLoading}
-          style={{display:'flex',alignItems:'center',gap:12,background:bioLoading?'rgba(139,92,246,.06)':'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.28)',borderRadius:18,padding:'15px 32px',color:'#a78bfa',fontSize:15,fontWeight:700,cursor:bioLoading?'default':'pointer',fontFamily:'inherit',boxShadow:'0 4px 18px rgba(139,92,246,.18)',transition:'all .2s',minWidth:240,justifyContent:'center'}}>
-          {bioLoading
-            ?<><div style={{width:20,height:20,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite',flexShrink:0}}/> Waiting…</>
-            :<><span style={{fontSize:28}}>👆</span> Use Fingerprint / Face ID</>
-          }
-        </button>
-      </>)}
-
-      {/* Biometric info message */}
-      {bioMsg&&(
-        <div style={{marginTop:14,background:'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.2)',borderRadius:12,padding:'10px 16px',fontSize:12,color:'#a78bfa',maxWidth:300,textAlign:'center',animation:'splashFade .3s ease'}}>
-          ℹ️ {bioMsg}
-        </div>
-      )}
+      </div>{/* end content column */}
     </div>
   );
 }
