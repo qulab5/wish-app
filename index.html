@@ -881,14 +881,24 @@ function AuthScreen({onLogin,lang}){
     setLoading(true);
     if(mode==="login"){
       let foundUser=null;
-      // Check demo/admin users first (in-memory)
+      // Check demo/admin users first (in-memory) for credentials
       if(method==="email"){
         foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
       } else {
         const fp=form.countryCode+form.phone;
         foundUser=users.find(u=>u.phone===fp&&u.pass===form.pass)||null;
       }
-      // Fall back to MongoDB for real registered users
+      // Always fetch the DB record so we get the latest pts/usd/state.
+      // For in-memory/demo users this merges their saved progress on top of the
+      // hardcoded seed values; for real registered users it IS the source of truth.
+      if(foundUser&&!foundUser.isAdmin&&method==="email"){
+        try{
+          const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
+          const d=await r.json();
+          if(d.user) foundUser={...foundUser,...d.user};
+        }catch(e){}
+      }
+      // Fall back to DB-only lookup for real registered users (no in-memory entry)
       if(!foundUser&&method==="email"){
         try{
           const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
@@ -1122,6 +1132,10 @@ function MainApp({user,onLogout,lang,setLang}){
   // written back to the DB 2 seconds after every page refresh, overwriting any
   // points/state that were saved to the DB since that last login.
   const dbLoaded = React.useRef(false);
+  // Always-current mirror of u — lets setTimeout callbacks (e.g. doSpin's
+  // 4.2s timer) read the latest pts/usd without stale-closure issues.
+  const uRef = React.useRef(u);
+  useEffect(()=>{ uRef.current = u; });
   const L = k => t$(lang,k);
   const dir = (LANGS[lang]||LANGS.en).dir;
 
@@ -1215,7 +1229,15 @@ function MainApp({user,onLogout,lang,setLang}){
     : 0;
 
   const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
-  const claimAd=()=>{addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);};
+  const claimAd=()=>{
+    const newPts=u.pts+adData.pts;
+    const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
+    const newAL=adLeft-1;
+    addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:newAL,adDate:new Date().toDateString()})
+    }).catch(()=>{});
+  };
   const doSpin=()=>{
     if(spinning) return;
     const now=Date.now();
@@ -1237,15 +1259,18 @@ function MainApp({user,onLogout,lang,setLang}){
     const newAngle=spinAngle+5*360+diff;
     setSA(newAngle);
     setTimeout(()=>{
-      const newPts=u.pts+SPIN_PTS[i];
-      const newUsd=+(u.usd+SPIN_USD[i]*0.01).toFixed(2);
+      // Read from uRef so we get the latest pts/usd even if state has
+      // changed (e.g. mining claim) during the 4.2s animation.
+      const cu=uRef.current;
+      const newPts=cu.pts+SPIN_PTS[i];
+      const newUsd=+(cu.usd+SPIN_USD[i]*0.01).toFixed(2);
       addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);
       setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});
       setSpin(false);
       // Persist immediately — don't rely on the 2s auto-save debounce which
       // can be cancelled by a page refresh before it fires.
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,
+        body:JSON.stringify({id:cu.id,email:cu.email,pts:newPts,usd:newUsd,
           spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs})
       })
       .then(r=>r.json())
@@ -1269,16 +1294,21 @@ function MainApp({user,onLogout,lang,setLang}){
   const claimMining=()=>{
     if(!mineReady)return;
     const earned = mineAccum;
+    // Compute new totals now (u.pts/u.usd are still the pre-claim values here).
+    const newPts = u.pts + earned;
+    const newUsd = +(u.usd + earned * USD_PER_POINT).toFixed(2);
     addPts(earned, earned * USD_PER_POINT);
     setMSAt(0); setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
-    // Remove mine metadata from tasksDone and save immediately so the session
-    // doesn't re-appear on the next login.
     // eslint-disable-next-line no-unused-vars
     const {__mine_startedAt:_a, __mine_boosts:_b, ...cleanTD} = tasksDone;
     setTD(cleanTD);
+    // Save pts + usd + session reset immediately — do NOT rely on the 2s
+    // auto-save debounce.  If the user refreshes or signs out right after
+    // claiming, the DB must already have the new balance.
     fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:u.id,email:u.email,tasksDone:cleanTD})
-    }).catch(()=>{});
+      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,tasksDone:cleanTD})
+    }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[mine claim save]',d);})
+      .catch(e=>console.error('[mine claim save]',e));
   };
   const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
 
