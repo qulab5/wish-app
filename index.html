@@ -1156,7 +1156,9 @@ function MainApp({user,onLogout,lang,setLang}){
         dbLoaded.current = true;
         if(!d.user) return;
         const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
-               spinNextFree:snf,extraSpins:es}=d.user;
+               spinNextFree:snf,extraSpins:es,lang:dbLang}=d.user;
+        // Restore language preference from DB (cross-device)
+        if(dbLang){ setLang(dbLang); Security.save('lang',dbLang); }
         setU(p=>({...p,
           // Prefer the DB value, but never let a DB 0 overwrite a locally-earned
           // value that was already synced to localStorage.  Saves bring the DB
@@ -1722,7 +1724,13 @@ function MainApp({user,onLogout,lang,setLang}){
             {langMenu&&(
               <div style={{position:"absolute",right:0,top:"110%",background:C.s2,border:`1px solid ${C.border}`,borderRadius:10,zIndex:99,minWidth:140,overflow:"hidden"}}>
                 {Object.entries(LANGS).map(([k,v])=>(
-                  <button key={k} onClick={()=>{setLang(k);setLM(false);}} style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",color:lang===k?C.brandLt:C.white,cursor:"pointer",textAlign:"left",fontSize:13}}>{v.flag} {v.name}</button>
+                  <button key={k} onClick={()=>{
+                    setLang(k);setLM(false);
+                    Security.save('lang',k);
+                    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+                      body:JSON.stringify({id:u.id,email:u.email,lang:k})
+                    }).catch(()=>{});
+                  }} style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",color:lang===k?C.brandLt:C.white,cursor:"pointer",textAlign:"left",fontSize:13}}>{v.flag} {v.name}</button>
                 ))}
               </div>
             )}
@@ -3166,7 +3174,7 @@ function WishApp(){
   const [phase, setPhase]       = useState('splash');
   const [loggedUser, setLU]     = useState(null);   // authenticated & unlocked user
   const [pendingUser, setPU]    = useState(null);   // saved user waiting behind unlock
-  const [lang, setLang]         = useState('en');
+  const [lang, setLang]         = useState(()=>Security.load('lang','en'));
 
   /* ── Splash done: branch on stored state ── */
   const handleSplashDone = ()=>{
