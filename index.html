@@ -1158,8 +1158,11 @@ function MainApp({user,onLogout,lang,setLang}){
         const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
                spinNextFree:snf,extraSpins:es}=d.user;
         setU(p=>({...p,
-          pts:pts??p.pts,
-          usd:usd??p.usd,
+          // Prefer the DB value, but never let a DB 0 overwrite a locally-earned
+          // value that was already synced to localStorage.  Saves bring the DB
+          // value UP; a DB value lower than localStorage means a save failed.
+          pts: Math.max(pts ?? 0, p.pts),
+          usd: Math.max(usd ?? 0, p.usd),
           avatar:avatar||p.avatar,
           name:name||p.name
         }));

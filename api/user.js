@@ -20,23 +20,59 @@ export default async function handler(req, res) {
       return res.status(200).json({ user: data || null });
     }
 
-    // ── POST /api/user  (upsert — works for both create and update) ──
+    // ── POST /api/user  (create or update) ───────────────────
     if (req.method === 'POST') {
       const body = req.body;
       if (!body?.email) return res.status(400).json({ error: 'email required' });
 
-      // Strip internal _id key if present; keep every other field as-is
-      // so the client controls what gets persisted.
+      // Strip any client-only _id key; keep everything else the client sent.
       const { _id, ...data } = body;
 
-      // upsert: INSERT the row if the email is new; UPDATE in-place if it
-      // already exists.  This is one atomic operation — no UPDATE+INSERT
-      // dance that can fail silently on unknown columns or race conditions.
-      const { error } = await supabase
+      // ── Step 1: look up the existing row by email ─────────
+      // We use SELECT rather than ON CONFLICT so we never depend on a
+      // UNIQUE constraint existing on the email column.
+      const { data: existing, error: selErr } = await supabase
         .from('users')
-        .upsert(data, { onConflict: 'email', ignoreDuplicates: false });
+        .select('id')
+        .eq('email', data.email)
+        .maybeSingle();
+      if (selErr) throw selErr;
 
-      if (error) throw error;
+      if (existing) {
+        // ── Step 2a: row exists — UPDATE by primary key ──────
+        // Strip `id` from the payload so we never try to overwrite the PK.
+        const { id: _clientId, ...fields } = data;
+
+        const { error: updErr } = await supabase
+          .from('users')
+          .update(fields)
+          .eq('id', existing.id);
+
+        if (updErr) {
+          // Full update failed (e.g. a column in `fields` doesn't exist yet).
+          // Fall back to a minimal update that only touches pts + usd — these
+          // columns exist in every version of the schema.
+          console.error('[api/user] full update failed, using minimal fallback:', updErr.message);
+          const safe = {};
+          if (fields.pts  !== undefined) safe.pts  = fields.pts;
+          if (fields.usd  !== undefined) safe.usd  = fields.usd;
+          if (fields.name !== undefined) safe.name = fields.name;
+          if (Object.keys(safe).length) {
+            const { error: minErr } = await supabase
+              .from('users')
+              .update(safe)
+              .eq('id', existing.id);
+            if (minErr) throw new Error(`full:${updErr.message} minimal:${minErr.message}`);
+          } else {
+            throw updErr;
+          }
+        }
+      } else {
+        // ── Step 2b: new user — INSERT ─────────────────────────
+        const { error: insErr } = await supabase.from('users').insert(data);
+        if (insErr) throw insErr;
+      }
+
       return res.status(200).json({ success: true });
     }
 
