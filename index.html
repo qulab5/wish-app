@@ -1178,6 +1178,15 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(()=>{ dbLoaded.current = true; });  // unlock even on network error
   },[]);
 
+  // Keep last_user in localStorage in sync with the live pts/usd so that a
+  // page refresh renders the correct value immediately (no 0-flash while the
+  // DB load is still in-flight).  Only runs after dbLoaded so the stale
+  // login-snapshot is never promoted back on top of a DB load.
+  useEffect(()=>{
+    if(!dbLoaded.current) return;
+    Security.save('last_user',{...u});
+  },[u.pts,u.usd]);
+
   // Auto-save progress (debounced 2s after last change).
   // avatar is intentionally excluded — it is saved explicitly after upload
   // to avoid sending a huge base64 data-URL that exceeds Supabase's body limit.
@@ -1190,7 +1199,7 @@ function MainApp({user,onLogout,lang,setLang}){
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
           tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins})
-      }).catch(()=>{});
+      }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[auto-save]',d);}).catch(e=>console.error('[auto-save]',e));
     },2000);
     return()=>clearTimeout(t);
   },[u.pts,u.usd,u.name,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
