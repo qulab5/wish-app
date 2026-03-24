@@ -8,17 +8,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<!-- Phantom Embedded + Solana SDKs loaded as ES modules, exposed on window -->
+<!-- Solana SDKs for balance display (no wallet extension needed) -->
 <script type="module">
-  window.__sdkPromise = Promise.all([
-    import('https://esm.sh/@phantom/wallet-sdk'),
-    import('https://esm.sh/@solana/spl-token'),
+  window.__solanaReady = Promise.all([
     import('https://esm.sh/@solana/web3.js@1.95.5'),
-  ]).then(([phantomMod, spl, web3]) => {
-    window.__PhantomModule = phantomMod;
-    window.__spl  = spl;
+  ]).then(([web3]) => {
     window.__web3 = web3;
-  }).catch(e => console.error('[Phantom SDK load error]', e));
+  }).catch(() => {});
 </script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -1143,16 +1139,14 @@ function AdminPanel({user,onExit,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   WALLET TAB  —  Phantom Browser SDK (embedded wallet)
+   WALLET TAB  —  server-side custodial wallet
+   (no browser wallet extension or SDK needed)
 ═══════════════════════════════════════════════ */
 function WalletTab({ u, C }) {
   const WISH_MINT  = '';   // ← paste your Wish Coin mint address here after creating the token
-  const WISH_DEC   = 9;
-  const PHANTOM_ID = '71f99e55-4da5-46a0-bbdf-1c37ee89be7c';
   const RPC        = 'https://api.mainnet-beta.solana.com';
   const mintReady  = WISH_MINT.length > 0;
 
-  const [phase,   setPhase]  = useState(u.walletAddress ? 'connected' : 'ready');
   const [wallet,  setWallet] = useState(u.walletAddress || '');
   const [wishBal, setWBal]   = useState(null);
   const [solBal,  setSBal]   = useState(null);
@@ -1162,128 +1156,33 @@ function WalletTab({ u, C }) {
   const [msg,     setMsg]    = useState('');
   const [busy,    setBusy]   = useState(false);
   const [copied,  setCopied] = useState(false);
-  const [sdkInfo, setSdkInfo]= useState('');  // visible debug line
+  const [creating,setCreating]=useState(false);
 
-  const uRef = useRef(u);
-  useEffect(() => { uRef.current = u; }, [u]);
-
-  // ── SDK init ────────────────────────────────────────────────────────────────
+  // ── Auto-create or restore wallet on mount ─────────────────────────────────
   useEffect(() => {
-    const init = async () => {
-      // SDK loading races against a 10s timeout so a stalled CDN never freezes the UI
-      const sdkTimeout = new Promise(r => setTimeout(r, 10000));
-      if (window.__sdkPromise) await Promise.race([window.__sdkPromise, sdkTimeout]);
-
-      const mod = window.__PhantomModule;
-      if (!mod) { setPhase('ready'); setSdkInfo('SDK module missing — check network'); return; }
-
-      // @phantom/wallet-sdk exports createPhantom as a named export
-      const createPhantom = mod.createPhantom || mod.default?.createPhantom || mod.default;
-      setSdkInfo('createPhantom: ' + typeof createPhantom + ' | keys: ' + Object.keys(mod).slice(0,6).join(','));
-
-      if (typeof createPhantom !== 'function') {
-        setPhase('ready');
-        return;
-      }
-
-      if (!window.__phantomInstance) {
-        try {
-          // Provide an element container so the SDK can render its UI in-page
-          if (!document.getElementById('__ph-root')) {
-            const el = document.createElement('div');
-            el.id = '__ph-root';
-            document.body.appendChild(el);
-          }
-          let inst = createPhantom({
-            appId: PHANTOM_ID,
-            element: document.getElementById('__ph-root'),
-            namespace: window.location.host,
-            zIndex: 10000,
-          });
-          // createPhantom may be async — await if it returned a Promise
-          if (inst && typeof inst.then === 'function') inst = await inst;
-          window.__phantomInstance = inst;
-        } catch(e) {
-          setSdkInfo('createPhantom() threw: ' + e.message);
-          setPhase('ready');
-          return;
-        }
-      }
-
-      const ph = window.__phantomInstance;
-
-      // The wallet adapter may be at ph.solana OR injected into window.phantom.solana
-      // Wait a tick for any async SDK side-effects to settle
-      await new Promise(r => setTimeout(r, 150));
-      const solana = ph?.solana || window.phantom?.solana;
-
-      // Show all available keys so we can diagnose any remaining API mismatch
-      const ownKeys = ph ? Object.keys(ph) : [];
-      const protoKeys = ph ? Object.getOwnPropertyNames(Object.getPrototypeOf(ph) || {}).filter(k => k !== 'constructor') : [];
-      const allKeys = [...new Set([...ownKeys, ...protoKeys])].slice(0, 10).join(',');
-      setSdkInfo(`ph:[${allKeys||'empty'}] solana:${typeof solana} win.phantom:${window.phantom ? 'yes' : 'no'}`);
-
-      if (!solana) { setPhase('ready'); return; }
-
-      // Store the solana adapter for use in connect()
-      window.__phantomSolana = solana;
-
-      // Listen for connect/disconnect events
-      if (solana.on) {
-        solana.on('connect', (publicKey) => {
-          if (window.__phConnectTimer) { clearTimeout(window.__phConnectTimer); window.__phConnectTimer = null; }
-          const addr = publicKey.toString();
-          setWallet(addr);
-          setPhase('connected');
-          setSdkInfo('');
-          if (typeof ph?.hide === 'function') ph.hide();
-          const { id, email, walletAddress: existing } = uRef.current;
-          fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ id, email, walletAddress: addr }) }).catch(()=>{});
-          if (!existing) {
-            fetch('/api/airdrop', { method:'POST', headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({ address: addr, userId: id }) }).catch(()=>{});
-          }
-          loadBalances(addr);
-        });
-        solana.on('disconnect', () => {
-          setPhase('ready'); setWallet(''); setSBal(null); setWBal(null);
-        });
-      }
-
-      // Restore existing session if already connected
-      if (solana.isConnected && solana.publicKey) {
-        const addr = solana.publicKey.toString();
-        setWallet(addr);
-        setPhase('connected');
-        setSdkInfo('');
-        loadBalances(addr);
-        return;
-      }
-
-      setPhase('ready');
-    };
-
-    init().catch(e => {
-      console.warn('[Phantom init]', e);
-      setSdkInfo('Init error: ' + e.message);
-      setPhase('ready');
-    });
+    if (u.walletAddress) { loadBalances(u.walletAddress); return; }
+    // First visit — ask server to derive and store a wallet for this user
+    setCreating(true);
+    fetch(`/api/wallet?userId=${encodeURIComponent(u.id)}`)
+      .then(r => r.json())
+      .then(d => { if (d.address) { setWallet(d.address); loadBalances(d.address); }
+                   else setMsg(d.error || 'Could not create wallet'); })
+      .catch(e => setMsg('Network error: ' + e.message))
+      .finally(() => setCreating(false));
   }, []);
 
   // React to walletAddress arriving from DB load after mount
   useEffect(() => {
-    if (u.walletAddress && phase !== 'connected') {
-      setWallet(u.walletAddress);
-      setPhase('connected');
-      loadBalances(u.walletAddress);
-    }
+    if (u.walletAddress && !wallet) { setWallet(u.walletAddress); loadBalances(u.walletAddress); }
   }, [u.walletAddress]);
 
   // ── Balance fetch ──────────────────────────────────────────────────────────
   const loadBalances = async (addr) => {
     try {
-      if (!window.__web3) { if (window.__sdkPromise) await window.__sdkPromise; else return; }
+      if (!window.__web3) {
+        if (window.__solanaReady) await window.__solanaReady;
+        if (!window.__web3) return;
+      }
       const { Connection, PublicKey } = window.__web3;
       const conn = new Connection(RPC, 'confirmed');
       const pk   = new PublicKey(addr);
@@ -1296,66 +1195,20 @@ function WalletTab({ u, C }) {
     } catch(e) { console.warn('[balances]', e.message); }
   };
 
-  // ── Connect ─────────────────────────────────────────────────────────────────
-  // With @phantom/wallet-sdk embedded mode, ph.show() opens the in-page wallet
-  // UI (an iframe). The user then clicks "Sign in with Google" inside that UI.
-  // Success is signalled by ph.solana.on('connect', ...) — not by a Promise.
-  const connect = () => {
-    const ph     = window.__phantomInstance;
-    const solana = window.__phantomSolana;
-
-    if (!solana) { setMsg('Wallet not ready — please refresh and try again.'); return; }
-
-    setPhase('connecting'); setMsg('');
-
-    const timer = setTimeout(() => {
-      setPhase(p => p === 'connecting' ? 'ready' : p);
-      setMsg(m => !m ? 'Sign-in closed or timed out. Tap the button to try again.' : m);
-    }, 120000);
-    window.__phConnectTimer = timer;
-
-    // ph.show() opens the embedded in-page sign-in UI (preferred)
-    if (typeof ph?.show === 'function') {
-      ph.show();
-    }
-
-    // solana.connect() triggers auth — works whether the SDK uses show() or a direct flow
-    solana.connect({ onlyIfTrusted: false }).catch(e => {
-      clearTimeout(timer);
-      window.__phConnectTimer = null;
-      setPhase('ready');
-      const m = e?.message || '';
-      setMsg(m.includes('cancel') || m.includes('reject') || e?.code === 4001
-        ? 'Sign-in cancelled.' : (m || 'Sign-in failed. Please try again.'));
-    });
-  };
-
-  // ── Send WISH coins ────────────────────────────────────────────────────────
+  // ── Send WISH coins (server-side signing) ──────────────────────────────────
   const send = async () => {
     if (busy || !wallet || !sendTo.trim() || !sendAmt || !mintReady) return;
     setBusy(true); setMsg('');
     try {
-      if (!window.__web3) await window.__sdkPromise;
-      const { Connection, PublicKey, Transaction } = window.__web3;
-      const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = window.__spl;
-      const ph      = window.__phantomInstance;
-      const conn    = new Connection(RPC, 'confirmed');
-      const mintPk  = new PublicKey(WISH_MINT);
-      const fromPk  = new PublicKey(wallet);
-      const toPk    = new PublicKey(sendTo.trim());
-      const fromAta = await getAssociatedTokenAddress(mintPk, fromPk);
-      const toAta   = await getAssociatedTokenAddress(mintPk, toPk);
-      const tx      = new Transaction();
-      if (!(await conn.getAccountInfo(toAta))) {
-        tx.add(createAssociatedTokenAccountInstruction(fromPk, toAta, toPk, mintPk));
-      }
-      tx.add(createTransferInstruction(fromAta, toAta, fromPk,
-        BigInt(Math.round(parseFloat(sendAmt) * 10 ** WISH_DEC))));
-      const solana = window.__phantomSolana || ph?.solana;
-      const sig = await solana.sendTransaction(tx, conn);
-      setMsg('✅ Sent!  Tx: ' + sig.slice(0,24) + '…');
-      setSendTo(''); setSendAmt('');
-      setScreen('main');
+      const r = await fetch('/api/wallet/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id, toAddress: sendTo.trim(), amount: sendAmt }),
+      });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      setMsg('✅ Sent!  Tx: ' + (d.signature||'').slice(0,24) + '…');
+      setSendTo(''); setSendAmt(''); setScreen('main');
       loadBalances(wallet);
     } catch(e) { setMsg('❌ ' + (e.message || 'Send failed')); }
     finally    { setBusy(false); }
@@ -1378,22 +1231,13 @@ function WalletTab({ u, C }) {
 
   // ── Screens ───────────────────────────────────────────────────────────────
 
-
-  // Not connected
-  if (phase !== 'connected') return (
-    <div style={{padding:'50px 24px',textAlign:'center',animation:'up .3s ease'}}>
-      <div style={{fontSize:60,marginBottom:16}}>👛</div>
-      <div style={{fontSize:22,fontWeight:800,color:C.white,marginBottom:8}}>Wish Wallet</div>
-      <div style={{fontSize:13,color:C.muted,marginBottom:36,lineHeight:1.7}}>
-        Create your free Solana wallet.<br/>Sign in with Google — no app or extension needed.
-      </div>
-      <button onClick={connect} disabled={phase==='connecting'}
-        style={{...pBtn('#4285F4',false),display:'inline-flex',alignItems:'center',
-          justifyContent:'center',gap:10,maxWidth:260}}>
-        {phase==='connecting' ? '⏳  Opening sign-in…' : '🔑  Sign in with Google'}
-      </button>
-      {msg && <div style={{color:'#f87171',fontSize:12,marginTop:16,lineHeight:1.5}}>{msg}</div>}
-      {sdkInfo && <div style={{color:C.muted,fontSize:10,marginTop:12,wordBreak:'break-all'}}>{sdkInfo}</div>}
+  // Wallet not yet loaded
+  if (!wallet) return (
+    <div style={{padding:'60px 24px',textAlign:'center'}}>
+      <div style={{fontSize:48,marginBottom:16}}>👛</div>
+      {creating
+        ? <div style={{fontSize:14,color:C.muted}}>Creating your wallet…</div>
+        : <div style={{fontSize:13,color:'#f87171'}}>{msg || 'Could not load wallet. Refresh to try again.'}</div>}
     </div>
   );
 
