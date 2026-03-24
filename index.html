@@ -1134,7 +1134,7 @@ function AdminPanel({user,onExit,lang}){
    WALLET TAB  —  server-side custodial wallet
    (no browser wallet extension or SDK needed)
 ═══════════════════════════════════════════════ */
-function WalletTab({ u, C }) {
+function WalletTab({ u, C, setU }) {
   const [wallet,    setWallet]    = useState(u.walletAddress || '');
   const [wishBal,   setWBal]      = useState(u.tokens ?? 0);
   const [solBal,    setSBal]      = useState(null);
@@ -1201,6 +1201,7 @@ function WalletTab({ u, C }) {
       if (d.error) throw new Error(d.error);
       // Update local balance immediately without waiting for a reload
       setWBal(d.newBalance);
+      setU(p => ({ ...p, tokens: d.newBalance }));
       setMsg('✅ Sent successfully!');
       setSendTo(''); setSendAmt('');
       loadTx();
@@ -1979,7 +1980,7 @@ function MainApp({user,onLogout,lang,setLang}){
       </div>
     ),
     wallet:(
-      <WalletTab u={u} C={C} />
+      <WalletTab u={u} C={C} setU={setU} />
     ),
     convert:(()=>{
       const tokens=u.tokens??0;
