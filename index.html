@@ -1136,7 +1136,7 @@ function AdminPanel({user,onExit,lang}){
 ═══════════════════════════════════════════════ */
 function WalletTab({ u, C }) {
   const [wallet,    setWallet]    = useState(u.walletAddress || '');
-  const [wishBal,   setWBal]      = useState(null);
+  const [wishBal,   setWBal]      = useState(u.tokens ?? 0);
   const [solBal,    setSBal]      = useState(null);
   const [mintCfg,   setMintCfg]   = useState(false);
   const [screen,    setScreen]    = useState('main');
@@ -1164,13 +1164,24 @@ function WalletTab({ u, C }) {
     if (u.walletAddress && !wallet) { setWallet(u.walletAddress); loadBalances(u.walletAddress); }
   }, [u.walletAddress]);
 
+  // Keep WISH balance in sync with in-app tokens when mint not on-chain yet
+  useEffect(() => {
+    if (!mintCfg) setWBal(u.tokens ?? 0);
+  }, [u.tokens, mintCfg]);
+
   // ── Balance fetch (server-side — avoids CORS on public Solana RPC) ─────────
   const loadBalances = async (addr) => {
     setBalLoad(true);
     try {
       const r = await fetch(`/api/walletBalance?address=${encodeURIComponent(addr)}`);
       const d = await r.json();
-      if (!d.error) { setSBal(d.sol); setWBal(d.wish); setMintCfg(!!d.mintConfigured); }
+      if (!d.error) {
+        setSBal(d.sol);
+        // Use on-chain balance only when WISH_COIN_MINT is configured;
+        // otherwise show the in-app token balance stored in the DB.
+        setMintCfg(!!d.mintConfigured);
+        setWBal(d.mintConfigured ? d.wish : (u.tokens ?? 0));
+      }
     } catch(e) { console.warn('[balances]', e.message); }
     finally { setBalLoad(false); }
   };
