@@ -1147,9 +1147,11 @@ function WalletTab({ u, C }) {
   const [copied,    setCopied]    = useState(false);
   const [creating,  setCreating]  = useState(false);
   const [balLoading,setBalLoad]   = useState(false);
+  const [txHistory,  setTxHistory] = useState([]);
 
   // ── Auto-create or restore wallet on mount ─────────────────────────────────
   useEffect(() => {
+    loadTx();
     if (u.walletAddress) { loadBalances(u.walletAddress); return; }
     setCreating(true);
     fetch(`/api/wallet?userId=${encodeURIComponent(u.id)}`)
@@ -1201,9 +1203,17 @@ function WalletTab({ u, C }) {
       setWBal(d.newBalance);
       setMsg('✅ Sent successfully!');
       setSendTo(''); setSendAmt('');
+      loadTx();
       setTimeout(() => { setMsg(''); setScreen('main'); }, 1800);
     } catch(e) { setMsg('❌ ' + (e.message || 'Send failed')); }
     finally    { setBusy(false); }
+  };
+
+  const loadTx = () => {
+    fetch(`/api/walletTx?userId=${encodeURIComponent(u.id)}`)
+      .then(r => r.json())
+      .then(d => { if (d.txs) setTxHistory(d.txs); })
+      .catch(() => {});
   };
 
   const copyAddr = async () => {
@@ -1388,6 +1398,40 @@ function WalletTab({ u, C }) {
           style={{padding:'8px 14px',background:copied?'rgba(52,211,153,.12)':'rgba(255,255,255,.06)',border:`1px solid ${copied?'rgba(52,211,153,.35)':'rgba(255,255,255,.1)'}`,borderRadius:10,color:copied?'#34d399':'rgba(255,255,255,.45)',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .2s'}}>
           {copied ? '✓ Copied' : '📋 Copy'}
         </button>
+      </div>
+
+      {/* Transaction history */}
+      <div style={{margin:'18px 16px 0'}}>
+        <div style={{fontSize:12,color:'rgba(255,255,255,.3)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:10}}>Transaction History</div>
+        {txHistory.length === 0
+          ? <div style={{textAlign:'center',padding:'24px 0',color:'rgba(255,255,255,.2)',fontSize:13}}>No transactions yet</div>
+          : txHistory.map(tx => {
+              const isSent = tx.type === 'sent';
+              const addr   = tx.address || '';
+              const short  = addr.length > 10 ? addr.slice(0,5)+'…'+addr.slice(-5) : addr || '—';
+              const date   = new Date(tx.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+              return (
+                <div key={tx.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',borderRadius:14,marginBottom:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:'50%',background:isSent?'rgba(248,113,113,.15)':'rgba(52,211,153,.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>
+                      {isSent ? '📤' : '📥'}
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:C.white}}>{isSent ? 'Sent' : 'Received'}</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{isSent ? 'To: ' : 'From: '}{short}</div>
+                      <div style={{fontSize:10,color:'rgba(255,255,255,.2)',marginTop:1}}>{date}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:15,fontWeight:800,color:isSent?'#f87171':'#34d399'}}>
+                      {isSent ? '−' : '+'}{tx.amount}
+                    </div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,.25)',marginTop:2}}>WISH</div>
+                  </div>
+                </div>
+              );
+            })
+        }
       </div>
     </div>
   );

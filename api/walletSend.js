@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     // ── Fetch sender ───────────────────────────────────────────────────────────
     const { data: sender, error: sErr } = await supabase
       .from('users')
-      .select('id, tokens')
+      .select('id, tokens, walletAddress')
       .eq('id', userId)
       .maybeSingle();
     if (sErr) throw sErr;
@@ -73,10 +73,18 @@ export default async function handler(req, res) {
       throw creditErr;
     }
 
+    // ── Record transaction ─────────────────────────────────────────────────────
+    await supabase.from('transactions').insert({
+      fromUserId:  sender.id,
+      toUserId:    recipient.id,
+      fromAddress: sender.walletAddress || null,
+      toAddress:   toAddress.trim(),
+      amount:      qty,
+    });
+
     return res.status(200).json({
       success: true,
       newBalance: senderBal - qty,
-      signature: `inapp_${Date.now()}`,  // placeholder — replace with tx hash when on-chain
     });
   } catch (e) {
     console.error('[/api/walletSend]', e.message);

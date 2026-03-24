@@ -42,6 +42,10 @@
       "dest": "/api/walletSend.js"
     },
     {
+      "src": "/api/walletTx",
+      "dest": "/api/walletTx.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
