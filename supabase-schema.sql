@@ -29,7 +29,9 @@ CREATE TABLE users (
   "refCode"       text    DEFAULT NULL,  -- user's unique referral code (derived from name+id)
   "refBy"         text    DEFAULT NULL,  -- referral code of the user who referred them
   "refPts"        integer DEFAULT 0,     -- total pts earned from referrals
-  refs            jsonb   DEFAULT '[]'   -- referred users [{name, joined, pts}]
+  refs            jsonb   DEFAULT '[]',  -- referred users [{name, joined, pts}]
+  "walletAddress" text    DEFAULT NULL,  -- Solana wallet (set on first Phantom connect)
+  "airdropDone"   boolean DEFAULT false  -- true once 0.01 SOL airdrop has been sent
 );
 
 -- Migration SQL (run against existing DB instead of DROP/CREATE):
@@ -43,3 +45,5 @@ CREATE TABLE users (
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS "refBy"         text    DEFAULT NULL;
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS "refPts"        integer DEFAULT 0;
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS refs            jsonb   DEFAULT '[]';
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "walletAddress" text    DEFAULT NULL;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "airdropDone"   boolean DEFAULT false;

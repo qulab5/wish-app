@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
+    "@solana/spl-token": "^0.4.8",
+    "@solana/web3.js": "^1.95.5",
     "@supabase/supabase-js": "^2.0.0",
     "resend": "^2.0.0"
   }
