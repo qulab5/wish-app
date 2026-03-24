@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     // ── Fetch sender ───────────────────────────────────────────────────────────
     const { data: sender, error: sErr } = await supabase
       .from('users')
-      .select('id, tokens, "walletAddress"')
+      .select('id, tokens')
       .eq('id', userId)
       .maybeSingle();
     if (sErr) throw sErr;
