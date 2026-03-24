@@ -1152,7 +1152,7 @@ function WalletTab({ u, C }) {
   const RPC        = 'https://api.mainnet-beta.solana.com';
   const mintReady  = WISH_MINT.length > 0;
 
-  const [phase,   setPhase]  = useState('init');   // init | ready | connecting | connected
+  const [phase,   setPhase]  = useState(u.walletAddress ? 'connected' : 'ready');
   const [wallet,  setWallet] = useState(u.walletAddress || '');
   const [wishBal, setWBal]   = useState(null);
   const [solBal,  setSBal]   = useState(null);
@@ -1170,16 +1170,9 @@ function WalletTab({ u, C }) {
   // ── SDK init ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      // If DB already has a wallet address, restore immediately
-      if (u.walletAddress) {
-        setWallet(u.walletAddress);
-        setPhase('connected');
-        loadBalances(u.walletAddress);
-        return;
-      }
-
-      if (!window.__sdkPromise) { setPhase('ready'); return; }
-      await window.__sdkPromise;
+      // SDK loading races against a 10s timeout so a stalled CDN never freezes the UI
+      const sdkTimeout = new Promise(r => setTimeout(r, 10000));
+      if (window.__sdkPromise) await Promise.race([window.__sdkPromise, sdkTimeout]);
 
       const mod = window.__PhantomModule;
       if (!mod) { setPhase('ready'); setSdkInfo('SDK module missing — check network'); return; }
@@ -1385,12 +1378,6 @@ function WalletTab({ u, C }) {
 
   // ── Screens ───────────────────────────────────────────────────────────────
 
-  // Init spinner
-  if (phase === 'init') return (
-    <div style={{padding:'60px 24px',textAlign:'center'}}>
-      <div style={{fontSize:13,color:C.muted}}>Loading wallet…</div>
-    </div>
-  );
 
   // Not connected
   if (phase !== 'connected') return (
