@@ -25,7 +25,11 @@ CREATE TABLE users (
   "mineStartedAt" bigint  DEFAULT NULL,  -- epoch ms when current session began; NULL = no active session
   "mineBoosts"    integer DEFAULT 0,     -- boosts applied in current session
   lang            text    DEFAULT 'en',  -- UI language preference
-  tokens          integer DEFAULT 0      -- Wish Tokens earned via conversion
+  tokens          integer DEFAULT 0,     -- Wish Tokens earned via conversion
+  "refCode"       text    DEFAULT NULL,  -- user's unique referral code (derived from name+id)
+  "refBy"         text    DEFAULT NULL,  -- referral code of the user who referred them
+  "refPts"        integer DEFAULT 0,     -- total pts earned from referrals
+  refs            jsonb   DEFAULT '[]'   -- referred users [{name, joined, pts}]
 );
 
 -- Migration SQL (run against existing DB instead of DROP/CREATE):
@@ -35,3 +39,7 @@ CREATE TABLE users (
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS "mineBoosts"    integer DEFAULT 0;
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS lang            text    DEFAULT 'en';
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens          integer DEFAULT 0;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "refCode"       text    DEFAULT NULL;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "refBy"         text    DEFAULT NULL;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS "refPts"        integer DEFAULT 0;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS refs            jsonb   DEFAULT '[]';

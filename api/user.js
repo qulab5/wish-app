@@ -7,14 +7,16 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    // ── GET /api/user?email=… ─────────────────────────────────
+    // ── GET /api/user?email=… or ?refCode=… ───────────────────
     if (req.method === 'GET') {
-      const { email } = req.query;
-      if (!email) return res.status(400).json({ error: 'email required' });
+      const { email, refCode } = req.query;
+      if (!email && !refCode) return res.status(400).json({ error: 'email or refCode required' });
+      const field = email ? 'email' : 'refCode';
+      const value = email || refCode;
       const { data, error } = await supabase
         .from('users')
         .select('*')
-        .eq('email', email)
+        .eq(field, value)
         .maybeSingle();
       if (error) throw error;
       return res.status(200).json({ user: data || null });

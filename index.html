@@ -199,7 +199,8 @@ const APP_NAME       = "Wish";
 const APP_TAGLINE    = "Earn & Reward Platform";
 const USD_PER_POINT  = 0.001;
 const PTS_PER_TOKEN  = 1000;   // 1000 pts = 1 Wish Token
-const REFERRAL_BONUS = 300;
+const REF_SIGNUP_BONUS = 2000;   // pts given to referrer on new sign-up
+const REF_MINE_PCT    = 0.10;   // referrer earns 10% of referred user's every mining claim
 const MINING_CYCLE   = 8 * 60 * 60;
 const SUN_CYCLE      = 4 * 60 * 60;
 const MINE_SESSION_S = 4 * 60 * 60;   // 4-hour mining session
@@ -681,7 +682,7 @@ body{background:#0d0b1e;}
 function AuthScreen({onLogin,lang}){
   const [mode,setMode]      = useState("welcome");
   const [method,setMethod]  = useState("email");
-  const [form,setForm]      = useState({name:"", email:"", phone:"", countryCode:"+1", pass:"", conf:""});
+  const [form,setForm]      = useState({name:"", email:"", phone:"", countryCode:"+1", pass:"", conf:"", refCode:""});
   const [errs,setErrs]      = useState({});
   const [loading,setLoading]= useState(false);
   const [users,setUsers]    = useState(INITIAL_USERS);
@@ -858,7 +859,7 @@ function AuthScreen({onLogin,lang}){
         // Persist new user to Supabase
         try{
           const saveRes=await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString()})});
+            body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString(),refCode:pendingUser.refCode||null,refBy:pendingUser.refBy||null,refPts:0,refs:[]})});
           if(!saveRes.ok){
             const e=await saveRes.json();
             console.error('Failed to save user:',e);
@@ -869,6 +870,20 @@ function AuthScreen({onLogin,lang}){
           console.error('Failed to save user:',e);
           setOtpErr('Account created but DB save failed. Check Vercel env vars (SUPABASE_URL, SUPABASE_SERVICE_KEY).');
           return;
+        }
+        // ── Award 2,000 pts signup bonus to the referrer ─────────────────
+        if(pendingUser.refBy){
+          try{
+            const rr=await fetch(`/api/user?refCode=${encodeURIComponent(pendingUser.refBy)}`);
+            const rd=await rr.json();
+            if(rd.user){
+              const ref=rd.user;
+              const joinedLabel=new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
+              const newRefs=[...(ref.refs||[]),{name:pendingUser.name,joined:joinedLabel,pts:0}];
+              await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({id:ref.id,email:ref.email,pts:(ref.pts||0)+REF_SIGNUP_BONUS,refPts:(ref.refPts||0)+REF_SIGNUP_BONUS,refs:newRefs})});
+            }
+          }catch(_){}
         }
         onLogin(pendingUser);
       } else {
@@ -937,7 +952,10 @@ function AuthScreen({onLogin,lang}){
         if(d.user){setLoading(false);setErrs({email:"Account already exists"});return;}
       }catch(e){}
       const fullPhone=form.countryCode+form.phone;
-      const nu={id:"u"+Date.now(),name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true};
+      const _uid="u"+Date.now();
+      const _rc=form.name.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+_uid.slice(-4);
+      const nu={id:_uid,name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true,
+        refCode:_rc,refBy:form.refCode.trim().toLowerCase()||null,refPts:0,refs:[]};
       setLoading(false);
       sendOtp(nu);
     }
@@ -1094,6 +1112,7 @@ function AuthScreen({onLogin,lang}){
         
         <Inp label={L("password")} type="password" val={form.pass} onChange={f("pass")} err={errs.pass} placeholder="••••••••" icon="🔒"/>
         {mode==="register"&&<Inp label="Confirm Password" type="password" val={form.conf} onChange={f("conf")} err={errs.conf} placeholder="••••••••" icon="🔑"/>}
+        {mode==="register"&&<Inp label="Referral Code (optional)" val={form.refCode} onChange={f("refCode")} placeholder="Enter a friend's referral code" icon="🔗"/>}
       </div>
 
       <Btn label={loading?"⏳ Please wait…":(mode==="login"?`🔓 ${L("signIn")}`:`🚀 ${L("signUp")}`)} onClick={submit} full variant="brand" disabled={loading} style={{marginTop:8,padding:16,fontSize:15,borderRadius:15}}/>
@@ -1146,6 +1165,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [profileMsg,setPMsg]  = useState("");
   const [sidebarOpen, setSO]  = useState(false);
   const [sidebarView, setSV]  = useState(null);
+  const [refCopied,  setRefCopied] = useState("");
   const [editingField, setEF] = useState(null);
   // Guard: auto-save must not fire until the initial DB load has finished.
   // Without this, the stale localStorage user (saved at login time) would be
@@ -1176,7 +1196,8 @@ function MainApp({user,onLogout,lang,setLang}){
         dbLoaded.current = true;
         if(!d.user) return;
         const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
-               spinNextFree:snf,extraSpins:es,lang:dbLang,tokens:dbTokens}=d.user;
+               spinNextFree:snf,extraSpins:es,lang:dbLang,tokens:dbTokens,
+               refCode:dbRefCode,refBy:dbRefBy,refPts:dbRefPts,refs:dbRefs}=d.user;
         // Restore language preference from DB (cross-device)
         if(dbLang){ setLang(dbLang); Security.save('lang',dbLang); }
         setU(p=>({...p,
@@ -1187,7 +1208,11 @@ function MainApp({user,onLogout,lang,setLang}){
           usd: Math.max(usd ?? 0, p.usd),
           tokens: Math.max(dbTokens ?? 0, p.tokens ?? 0),
           avatar:avatar||p.avatar,
-          name:name||p.name
+          name:name||p.name,
+          refCode: dbRefCode||p.refCode||null,
+          refBy:   dbRefBy  ||p.refBy  ||null,
+          refPts:  Math.max(dbRefPts??0, p.refPts??0),
+          refs:    dbRefs   ||p.refs   ||[],
         }));
         const today=new Date().toDateString();
         if(al!=null) setAL(adDate===today?al:5);
@@ -1238,11 +1263,12 @@ function MainApp({user,onLogout,lang,setLang}){
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
-          tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins})
+          tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins,
+          refCode:u.refCode||null,refPts:u.refPts??0,refs:u.refs??[]})
       }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[auto-save]',d);}).catch(e=>console.error('[auto-save]',e));
     },2000);
     return()=>clearTimeout(t);
-  },[u.pts,u.usd,u.name,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
+  },[u.pts,u.usd,u.name,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
@@ -1350,6 +1376,23 @@ function MainApp({user,onLogout,lang,setLang}){
       body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,tasksDone:cleanTD})
     }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[mine claim save]',d);})
       .catch(e=>console.error('[mine claim save]',e));
+    // ── Give referrer 10% of this mining claim ────────────────────────────
+    if(u.refBy){
+      const bonus=Math.floor(earned*REF_MINE_PCT);
+      if(bonus>0){
+        fetch(`/api/user?refCode=${encodeURIComponent(u.refBy)}`)
+          .then(r=>r.json())
+          .then(rd=>{
+            if(!rd.user)return;
+            const ref=rd.user;
+            const newRefPts=(ref.refPts||0)+bonus;
+            const newRefs=(ref.refs||[]).map(r=>r.name===u.name?{...r,pts:(r.pts||0)+bonus}:r);
+            fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({id:ref.id,email:ref.email,pts:(ref.pts||0)+bonus,refPts:newRefPts,refs:newRefs})
+            }).catch(()=>{});
+          }).catch(()=>{});
+      }
+    }
   };
   const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
 
@@ -2034,6 +2077,7 @@ function MainApp({user,onLogout,lang,setLang}){
                   if(item.label==="Profile"){setSO(false);setSV("profile");}
                   else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
                   else if(item.label==="Security"){setSO(false);setSV("security");}
+                  else if(item.label==="Referral Team"){setSO(false);setSV("referral");}
                   else setSO(false);
                 }}>
                   <span style={{fontSize:20}}>{item.icon}</span>
@@ -2307,6 +2351,111 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
         </div>
       )}
+      {/* ── Referral Panel ─────────────────────────────────────────── */}
+      {sidebarView==="referral"&&(()=>{
+        const refLink=`${window.location.origin}/ref/${u.refCode||""}`;
+        const copyCode=()=>{navigator.clipboard?.writeText(u.refCode||"").catch(()=>{});setRefCopied("code");setTimeout(()=>setRefCopied(""),2000);};
+        const copyLink=()=>{navigator.clipboard?.writeText(refLink).catch(()=>{});setRefCopied("link");setTimeout(()=>setRefCopied(""),2000);};
+        const shareLink=()=>{
+          if(navigator.share){navigator.share({title:`Join ${APP_NAME}`,text:`Join me on ${APP_NAME} and earn rewards! Use my code: ${u.refCode}`,url:refLink}).catch(()=>{});}
+          else{window.open(`https://wa.me/?text=${encodeURIComponent(`Join me on ${APP_NAME} and earn rewards!\nUse my referral code: *${u.refCode}*\n${refLink}`)}`,"_blank");}
+        };
+        const refs=u.refs||[];
+        const statCard=(icon,val,label,col)=>(
+          <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px 12px",textAlign:"center"}}>
+            <div style={{fontSize:26,marginBottom:4}}>{icon}</div>
+            <div style={{fontSize:22,fontWeight:800,color:col||C.brandLt}}>{val}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>{label}</div>
+          </div>
+        );
+        return(
+          <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+            {/* Header */}
+            <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+              <div style={{fontSize:18,fontWeight:800,color:C.white}}>Referral Program</div>
+            </div>
+            {/* Content */}
+            <div style={{flex:1,overflowY:"auto",padding:"16px 16px 40px"}}>
+              {/* Hero */}
+              <div style={{background:"linear-gradient(135deg,rgba(139,92,246,.18),rgba(236,72,153,.12))",border:"1px solid rgba(139,92,246,.3)",borderRadius:20,padding:"22px 20px 18px",marginBottom:14,textAlign:"center",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.15),transparent 70%)",top:-40,right:-40,pointerEvents:"none"}}/>
+                <div style={{fontSize:44,marginBottom:8}}>🔗</div>
+                <div style={{fontSize:20,fontWeight:800,color:C.white,marginBottom:8}}>Invite & Earn Together</div>
+                <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>
+                  <span style={{color:C.brandLt,fontWeight:700}}>+2,000 pts</span> when a friend signs up with your code<br/>
+                  <span style={{color:"#f59e0b",fontWeight:700}}>+10%</span> of their daily mining rewards — automatically, forever
+                </div>
+              </div>
+
+              {/* Your Referral Code */}
+              <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:12}}>
+                <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:10,fontWeight:600}}>Your Referral Code</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{flex:1,background:"rgba(139,92,246,.1)",border:"1px solid rgba(139,92,246,.35)",borderRadius:10,padding:"11px 14px",fontFamily:"monospace",fontSize:19,fontWeight:800,color:C.brandLt,letterSpacing:3}}>
+                    {u.refCode||"—"}
+                  </div>
+                  <button onClick={copyCode} style={{flexShrink:0,background:refCopied==="code"?"rgba(52,211,153,.2)":"rgba(139,92,246,.15)",border:`1px solid ${refCopied==="code"?"rgba(52,211,153,.5)":"rgba(139,92,246,.4)"}`,borderRadius:10,padding:"11px 16px",color:refCopied==="code"?"#34d399":C.brandLt,fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+                    {refCopied==="code"?"✓ Copied":"📋 Copy"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Referral Link */}
+              <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:14}}>
+                <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:10,fontWeight:600}}>Your Referral Link</div>
+                <div style={{background:"rgba(6,182,212,.07)",border:"1px solid rgba(6,182,212,.2)",borderRadius:10,padding:"10px 13px",fontSize:12,color:"#67e8f9",wordBreak:"break-all",marginBottom:10,lineHeight:1.5}}>
+                  {refLink}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={copyLink} style={{flex:1,background:refCopied==="link"?"rgba(52,211,153,.15)":"rgba(6,182,212,.1)",border:`1px solid ${refCopied==="link"?"rgba(52,211,153,.4)":"rgba(6,182,212,.3)"}`,borderRadius:10,padding:"10px 8px",color:refCopied==="link"?"#34d399":"#67e8f9",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+                    {refCopied==="link"?"✓ Copied":"📋 Copy Link"}
+                  </button>
+                  <button onClick={shareLink} style={{flex:1,background:"linear-gradient(135deg,rgba(139,92,246,.25),rgba(236,72,153,.2))",border:"1px solid rgba(139,92,246,.4)",borderRadius:10,padding:"10px 8px",color:C.white,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                    📤 Share
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                {statCard("👥",refs.length,"Total Referrals",C.brandLt)}
+                {statCard("⭐",(u.refPts||0).toLocaleString(),"Pts from Referrals","#f59e0b")}
+              </div>
+
+              {/* Team List */}
+              <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden"}}>
+                <div style={{padding:"14px 16px 10px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:C.white}}>Your Team</div>
+                  {refs.length>0&&<div style={{fontSize:12,color:C.muted}}>{refs.length} member{refs.length!==1?"s":""}</div>}
+                </div>
+                {refs.length===0?(
+                  <div style={{padding:"28px 20px",textAlign:"center"}}>
+                    <div style={{fontSize:32,marginBottom:10}}>👀</div>
+                    <div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>No referrals yet.<br/>Share your code and start earning!</div>
+                  </div>
+                ):(
+                  refs.map((r,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<refs.length-1?`1px solid ${C.border}`:"none"}}>
+                      <div style={{width:38,height:38,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,color:"#fff",flexShrink:0}}>
+                        {(r.name||"?")[0].toUpperCase()}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,color:C.white,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.name||"Unknown"}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Joined {r.joined||"—"}</div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>+{(r.pts||0).toLocaleString()}</div>
+                        <div style={{fontSize:10,color:C.muted}}>pts earned</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Spin Ad Popup — shown after free spin is consumed and no extra spins remain */}
       {spinAdPopup&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
