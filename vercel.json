@@ -38,6 +38,10 @@
       "dest": "/api/walletBalance.js"
     },
     {
+      "src": "/api/walletSend",
+      "dest": "/api/walletSend.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

@@ -1191,15 +1191,17 @@ function WalletTab({ u, C }) {
     if (busy || !wallet || !sendTo.trim() || !sendAmt) return;
     setBusy(true); setMsg('');
     try {
-      const r = await fetch('/api/wallet/send', {
+      const r = await fetch('/api/walletSend', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: u.id, toAddress: sendTo.trim(), amount: sendAmt }),
+        body: JSON.stringify({ userId: u.id, toAddress: sendTo.trim(), amount: Number(sendAmt) }),
       });
       const d = await r.json();
       if (d.error) throw new Error(d.error);
-      setMsg('✅ Sent! Tx: ' + (d.signature||'').slice(0,24) + '…');
-      setSendTo(''); setSendAmt(''); setScreen('main');
-      loadBalances(wallet);
+      // Update local balance immediately without waiting for a reload
+      setWBal(d.newBalance);
+      setMsg('✅ Sent successfully!');
+      setSendTo(''); setSendAmt('');
+      setTimeout(() => { setMsg(''); setScreen('main'); }, 1800);
     } catch(e) { setMsg('❌ ' + (e.message || 'Send failed')); }
     finally    { setBusy(false); }
   };
@@ -1236,17 +1238,16 @@ function WalletTab({ u, C }) {
       </div>
       <div style={{background:'linear-gradient(135deg,rgba(245,158,11,.12),rgba(249,115,22,.08))',border:'1px solid rgba(245,158,11,.25)',borderRadius:14,padding:'12px 16px',marginBottom:20,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
         <span style={{fontSize:12,color:'rgba(255,255,255,.45)'}}>Available balance</span>
-        <span style={{fontWeight:800,color:'#f59e0b',fontSize:18}}>{mintCfg?(wishBal??'…'):0} <span style={{fontSize:12,opacity:.6}}>WISH</span></span>
+        <span style={{fontWeight:800,color:'#f59e0b',fontSize:18}}>{wishBal??'…'} <span style={{fontSize:12,opacity:.6}}>WISH</span></span>
       </div>
       <input style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,padding:'14px 16px',color:C.white,fontSize:14,width:'100%',outline:'none',marginBottom:12,boxSizing:'border-box'}}
         placeholder="Recipient wallet address" value={sendTo} onChange={e=>setSendTo(e.target.value)}/>
       <input style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,padding:'14px 16px',color:C.white,fontSize:22,fontWeight:700,width:'100%',outline:'none',marginBottom:20,boxSizing:'border-box'}}
         type="number" min="0" placeholder="0" value={sendAmt} onChange={e=>setSendAmt(e.target.value)}/>
-      <button onClick={send} disabled={busy||!mintCfg||!sendTo||!sendAmt}
-        style={{width:'100%',padding:'16px 0',background:(!mintCfg||!sendTo||!sendAmt)?'rgba(255,255,255,.06)':'linear-gradient(135deg,#f59e0b,#f97316)',border:'none',borderRadius:14,color:(!mintCfg||!sendTo||!sendAmt)?'rgba(255,255,255,.25)':'#fff',fontWeight:800,fontSize:16,cursor:(!mintCfg||!sendTo||!sendAmt)?'not-allowed':'pointer',opacity:busy?.7:1}}>
+      <button onClick={send} disabled={busy||!sendTo||!sendAmt||Number(sendAmt)<=0}
+        style={{width:'100%',padding:'16px 0',background:(!sendTo||!sendAmt||Number(sendAmt)<=0)?'rgba(255,255,255,.06)':'linear-gradient(135deg,#f59e0b,#f97316)',border:'none',borderRadius:14,color:(!sendTo||!sendAmt||Number(sendAmt)<=0)?'rgba(255,255,255,.25)':'#fff',fontWeight:800,fontSize:16,cursor:(!sendTo||!sendAmt||Number(sendAmt)<=0)?'not-allowed':'pointer',opacity:busy?.7:1}}>
         {busy?'⏳ Sending…':'📤 Confirm Send'}
       </button>
-      {!mintCfg && <div style={{fontSize:11,color:'rgba(255,255,255,.25)',marginTop:10,textAlign:'center'}}>WISH token not configured yet</div>}
       {msg && <div style={{marginTop:14,background:msg.startsWith('✅')?'rgba(52,211,153,.08)':'rgba(248,113,113,.08)',border:`1px solid ${msg.startsWith('✅')?'rgba(52,211,153,.25)':'rgba(248,113,113,.25)'}`,borderRadius:12,padding:'10px 14px',color:msg.startsWith('✅')?'#34d399':'#f87171',fontSize:12,fontFamily:'monospace'}}>{msg}</div>}
     </div>
   );
