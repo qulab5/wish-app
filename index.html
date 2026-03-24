@@ -1304,6 +1304,11 @@ function MainApp({user,onLogout,lang,setLang}){
     const newEs=hasFree?extraSpins:extraSpins-1;
     if(hasFree) setSNF(newSnf);
     else        setES(newEs);
+    // Save spin consumption immediately so a refresh before the 4.2s animation
+    // completes doesn't restore the free spin from the DB.
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:u.id,email:u.email,spinNextFree:newSnf,extraSpins:newEs})
+    }).catch(()=>{});
     const i=Math.floor(Math.random()*SPIN_PTS.length);
     const targetOffset=(337.5-i*45+720)%360;
     const currentMod=spinAngle%360;
