@@ -284,7 +284,7 @@ const TR = {
        convHistory:"Total Tokens Earned",
        logout:"Logout", logoutQ:"Are you sure you want to logout?", yes:"Yes, Logout", cancel:"Cancel",
        profile:"My Profile", exchange:"Exchange", soon:"SOON", language:"Language",
-       totalPts:"Total Points", usdBal:"USD Balance", adsLeft:"Ads Left",
+       totalPts:"Total Points", usdBal:"Tokens", adsLeft:"Ads Left",
        spins:"Spins", season:"Season", watchAd:"Watch Ad & Earn",
        spinNow:"Spin Now", spinning:"Spinning…",
        miningTitle:"Mining Season", miningNext:"Next reward in",
@@ -310,7 +310,7 @@ const TR = {
        convHistory:"کل ٹوکن",
        logout:"لاگ آؤٹ", logoutQ:"کیا آپ لاگ آؤٹ کرنا چاہتے ہیں؟", yes:"ہاں", cancel:"منسوخ",
        profile:"میری پروفائل", exchange:"ایکسچینج", soon:"جلد", language:"زبان",
-       totalPts:"کل پوائنٹس", usdBal:"USD بیلنس", adsLeft:"باقی اشتہار",
+       totalPts:"کل پوائنٹس", usdBal:"ٹوکن", adsLeft:"باقی اشتہار",
        spins:"اسپن", season:"سیزن", watchAd:"اشتہار دیکھیں",
        spinNow:"اسپن کریں", spinning:"گھوم رہا ہے…",
        miningTitle:"مائننگ سیزن", miningNext:"اگلا انعام",
@@ -1421,7 +1421,7 @@ function MainApp({user,onLogout,lang,setLang}){
         </div>
         {/* Stats Grid */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:`$${u.usd.toFixed(2)}`,icon:"💵"},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡"}].map(s=>(
+          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:"🪙"},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡"}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
               <div style={{fontSize:22}}>{s.icon}</div>
               <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
