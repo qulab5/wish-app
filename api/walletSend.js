@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     const { data: recipient, error: rErr } = await supabase
       .from('users')
       .select('id, tokens')
-      .eq('"walletAddress"', toAddress.trim())
+      .eq('walletAddress', toAddress.trim())
       .maybeSingle();
     if (rErr) throw rErr;
     if (!recipient) {

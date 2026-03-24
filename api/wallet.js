@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     // Return existing wallet address if already stored
     const { data: user } = await supabase
       .from('users')
-      .select('"walletAddress"')
+      .select('walletAddress')
       .eq('id', userId)
       .maybeSingle();
 
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
 
     await supabase
       .from('users')
-      .update({ '"walletAddress"': address })
+      .update({ walletAddress: address })
       .eq('id', userId);
 
     // Trigger airdrop in background (fire-and-forget)
