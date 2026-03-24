@@ -1163,27 +1163,76 @@ function WalletTab({ u, C }) {
   const [busy,    setBusy]   = useState(false);
   const [copied,  setCopied] = useState(false);
 
-  // ── Pre-init Phantom on mount so connect() can fire synchronously on click ──
-  // CRITICAL: phantom.connect() must be called with NO await before it.
-  // Any await (even a resolved one) breaks the browser's popup allowance.
+  // Keep a ref so event-listener callbacks always see the latest u without re-registering
+  const uRef = useRef(u);
+  useEffect(() => { uRef.current = u; }, [u]);
+
+  // Inject CSS that hides Phantom's injected floating button once the user is connected.
+  // We leave it visible during the sign-in flow so the in-page overlay can render.
+  const suppressPhantomUI = () => {
+    if (document.getElementById('__ph_hide')) return;
+    const s = document.createElement('style');
+    s.id = '__ph_hide';
+    // These selectors cover how different versions of @phantom/wallet-sdk inject their element.
+    s.textContent = `
+      #phantom-app-root,
+      #phantom-wallet-sdk,
+      .phantom-wallet-adapter-button-trigger,
+      [id^="phantom"][style*="position: fixed"],
+      [class^="phantom"][style*="position: fixed"]
+      { display:none!important; }
+    `;
+    document.head.appendChild(s);
+  };
+
+  // ── SDK init: runs once on mount ───────────────────────────────────────────
+  // launchMode:'embedded'  ← THE FIX.  'popup' makes Phantom call window.open()
+  // which browsers silently block, causing ph.connect() to hang forever.
+  // 'embedded' uses an in-page iframe/overlay — no window.open(), no blocking.
   useEffect(() => {
     const init = async () => {
       if (!window.__sdkPromise) return;
-      await window.__sdkPromise;   // wait for esm.sh loads (only runs once at startup)
+      await window.__sdkPromise;
 
       if (!window.__phantomInstance) {
         window.__phantomInstance = window.__phantomCreate({
           appId: PHANTOM_ID,
-          launchMode: 'popup',    // 'popup' = no persistent Phantom widget on screen
+          launchMode: 'embedded',   // ← in-page overlay, never blocked
+          hideLaunchButton: true,   // hide Phantom's own floating button if SDK supports it
         });
       }
 
       const ph = window.__phantomInstance;
-      // Restore session if user already signed in previously
-      if (ph?.solana?.isConnected && ph.solana.publicKey) {
+
+      // PRIMARY connection signal — fires when user completes Google sign-in.
+      // With embedded mode the ph.connect() Promise may resolve before auth is done;
+      // the 'connect' event is the authoritative signal that the wallet is ready.
+      if (ph.solana?.on) {
+        ph.solana.on('connect', (publicKey) => {
+          const addr = publicKey.toString();
+          setWallet(addr);
+          setPhase('connected');
+          suppressPhantomUI();
+          const { id, email, walletAddress: existing } = uRef.current;
+          fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ id, email, walletAddress: addr }) }).catch(()=>{});
+          if (!existing) {
+            fetch('/api/airdrop', { method:'POST', headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ address: addr, userId: id }) }).catch(()=>{});
+          }
+          loadBalances(addr);
+        });
+        ph.solana.on('disconnect', () => {
+          setPhase('ready'); setWallet(''); setSBal(null); setWBal(null);
+        });
+      }
+
+      // Restore existing Phantom session (user already signed in earlier)
+      if (ph.solana?.isConnected && ph.solana.publicKey) {
         const addr = ph.solana.publicKey.toString();
         setWallet(addr);
         setPhase('connected');
+        suppressPhantomUI();
         loadBalances(addr);
         return;
       }
@@ -1191,7 +1240,7 @@ function WalletTab({ u, C }) {
       setPhase('ready');
     };
 
-    // Also restore from DB (may arrive before or after SDK init)
+    // Restore from DB immediately (arrives async during DB load in MainApp)
     if (u.walletAddress) {
       setWallet(u.walletAddress);
       setPhase('connected');
@@ -1201,11 +1250,11 @@ function WalletTab({ u, C }) {
     init().catch(e => {
       console.warn('[Phantom init]', e);
       setPhase('ready');
-      setMsg('Wallet SDK failed to load. Check your connection and reload.');
+      setMsg('Wallet SDK failed to load. Try refreshing the page.');
     });
   }, []);
 
-  // React when DB load provides walletAddress after mount
+  // React to walletAddress arriving from DB load after mount
   useEffect(() => {
     if (u.walletAddress && (phase === 'init' || phase === 'ready')) {
       setWallet(u.walletAddress);
@@ -1230,30 +1279,22 @@ function WalletTab({ u, C }) {
     } catch(e) { console.warn('[balances]', e.message); }
   };
 
-  // ── Connect — NO await before ph.connect() to avoid popup blocker ─────────
+  // ── Connect ─────────────────────────────────────────────────────────────────
+  // ph.connect() opens Phantom's in-page sign-in overlay (no popup, no blocking).
+  // We only use .catch() here — success is handled by the solana.on('connect') listener.
   const connect = () => {
     const ph = window.__phantomInstance;
-    if (!ph) { setMsg('SDK still loading — wait a moment then try again.'); return; }
+    if (!ph) { setMsg('Still loading — wait a moment and try again.'); return; }
 
     setPhase('connecting'); setMsg('');
 
-    ph.connect()            // ← called synchronously in click handler — popup allowed
-      .then(() => {
-        const addr = ph.solana.publicKey.toString();
-        setWallet(addr);
-        setPhase('connected');
-        fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ id:u.id, email:u.email, walletAddress:addr }) }).catch(()=>{});
-        if (!u.walletAddress) {
-          fetch('/api/airdrop', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ address:addr, userId:u.id }) }).catch(()=>{});
-        }
-        loadBalances(addr);
-      })
+    ph.connect()   // triggers Phantom's embedded sign-in overlay
       .catch(e => {
         console.error('[connect]', e);
         setPhase('ready');
-        setMsg(e.message?.includes('rejected') ? 'Sign-in cancelled.' : (e.message || 'Sign-in failed. Please try again.'));
+        setMsg(e?.code === 4001 || e?.message?.includes('reject')
+          ? 'Sign-in cancelled.'
+          : (e?.message || 'Sign-in failed. Please try again.'));
       });
   };
 
