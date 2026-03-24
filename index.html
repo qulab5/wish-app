@@ -11,11 +11,11 @@
 <!-- Phantom Embedded + Solana SDKs loaded as ES modules, exposed on window -->
 <script type="module">
   window.__sdkPromise = Promise.all([
-    import('https://esm.sh/@phantom/wallet-sdk'),
+    import('https://esm.sh/@phantom/browser-sdk'),
     import('https://esm.sh/@solana/spl-token'),
     import('https://esm.sh/@solana/web3.js@1.95.5'),
-  ]).then(([phantom, spl, web3]) => {
-    window.__phantomCreate = phantom.createPhantom;
+  ]).then(([phantomMod, spl, web3]) => {
+    window.__PhantomModule = phantomMod;
     window.__spl  = spl;
     window.__web3 = web3;
   }).catch(e => console.error('[Phantom SDK load error]', e));
@@ -1143,7 +1143,7 @@ function AdminPanel({user,onExit,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   WALLET TAB  —  Phantom Embedded + Solana
+   WALLET TAB  —  Phantom Browser SDK (embedded wallet)
 ═══════════════════════════════════════════════ */
 function WalletTab({ u, C }) {
   const WISH_MINT  = '';   // ← paste your Wish Coin mint address here after creating the token
@@ -1162,101 +1162,81 @@ function WalletTab({ u, C }) {
   const [msg,     setMsg]    = useState('');
   const [busy,    setBusy]   = useState(false);
   const [copied,  setCopied] = useState(false);
+  const [sdkInfo, setSdkInfo]= useState('');  // visible debug line
 
-  // Keep a ref so event-listener callbacks always see the latest u without re-registering
   const uRef = useRef(u);
   useEffect(() => { uRef.current = u; }, [u]);
 
-  // Inject CSS that hides Phantom's injected floating button once the user is connected.
-  // We leave it visible during the sign-in flow so the in-page overlay can render.
-  const suppressPhantomUI = () => {
-    if (document.getElementById('__ph_hide')) return;
-    const s = document.createElement('style');
-    s.id = '__ph_hide';
-    // These selectors cover how different versions of @phantom/wallet-sdk inject their element.
-    s.textContent = `
-      #phantom-app-root,
-      #phantom-wallet-sdk,
-      .phantom-wallet-adapter-button-trigger,
-      [id^="phantom"][style*="position: fixed"],
-      [class^="phantom"][style*="position: fixed"]
-      { display:none!important; }
-    `;
-    document.head.appendChild(s);
-  };
-
-  // ── SDK init: runs once on mount ───────────────────────────────────────────
-  // launchMode:'embedded'  ← THE FIX.  'popup' makes Phantom call window.open()
-  // which browsers silently block, causing ph.connect() to hang forever.
-  // 'embedded' uses an in-page iframe/overlay — no window.open(), no blocking.
+  // ── SDK init ────────────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      if (!window.__sdkPromise) return;
-      await window.__sdkPromise;
-
-      if (!window.__phantomInstance) {
-        window.__phantomInstance = window.__phantomCreate({
-          appId: PHANTOM_ID,
-          launchMode: 'embedded',   // ← in-page overlay, never blocked
-          hideLaunchButton: true,   // hide Phantom's own floating button if SDK supports it
-        });
-      }
-
-      const ph = window.__phantomInstance;
-
-      // PRIMARY connection signal — fires when user completes Google sign-in.
-      // With embedded mode the ph.connect() Promise may resolve before auth is done;
-      // the 'connect' event is the authoritative signal that the wallet is ready.
-      if (ph.solana?.on) {
-        ph.solana.on('connect', (publicKey) => {
-          const addr = publicKey.toString();
-          setWallet(addr);
-          setPhase('connected');
-          suppressPhantomUI();
-          const { id, email, walletAddress: existing } = uRef.current;
-          fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ id, email, walletAddress: addr }) }).catch(()=>{});
-          if (!existing) {
-            fetch('/api/airdrop', { method:'POST', headers:{'Content-Type':'application/json'},
-              body: JSON.stringify({ address: addr, userId: id }) }).catch(()=>{});
-          }
-          loadBalances(addr);
-        });
-        ph.solana.on('disconnect', () => {
-          setPhase('ready'); setWallet(''); setSBal(null); setWBal(null);
-        });
-      }
-
-      // Restore existing Phantom session (user already signed in earlier)
-      if (ph.solana?.isConnected && ph.solana.publicKey) {
-        const addr = ph.solana.publicKey.toString();
-        setWallet(addr);
+      // If DB already has a wallet address, restore immediately
+      if (u.walletAddress) {
+        setWallet(u.walletAddress);
         setPhase('connected');
-        suppressPhantomUI();
-        loadBalances(addr);
+        loadBalances(u.walletAddress);
         return;
       }
+
+      if (!window.__sdkPromise) { setPhase('ready'); return; }
+      await window.__sdkPromise;
+
+      const mod = window.__PhantomModule;
+      if (!mod) { setPhase('ready'); setSdkInfo('SDK module missing'); return; }
+
+      // @phantom/browser-sdk exports BrowserSDK + AddressType as named exports
+      const BrowserSDK  = mod.BrowserSDK  || mod.default?.BrowserSDK;
+      const AddressType = mod.AddressType || mod.default?.AddressType;
+      setSdkInfo('BrowserSDK: ' + typeof BrowserSDK + (AddressType ? ', AddressType ok' : ', no AddressType'));
+
+      if (typeof BrowserSDK !== 'function') {
+        // SDK module loaded but class not found — show all exported keys for diagnosis
+        setSdkInfo('SDK keys: ' + Object.keys(mod).join(', '));
+        setPhase('ready');
+        return;
+      }
+
+      if (!window.__phantomInstance) {
+        try {
+          window.__phantomInstance = new BrowserSDK({
+            appId: PHANTOM_ID,
+            providers: ['google'],
+            addressTypes: AddressType ? [AddressType.solana] : ['solana'],
+          });
+        } catch(e) {
+          setSdkInfo('BrowserSDK() threw: ' + e.message);
+          setPhase('ready');
+          return;
+        }
+      }
+
+      const sdk = window.__phantomInstance;
+
+      // Auto-restore existing session (user already connected in a previous visit)
+      try {
+        const pk = sdk.solana?.publicKey || sdk.publicKey;
+        if (pk) {
+          const addr = pk.toString();
+          setWallet(addr);
+          setPhase('connected');
+          loadBalances(addr);
+          return;
+        }
+      } catch(_) {}
 
       setPhase('ready');
     };
 
-    // Restore from DB immediately (arrives async during DB load in MainApp)
-    if (u.walletAddress) {
-      setWallet(u.walletAddress);
-      setPhase('connected');
-      loadBalances(u.walletAddress);
-    }
-
     init().catch(e => {
       console.warn('[Phantom init]', e);
+      setSdkInfo('Init error: ' + e.message);
       setPhase('ready');
-      setMsg('Wallet SDK failed to load. Try refreshing the page.');
     });
   }, []);
 
   // React to walletAddress arriving from DB load after mount
   useEffect(() => {
-    if (u.walletAddress && (phase === 'init' || phase === 'ready')) {
+    if (u.walletAddress && phase !== 'connected') {
       setWallet(u.walletAddress);
       setPhase('connected');
       loadBalances(u.walletAddress);
@@ -1280,22 +1260,57 @@ function WalletTab({ u, C }) {
   };
 
   // ── Connect ─────────────────────────────────────────────────────────────────
-  // ph.connect() opens Phantom's in-page sign-in overlay (no popup, no blocking).
-  // We only use .catch() here — success is handled by the solana.on('connect') listener.
-  const connect = () => {
-    const ph = window.__phantomInstance;
-    if (!ph) { setMsg('Still loading — wait a moment and try again.'); return; }
+  // @phantom/browser-sdk: sdk.connect({ provider: 'google' }) triggers Google OAuth.
+  // Returns a Promise that resolves to { addresses: { solana: '...' } }
+  const connect = async () => {
+    const sdk = window.__phantomInstance;
+    if (!sdk) { setMsg('Wallet SDK not ready — please refresh and try again.'); return; }
 
     setPhase('connecting'); setMsg('');
 
-    ph.connect()   // triggers Phantom's embedded sign-in overlay
-      .catch(e => {
-        console.error('[connect]', e);
-        setPhase('ready');
-        setMsg(e?.code === 4001 || e?.message?.includes('reject')
+    // Safety valve — always recover the button after 60s
+    const timer = setTimeout(() => {
+      setPhase(p => p === 'connecting' ? 'ready' : p);
+      setMsg(m => !m ? 'Sign-in timed out. Please try again.' : m);
+    }, 60000);
+
+    try {
+      // This is the correct @phantom/browser-sdk API for embedded Google sign-in
+      const result = await sdk.connect({ provider: 'google' });
+
+      clearTimeout(timer);
+
+      // result.addresses.solana is the Solana wallet address (base58 string)
+      const addr = result?.addresses?.solana
+        || result?.address
+        || sdk.solana?.publicKey?.toString()
+        || sdk.publicKey?.toString();
+
+      if (!addr) throw new Error('Sign-in completed but no wallet address returned');
+
+      setWallet(addr);
+      setPhase('connected');
+      setSdkInfo('');
+
+      const { id, email, walletAddress: existing } = uRef.current;
+      fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ id, email, walletAddress: addr }) }).catch(()=>{});
+      if (!existing) {
+        fetch('/api/airdrop', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ address: addr, userId: id }) }).catch(()=>{});
+      }
+      loadBalances(addr);
+    } catch(e) {
+      clearTimeout(timer);
+      console.error('[connect]', e);
+      setPhase('ready');
+      const m = e?.message || '';
+      setMsg(
+        (m.includes('cancel') || m.includes('reject') || m.includes('denied') || e?.code === 4001)
           ? 'Sign-in cancelled.'
-          : (e?.message || 'Sign-in failed. Please try again.'));
-      });
+          : (m || 'Sign-in failed. Please try again.')
+      );
+    }
   };
 
   // ── Send WISH coins ────────────────────────────────────────────────────────
@@ -1306,7 +1321,7 @@ function WalletTab({ u, C }) {
       if (!window.__web3) await window.__sdkPromise;
       const { Connection, PublicKey, Transaction } = window.__web3;
       const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = window.__spl;
-      const ph      = window.__phantomInstance;
+      const sdk     = window.__phantomInstance;
       const conn    = new Connection(RPC, 'confirmed');
       const mintPk  = new PublicKey(WISH_MINT);
       const fromPk  = new PublicKey(wallet);
@@ -1319,7 +1334,8 @@ function WalletTab({ u, C }) {
       }
       tx.add(createTransferInstruction(fromAta, toAta, fromPk,
         BigInt(Math.round(parseFloat(sendAmt) * 10 ** WISH_DEC))));
-      const sig = await ph.solana.sendTransaction(tx, conn);
+      const solana  = sdk.solana || sdk;
+      const sig = await solana.sendTransaction(tx, conn);
       setMsg('✅ Sent!  Tx: ' + sig.slice(0,24) + '…');
       setSendTo(''); setSendAmt('');
       setScreen('main');
@@ -1366,6 +1382,7 @@ function WalletTab({ u, C }) {
         {phase==='connecting' ? '⏳  Opening sign-in…' : '🔑  Sign in with Google'}
       </button>
       {msg && <div style={{color:'#f87171',fontSize:12,marginTop:16,lineHeight:1.5}}>{msg}</div>}
+      {sdkInfo && <div style={{color:C.muted,fontSize:10,marginTop:12,wordBreak:'break-all'}}>{sdkInfo}</div>}
     </div>
   );
 
