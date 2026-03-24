@@ -1146,261 +1146,289 @@ function AdminPanel({user,onExit,lang}){
    WALLET TAB  —  Phantom Embedded + Solana
 ═══════════════════════════════════════════════ */
 function WalletTab({ u, C }) {
-  // ── Config ─────────────────────────────────────────────────────────────────
-  // After creating your Wish Coin token (instructions below), paste the mint
-  // address here and redeploy.  Everything is disabled until this is set.
-  const WISH_MINT  = '';   // ← e.g. 'Abc123...XYZ'
-  const WISH_DEC   = 9;    // decimals you chose when creating the token
+  const WISH_MINT  = '';   // ← paste your Wish Coin mint address here after creating the token
+  const WISH_DEC   = 9;
   const PHANTOM_ID = '71f99e55-4da5-46a0-bbdf-1c37ee89be7c';
-  const RPC        = 'https://api.mainnet-beta.solana.com'; // swap for Helius/QuickNode in prod
+  const RPC        = 'https://api.mainnet-beta.solana.com';
   const mintReady  = WISH_MINT.length > 0;
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [phase,    setPhase]   = useState('idle');  // idle | loading | connected | error
-  const [wallet,   setWallet]  = useState(u.walletAddress || '');
-  const [solBal,   setSolBal]  = useState(null);
-  const [wishBal,  setWishBal] = useState(null);
-  const [sendTo,   setSendTo]  = useState('');
-  const [sendAmt,  setSendAmt] = useState('');
-  const [msg,      setMsg]     = useState('');
-  const [busy,     setBusy]    = useState(false);
+  const [phase,   setPhase]  = useState('init');   // init | ready | connecting | connected
+  const [wallet,  setWallet] = useState(u.walletAddress || '');
+  const [wishBal, setWBal]   = useState(null);
+  const [solBal,  setSBal]   = useState(null);
+  const [screen,  setScreen] = useState('main');   // main | send | receive
+  const [sendTo,  setSendTo] = useState('');
+  const [sendAmt, setSendAmt]= useState('');
+  const [msg,     setMsg]    = useState('');
+  const [busy,    setBusy]   = useState(false);
+  const [copied,  setCopied] = useState(false);
 
-  // ── SDK helpers ────────────────────────────────────────────────────────────
-  const ensureSdks = async () => {
-    if (window.__web3) return;
-    if (!window.__sdkPromise) throw new Error('SDK scripts not found');
-    await window.__sdkPromise;
-  };
-
-  const getPhantom = async () => {
-    await ensureSdks();
-    if (!window.__phantomInstance) {
-      window.__phantomInstance = window.__phantomCreate({
-        appId: PHANTOM_ID,
-        launchMode: 'embedded',
-      });
-    }
-    return window.__phantomInstance;
-  };
-
-  // ── Fetch on-chain balances ────────────────────────────────────────────────
-  const loadBalances = async (addr) => {
-    try {
-      await ensureSdks();
-      const { Connection, PublicKey } = window.__web3;
-      const conn = new Connection(RPC, 'confirmed');
-      const pk   = new PublicKey(addr);
-
-      const lam = await conn.getBalance(pk);
-      setSolBal((lam / 1e9).toFixed(4));
-
-      if (mintReady) {
-        const mint  = new PublicKey(WISH_MINT);
-        const accts = await conn.getParsedTokenAccountsByOwner(pk, { mint });
-        const bal   = accts.value[0]?.account?.data?.parsed?.info?.tokenAmount?.uiAmount ?? 0;
-        setWishBal(bal);
-      }
-    } catch(e) { console.warn('[WalletTab balances]', e.message); }
-  };
-
-  // ── Connect with Google via Phantom Embedded ───────────────────────────────
-  const connect = async () => {
-    setPhase('loading'); setMsg('');
-    try {
-      const phantom = await getPhantom();
-      await phantom.connect();                     // opens Phantom's Google sign-in popup
-      const addr = phantom.solana.publicKey.toString();
-      setWallet(addr);
-      setPhase('connected');
-
-      // Persist wallet address to DB
-      fetch('/api/user', { method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ id: u.id, email: u.email, walletAddress: addr }),
-      }).catch(()=>{});
-
-      // One-time 0.01 SOL airdrop for brand-new wallets
-      if (!u.walletAddress) {
-        fetch('/api/airdrop', { method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ address: addr, userId: u.id }),
-        }).catch(()=>{});
-      }
-
-      await loadBalances(addr);
-    } catch(e) {
-      console.error('[WalletTab connect]', e);
-      setPhase('error');
-      setMsg(e.message || 'Connection failed. Please try again.');
-    }
-  };
-
-  // ── Mine: backend treasury → user wallet ──────────────────────────────────
-  const mine = async () => {
-    if (busy || !wallet) return;
-    setBusy(true); setMsg('');
-    try {
-      const r = await fetch('/api/mine', { method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ address: wallet, userId: u.id }),
-      });
-      const d = await r.json();
-      if (d.success) {
-        setMsg('⛏️ Mined!  Tx: ' + d.signature.slice(0, 24) + '…');
-        await loadBalances(wallet);
-      } else {
-        setMsg('❌ ' + (d.error || 'Mine failed'));
-      }
-    } catch(e) { setMsg('❌ ' + e.message); }
-    finally    { setBusy(false); }
-  };
-
-  // ── Send: on-chain SPL token transfer signed by user via Phantom ───────────
-  const send = async () => {
-    if (busy || !wallet || !sendTo.trim() || !sendAmt || !mintReady) return;
-    setBusy(true); setMsg('');
-    try {
-      await ensureSdks();
-      const { Connection, PublicKey, Transaction } = window.__web3;
-      const { getAssociatedTokenAddress,
-              createAssociatedTokenAccountInstruction,
-              createTransferInstruction } = window.__spl;
-
-      const phantom = await getPhantom();
-      const conn    = new Connection(RPC, 'confirmed');
-      const mintPk  = new PublicKey(WISH_MINT);
-      const fromPk  = new PublicKey(wallet);
-      const toPk    = new PublicKey(sendTo.trim());
-
-      const fromAta = await getAssociatedTokenAddress(mintPk, fromPk);
-      const toAta   = await getAssociatedTokenAddress(mintPk, toPk);
-
-      const tx = new Transaction();
-
-      // Create destination ATA if it doesn't exist yet
-      const toAcct = await conn.getAccountInfo(toAta);
-      if (!toAcct) {
-        tx.add(createAssociatedTokenAccountInstruction(fromPk, toAta, toPk, mintPk));
-      }
-
-      tx.add(createTransferInstruction(
-        fromAta, toAta, fromPk,
-        BigInt(Math.round(parseFloat(sendAmt) * (10 ** WISH_DEC))),
-      ));
-
-      const sig = await phantom.solana.sendTransaction(tx, conn);
-      setMsg('✅ Sent!  Tx: ' + sig.slice(0, 24) + '…');
-      setSendTo(''); setSendAmt('');
-      await loadBalances(wallet);
-    } catch(e) { setMsg('❌ ' + (e.message || 'Send failed')); }
-    finally    { setBusy(false); }
-  };
-
-  // Auto-restore connected state once DB load provides u.walletAddress
+  // ── Pre-init Phantom on mount so connect() can fire synchronously on click ──
+  // CRITICAL: phantom.connect() must be called with NO await before it.
+  // Any await (even a resolved one) breaks the browser's popup allowance.
   useEffect(() => {
-    if (u.walletAddress && phase === 'idle') {
-      setPhase('connected');
+    const init = async () => {
+      if (!window.__sdkPromise) return;
+      await window.__sdkPromise;   // wait for esm.sh loads (only runs once at startup)
+
+      if (!window.__phantomInstance) {
+        window.__phantomInstance = window.__phantomCreate({
+          appId: PHANTOM_ID,
+          launchMode: 'popup',    // 'popup' = no persistent Phantom widget on screen
+        });
+      }
+
+      const ph = window.__phantomInstance;
+      // Restore session if user already signed in previously
+      if (ph?.solana?.isConnected && ph.solana.publicKey) {
+        const addr = ph.solana.publicKey.toString();
+        setWallet(addr);
+        setPhase('connected');
+        loadBalances(addr);
+        return;
+      }
+
+      setPhase('ready');
+    };
+
+    // Also restore from DB (may arrive before or after SDK init)
+    if (u.walletAddress) {
       setWallet(u.walletAddress);
+      setPhase('connected');
+      loadBalances(u.walletAddress);
+    }
+
+    init().catch(e => {
+      console.warn('[Phantom init]', e);
+      setPhase('ready');
+      setMsg('Wallet SDK failed to load. Check your connection and reload.');
+    });
+  }, []);
+
+  // React when DB load provides walletAddress after mount
+  useEffect(() => {
+    if (u.walletAddress && (phase === 'init' || phase === 'ready')) {
+      setWallet(u.walletAddress);
+      setPhase('connected');
       loadBalances(u.walletAddress);
     }
   }, [u.walletAddress]);
 
-  // ── Shared styles ──────────────────────────────────────────────────────────
-  const card = { background: C.s2, borderRadius: 16, padding: 16,
-                 marginBottom: 14, border: `1px solid ${C.border}` };
-  const inp  = { background: C.s3, border: `1px solid ${C.border}`, borderRadius: 10,
-                 padding: '10px 12px', color: C.white, fontSize: 14, width: '100%',
-                 outline: 'none', marginBottom: 10 };
-  const btn  = (bg, disabled) => ({
-    background: disabled ? C.s3 : bg, border: 'none', borderRadius: 12,
-    padding: '12px 0', color: disabled ? C.muted : '#fff',
-    fontWeight: 700, fontSize: 14, cursor: (busy || disabled) ? 'not-allowed' : 'pointer',
-    opacity: busy ? 0.6 : 1, width: '100%',
-  });
+  // ── Balance fetch ──────────────────────────────────────────────────────────
+  const loadBalances = async (addr) => {
+    try {
+      if (!window.__web3) { if (window.__sdkPromise) await window.__sdkPromise; else return; }
+      const { Connection, PublicKey } = window.__web3;
+      const conn = new Connection(RPC, 'confirmed');
+      const pk   = new PublicKey(addr);
+      const lam  = await conn.getBalance(pk);
+      setSBal((lam / 1e9).toFixed(4));
+      if (mintReady) {
+        const accts = await conn.getParsedTokenAccountsByOwner(pk, { mint: new PublicKey(WISH_MINT) });
+        setWBal(accts.value[0]?.account?.data?.parsed?.info?.tokenAmount?.uiAmount ?? 0);
+      } else { setWBal(0); }
+    } catch(e) { console.warn('[balances]', e.message); }
+  };
 
-  // ── Unconnected screen ─────────────────────────────────────────────────────
-  if (phase !== 'connected') return (
-    <div style={{ padding:'50px 24px', textAlign:'center', animation:'up .3s ease' }}>
-      <div style={{ fontSize:62, marginBottom:16 }}>👛</div>
-      <div style={{ fontSize:22, fontWeight:800, color:C.white, marginBottom:8 }}>Wish Wallet</div>
-      <div style={{ fontSize:13, color:C.muted, marginBottom:36, lineHeight:1.7 }}>
-        Your Solana wallet — powered by Phantom.<br/>
-        Sign in with Google. No extension needed.
-      </div>
-      <button onClick={connect} disabled={phase==='loading'}
-        style={{ ...btn('#4285F4', false), display:'inline-flex', alignItems:'center',
-          justifyContent:'center', gap:10, maxWidth:264 }}>
-        {phase==='loading' ? '⏳  Connecting…' : '🔑  Sign in with Google'}
-      </button>
-      {msg && <div style={{ color:'#f87171', fontSize:12, marginTop:16, lineHeight:1.5 }}>{msg}</div>}
+  // ── Connect — NO await before ph.connect() to avoid popup blocker ─────────
+  const connect = () => {
+    const ph = window.__phantomInstance;
+    if (!ph) { setMsg('SDK still loading — wait a moment then try again.'); return; }
+
+    setPhase('connecting'); setMsg('');
+
+    ph.connect()            // ← called synchronously in click handler — popup allowed
+      .then(() => {
+        const addr = ph.solana.publicKey.toString();
+        setWallet(addr);
+        setPhase('connected');
+        fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ id:u.id, email:u.email, walletAddress:addr }) }).catch(()=>{});
+        if (!u.walletAddress) {
+          fetch('/api/airdrop', { method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ address:addr, userId:u.id }) }).catch(()=>{});
+        }
+        loadBalances(addr);
+      })
+      .catch(e => {
+        console.error('[connect]', e);
+        setPhase('ready');
+        setMsg(e.message?.includes('rejected') ? 'Sign-in cancelled.' : (e.message || 'Sign-in failed. Please try again.'));
+      });
+  };
+
+  // ── Send WISH coins ────────────────────────────────────────────────────────
+  const send = async () => {
+    if (busy || !wallet || !sendTo.trim() || !sendAmt || !mintReady) return;
+    setBusy(true); setMsg('');
+    try {
+      if (!window.__web3) await window.__sdkPromise;
+      const { Connection, PublicKey, Transaction } = window.__web3;
+      const { getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } = window.__spl;
+      const ph      = window.__phantomInstance;
+      const conn    = new Connection(RPC, 'confirmed');
+      const mintPk  = new PublicKey(WISH_MINT);
+      const fromPk  = new PublicKey(wallet);
+      const toPk    = new PublicKey(sendTo.trim());
+      const fromAta = await getAssociatedTokenAddress(mintPk, fromPk);
+      const toAta   = await getAssociatedTokenAddress(mintPk, toPk);
+      const tx      = new Transaction();
+      if (!(await conn.getAccountInfo(toAta))) {
+        tx.add(createAssociatedTokenAccountInstruction(fromPk, toAta, toPk, mintPk));
+      }
+      tx.add(createTransferInstruction(fromAta, toAta, fromPk,
+        BigInt(Math.round(parseFloat(sendAmt) * 10 ** WISH_DEC))));
+      const sig = await ph.solana.sendTransaction(tx, conn);
+      setMsg('✅ Sent!  Tx: ' + sig.slice(0,24) + '…');
+      setSendTo(''); setSendAmt('');
+      setScreen('main');
+      loadBalances(wallet);
+    } catch(e) { setMsg('❌ ' + (e.message || 'Send failed')); }
+    finally    { setBusy(false); }
+  };
+
+  const copyAddr = async () => {
+    try { await navigator.clipboard.writeText(wallet); } catch { /* ignore */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ── Shared micro-styles ────────────────────────────────────────────────────
+  const card = { background:C.s2, borderRadius:16, padding:16, marginBottom:14, border:`1px solid ${C.border}` };
+  const inp  = { background:C.s3, border:`1px solid ${C.border}`, borderRadius:10,
+                 padding:'10px 12px', color:C.white, fontSize:14, width:'100%', outline:'none', marginBottom:10 };
+  const pBtn = (bg, off) => ({ background: off?C.s3:bg, border:'none', borderRadius:12,
+                 padding:'13px 0', color:off?C.muted:'#fff', fontWeight:700, fontSize:14,
+                 cursor:off?'not-allowed':'pointer', width:'100%', opacity:busy?.65:1 });
+  const back = () => { setScreen('main'); setMsg(''); };
+
+  // ── Screens ───────────────────────────────────────────────────────────────
+
+  // Init spinner
+  if (phase === 'init') return (
+    <div style={{padding:'60px 24px',textAlign:'center'}}>
+      <div style={{fontSize:13,color:C.muted}}>Loading wallet…</div>
     </div>
   );
 
-  // ── Connected screen ───────────────────────────────────────────────────────
+  // Not connected
+  if (phase !== 'connected') return (
+    <div style={{padding:'50px 24px',textAlign:'center',animation:'up .3s ease'}}>
+      <div style={{fontSize:60,marginBottom:16}}>👛</div>
+      <div style={{fontSize:22,fontWeight:800,color:C.white,marginBottom:8}}>Wish Wallet</div>
+      <div style={{fontSize:13,color:C.muted,marginBottom:36,lineHeight:1.7}}>
+        Create your free Solana wallet.<br/>Sign in with Google — no app or extension needed.
+      </div>
+      <button onClick={connect} disabled={phase==='connecting'}
+        style={{...pBtn('#4285F4',false),display:'inline-flex',alignItems:'center',
+          justifyContent:'center',gap:10,maxWidth:260}}>
+        {phase==='connecting' ? '⏳  Opening sign-in…' : '🔑  Sign in with Google'}
+      </button>
+      {msg && <div style={{color:'#f87171',fontSize:12,marginTop:16,lineHeight:1.5}}>{msg}</div>}
+    </div>
+  );
+
+  // Send screen
+  if (screen === 'send') return (
+    <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
+        <button onClick={back} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',lineHeight:1}}>←</button>
+        <div style={{fontSize:16,fontWeight:700,color:C.white}}>Send Wish Coins</div>
+      </div>
+      <div style={card}>
+        <div style={{fontSize:12,color:C.muted,marginBottom:2}}>Available balance</div>
+        <div style={{fontSize:30,fontWeight:800,color:'#f59e0b',marginBottom:18}}>
+          {mintReady?(wishBal??'…'):0} <span style={{fontSize:14,color:C.muted}}>WISH</span>
+        </div>
+        <input style={inp} placeholder="Recipient wallet address" value={sendTo} onChange={e=>setSendTo(e.target.value)}/>
+        <input style={{...inp,marginBottom:16}} type="number" min="0" placeholder="Amount (WISH)" value={sendAmt} onChange={e=>setSendAmt(e.target.value)}/>
+        <button onClick={send} disabled={busy||!mintReady||!sendTo||!sendAmt}
+          style={pBtn('linear-gradient(135deg,#f59e0b,#d97706)', !mintReady||!sendTo||!sendAmt)}>
+          {busy?'⏳  Sending…':'Confirm Send'}
+        </button>
+        {!mintReady && <div style={{fontSize:11,color:C.muted,marginTop:8,textAlign:'center'}}>Token not configured yet</div>}
+      </div>
+      {msg && <div style={{background:C.s3,borderRadius:12,padding:'10px 14px',
+        color:msg.startsWith('✅')?'#34d399':'#f87171',fontSize:12,fontFamily:'monospace'}}>{msg}</div>}
+    </div>
+  );
+
+  // Receive screen
+  if (screen === 'receive') return (
+    <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
+        <button onClick={back} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',lineHeight:1}}>←</button>
+        <div style={{fontSize:16,fontWeight:700,color:C.white}}>Receive</div>
+      </div>
+      <div style={{...card,textAlign:'center'}}>
+        <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Send WISH or SOL to this address</div>
+        <img src={`https://api.qrserver.com/v1/create-qr-code/?data=${wallet}&size=180x180&bgcolor=1a1333&color=f59e0b&margin=10`}
+          alt="QR" style={{borderRadius:12,marginBottom:16,width:180,height:180}}/>
+        <div style={{fontSize:11,color:'#f59e0b',fontFamily:'monospace',wordBreak:'break-all',padding:'0 8px',marginBottom:16,lineHeight:1.6}}>
+          {wallet}
+        </div>
+        <button onClick={copyAddr}
+          style={pBtn(copied?'#34d399':'linear-gradient(135deg,#8b5cf6,#6d28d9)', false)}>
+          {copied ? '✓  Copied!' : '📋  Copy Address'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Main wallet screen
   return (
-    <div style={{ padding:'0 16px 32px', animation:'up .3s ease' }}>
+    <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
 
-      {/* ── Hero address card ── */}
-      <div style={{ background:'linear-gradient(135deg,#1a0a3e,#2d1060,#1a0a3e)',
-          borderRadius:22, padding:'22px 20px', marginBottom:16,
+      {/* Balance hero */}
+      <div style={{background:'linear-gradient(135deg,#1a0a3e,#2d1060,#1a0a3e)',
+          borderRadius:22,padding:'24px 20px',marginBottom:16,
           border:'1px solid rgba(245,158,11,.25)',
-          boxShadow:'0 8px 32px rgba(245,158,11,.1)' }}>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,.45)', letterSpacing:1.2,
-            textTransform:'uppercase', marginBottom:6 }}>Your Solana Wallet</div>
-        <div style={{ fontSize:11, color:'#f59e0b', fontFamily:'monospace',
-            wordBreak:'break-all', marginBottom:18 }}>{wallet}</div>
-        <div style={{ display:'flex', gap:28 }}>
-          <div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,.45)', marginBottom:2 }}>SOL</div>
-            <div style={{ fontSize:26, fontWeight:800, color:C.white }}>{solBal ?? '…'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,.45)', marginBottom:2 }}>WISH</div>
-            <div style={{ fontSize:26, fontWeight:800, color:'#f59e0b' }}>
-              {mintReady ? (wishBal ?? '…') : '—'}
-            </div>
-          </div>
+          boxShadow:'0 8px 32px rgba(245,158,11,.1)'}}>
+        <div style={{fontSize:11,color:'rgba(255,255,255,.45)',letterSpacing:1.2,textTransform:'uppercase',marginBottom:4}}>
+          Wish Coin Balance
         </div>
-        <button onClick={()=>loadBalances(wallet)} disabled={busy}
-          style={{ marginTop:14, background:'rgba(255,255,255,.08)',
-            border:'1px solid rgba(255,255,255,.15)', borderRadius:8,
-            padding:'5px 12px', color:'rgba(255,255,255,.65)',
-            fontSize:12, cursor:'pointer' }}>↻  Refresh</button>
+        <div style={{fontSize:44,fontWeight:900,color:'#f59e0b',letterSpacing:-1,marginBottom:4,lineHeight:1.1}}>
+          {mintReady?(wishBal??'…'):'—'}
+        </div>
+        <div style={{fontSize:13,color:'rgba(255,255,255,.4)',marginBottom:22}}>
+          WISH&nbsp;&nbsp;·&nbsp;&nbsp;{solBal??'…'} SOL
+        </div>
+
+        {/* Send / Receive buttons */}
+        <div style={{display:'flex',gap:12}}>
+          <button onClick={()=>{setScreen('send');setMsg('');}}
+            style={{flex:1,background:'rgba(245,158,11,.18)',border:'1px solid rgba(245,158,11,.35)',
+              borderRadius:12,padding:'12px 0',color:'#f59e0b',fontWeight:700,fontSize:14,cursor:'pointer'}}>
+            📤  Send
+          </button>
+          <button onClick={()=>setScreen('receive')}
+            style={{flex:1,background:'rgba(139,92,246,.18)',border:'1px solid rgba(139,92,246,.35)',
+              borderRadius:12,padding:'12px 0',color:'#a78bfa',fontWeight:700,fontSize:14,cursor:'pointer'}}>
+            📥  Receive
+          </button>
+        </div>
       </div>
 
-      {/* ── Mine ── */}
-      <div style={card}>
-        <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:8 }}>⛏️  Mine Wish Coins</div>
-        <div style={{ fontSize:12, color:C.muted, marginBottom:12, lineHeight:1.5 }}>
-          Sends Wish Coins from the treasury directly to your wallet.
+      {/* Address row */}
+      <div style={{...card,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div>
+          <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Wallet Address</div>
+          <div style={{fontSize:12,color:C.white,fontFamily:'monospace'}}>
+            {wallet.slice(0,8)}…{wallet.slice(-8)}
+          </div>
         </div>
-        <button onClick={mine} disabled={busy || !mintReady}
-          style={btn('linear-gradient(135deg,#8b5cf6,#6d28d9)', !mintReady)}>
-          {busy ? '⏳  Mining…' : mintReady ? 'Mine Now' : 'Set WISH_MINT to enable'}
+        <button onClick={copyAddr} style={{background:'none',border:`1px solid ${C.border}`,
+          borderRadius:8,padding:'6px 12px',color:copied?'#34d399':C.muted,fontSize:12,cursor:'pointer'}}>
+          {copied?'✓':'📋 Copy'}
         </button>
       </div>
 
-      {/* ── Send ── */}
-      <div style={card}>
-        <div style={{ fontSize:14, fontWeight:700, color:C.white, marginBottom:12 }}>📤  Send Wish Coins</div>
-        <input style={inp} placeholder="Recipient Solana address"
-          value={sendTo} onChange={e=>setSendTo(e.target.value)} />
-        <input style={{ ...inp, marginBottom:12 }} type="number" min="0" placeholder="Amount (WISH)"
-          value={sendAmt} onChange={e=>setSendAmt(e.target.value)} />
-        <button onClick={send} disabled={busy || !mintReady || !sendTo || !sendAmt}
-          style={btn('linear-gradient(135deg,#f59e0b,#d97706)', !mintReady || !sendTo || !sendAmt)}>
-          {busy ? '⏳  Sending…' : mintReady ? 'Send' : 'Set WISH_MINT to enable'}
-        </button>
-      </div>
-
-      {/* ── TX / error feedback ── */}
-      {msg && (
-        <div style={{ background:C.s3, borderRadius:12, padding:'10px 14px', lineHeight:1.6,
-          color: msg.startsWith('✅')?'#34d399' : msg.startsWith('⛏️')?'#a78bfa' : '#f87171',
-          fontSize:12, fontFamily:'monospace' }}>
-          {msg}
-        </div>
-      )}
+      {/* Refresh */}
+      <button onClick={()=>loadBalances(wallet)} disabled={busy}
+        style={{width:'100%',background:'none',border:`1px solid ${C.border}`,
+          borderRadius:12,padding:'11px 0',color:C.muted,fontSize:13,cursor:'pointer'}}>
+        ↻  Refresh Balances
+      </button>
     </div>
   );
 }
