@@ -1145,7 +1145,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [spinning,setSpin]   = useState(false);
   const [spinResult,setSR]   = useState(null);
   const [spinAngle,setSA]    = useState(0);
-  const [spinNextFree,setSNF]= useState(0);   // epoch ms when next free spin is available
+  const [spinNextFree,setSNF]= useState(()=>Security.load('snf_'+user.id,0)||0); // epoch ms when next free spin is available
   const [extraSpins,setES]   = useState(0);   // additional spins earned by watching ads
   const [spinAdPopup,setSAP] = useState(false);
   const [mineStartedAt,setMSAt]= useState(0);        // epoch ms when session began (0 = no session)
@@ -1217,7 +1217,8 @@ function MainApp({user,onLogout,lang,setLang}){
         const today=new Date().toDateString();
         if(al!=null) setAL(adDate===today?al:5);
         if(sa!=null) setSA(sa);
-        if(snf!=null) setSNF(snf);
+        // Take max(DB, local) — prevents a stale DB 0 from overwriting a valid local cooldown.
+        setSNF(p=>Math.max(snf??0, p));
         if(es!=null)  setES(es);
         // ── Restore task state + mining session ──────────────────────────────
         // Mining session start time is stored as tasksDone.__mine_startedAt
@@ -1251,6 +1252,12 @@ function MainApp({user,onLogout,lang,setLang}){
     if(!dbLoaded.current) return;
     Security.save('last_user',{...u});
   },[u.pts,u.usd]);
+
+  // Persist spinNextFree to localStorage immediately on change so it survives
+  // a page refresh even if the DB save hasn't completed yet.
+  useEffect(()=>{
+    if(spinNextFree>0) Security.save('snf_'+u.id, spinNextFree);
+  },[spinNextFree]);
 
   // Auto-save progress (debounced 2s after last change).
   // avatar is intentionally excluded — it is saved explicitly after upload
