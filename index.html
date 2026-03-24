@@ -636,6 +636,13 @@ body{background:#0d0b1e;}
 @keyframes gold-pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.55)}70%{box-shadow:0 0 0 14px rgba(245,158,11,0)}}
 @keyframes conv-btn-shine{0%{background-position:200% center}100%{background-position:-200% center}}
 @keyframes coin-drop{0%{transform:translateY(-18px) scale(.7);opacity:0}60%{transform:translateY(4px) scale(1.1);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
+@keyframes nav-pop{0%{transform:scale(1) translateY(0)}45%{transform:scale(1.32) translateY(-5px)}100%{transform:scale(1.18) translateY(-3px)}}
+@keyframes nav-glow{0%,100%{filter:drop-shadow(0 0 0px currentColor)}50%{filter:drop-shadow(0 0 6px currentColor)}}
+@keyframes nav-spin-once{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes nav-pill-in{0%{transform:scaleX(0);opacity:0}100%{transform:scaleX(1);opacity:1}}
+.nav-ico-active{animation:nav-pop .38s cubic-bezier(.34,1.56,.64,1) forwards,nav-glow 2s ease infinite .38s}
+.nav-ico-convert-active{animation:nav-pop .38s cubic-bezier(.34,1.56,.64,1) forwards,nav-spin-once .6s ease .1s}
+.nav-pill{display:block;width:20px;height:3px;border-radius:2px;margin:3px auto 0;animation:nav-pill-in .3s cubic-bezier(.34,1.56,.64,1) forwards}
 .sec{animation:up .28s ease both;}
 .ptr{height:6px;background:rgba(139,92,246,.1);border-radius:99px;overflow:hidden;}
 .ptrf{height:100%;border-radius:99px;transition:width .6s ease;}
@@ -1863,12 +1870,38 @@ function MainApp({user,onLogout,lang,setLang}){
     ),
   };
 
+  const NAV_ICONS={
+    home:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('path',{d:"M3 12L12 4l9 8"}),
+      React.createElement('path',{d:"M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9",fill:a?"currentColor":"none",fillOpacity:a?.18:0})
+    ),
+    earn:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('circle',{cx:12,cy:12,r:9}),
+      React.createElement('polygon',{points:"10,8 17,12 10,16",fill:"currentColor",stroke:"none"}),
+      a&&React.createElement('circle',{cx:19,cy:5,r:3,fill:"#f59e0b",stroke:"none"})
+    ),
+    tasks:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('rect',{x:3,y:3,width:18,height:18,rx:3,fill:a?"currentColor":"none",fillOpacity:a?.12:0}),
+      React.createElement('path',{d:"M8 12l3 3 5-5"}),
+      React.createElement('path',{d:"M8 7h3M8 17h3"})
+    ),
+    convert:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('polyline',{points:"17 2 21 6 17 10"}),
+      React.createElement('path',{d:"M3 11V9a4 4 0 014-4h14"}),
+      React.createElement('polyline',{points:"7 22 3 18 7 14"}),
+      React.createElement('path',{d:"M21 13v2a4 4 0 01-4 4H3"})
+    ),
+    wallet:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('path',{d:"M20 7H6a2 2 0 000 4h14a2 2 0 012 2v5a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h12l2 2z",fill:a?"currentColor":"none",fillOpacity:a?.12:0}),
+      React.createElement('circle',{cx:16,cy:14,r:1.5,fill:"currentColor",stroke:"none"})
+    ),
+  };
   const NAV=[
-    {id:"home",icon:"🏠",label:L("home")},
-    {id:"earn",icon:"📺",label:L("earn")},
-    {id:"tasks",icon:"✅",label:L("tasks")},
-    {id:"convert",icon:"🔄",label:L("convert")},
-    {id:"wallet",icon:"💰",label:L("wallet")},
+    {id:"home",label:L("home")},
+    {id:"earn",label:L("earn")},
+    {id:"tasks",label:L("tasks")},
+    {id:"convert",label:L("convert")},
+    {id:"wallet",label:L("wallet")},
   ];
 
   return(
@@ -1906,13 +1939,20 @@ function MainApp({user,onLogout,lang,setLang}){
       {/* Content */}
       <div style={{flex:1,overflowY:"auto",paddingTop:16,paddingBottom:80}}>{TAB[tab]}</div>
       {/* Bottom Nav */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.s1,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:10}}>
-        {NAV.map(n=>(
-          <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",color:tab===n.id?C.brandLt:C.muted,cursor:"pointer",textAlign:"center"}}>
-            <div style={{fontSize:20}}>{n.icon}</div>
-            <div style={{fontSize:10,fontWeight:tab===n.id?700:400,marginTop:1}}>{n.label}</div>
-          </button>
-        ))}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.s1,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:10,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+        {NAV.map(n=>{
+          const active=tab===n.id;
+          const accentCol=n.id==="wallet"?"#f59e0b":n.id==="earn"?"#a78bfa":n.id==="convert"?"#34d399":C.brandLt;
+          return(
+            <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"10px 2px 6px",background:"none",border:"none",color:active?accentCol:C.muted,cursor:"pointer",textAlign:"center",transition:"color .2s"}}>
+              <div className={active?(n.id==="convert"?"nav-ico-convert-active":"nav-ico-active"):""} style={{display:"flex",justifyContent:"center",alignItems:"center",height:26}}>
+                {NAV_ICONS[n.id](active)}
+              </div>
+              <div style={{fontSize:9.5,fontWeight:active?700:400,marginTop:2,letterSpacing:active?.4:0,transition:"all .2s"}}>{n.label}</div>
+              {active&&<span className="nav-pill" style={{background:accentCol}}/>}
+            </button>
+          );
+        })}
       </div>
       {/* Global hidden file input — reused for camera & gallery from any screen */}
       <input ref={fileInputRef} type="file" accept="image/*" capture={picCapture?"user":undefined} style={{display:"none"}} onChange={e=>{
