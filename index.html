@@ -1562,11 +1562,6 @@ function MainApp({user,onLogout,lang,setLang}){
             </div>
           )}
         </div>
-        {/* Quick actions */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <button onClick={()=>setTab("earn")} style={{background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>📺 {L("watchAd")}</button>
-          <button onClick={()=>setTab("tasks")} style={{background:`linear-gradient(135deg,${C.cyan},${C.brand})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>✅ {L("tasks")}</button>
-        </div>
       </div>
     ),
     earn:(()=>{
