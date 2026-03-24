@@ -8,14 +8,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<!-- Solana SDKs for balance display (no wallet extension needed) -->
-<script type="module">
-  window.__solanaReady = Promise.all([
-    import('https://esm.sh/@solana/web3.js@1.95.5'),
-  ]).then(([web3]) => {
-    window.__web3 = web3;
-  }).catch(() => {});
-</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;background:#0d0b1e;font-family:'Plus Jakarta Sans',sans-serif;}
@@ -1143,25 +1135,22 @@ function AdminPanel({user,onExit,lang}){
    (no browser wallet extension or SDK needed)
 ═══════════════════════════════════════════════ */
 function WalletTab({ u, C }) {
-  const WISH_MINT  = '';   // ← paste your Wish Coin mint address here after creating the token
-  const RPC        = 'https://api.mainnet-beta.solana.com';
-  const mintReady  = WISH_MINT.length > 0;
-
-  const [wallet,  setWallet] = useState(u.walletAddress || '');
-  const [wishBal, setWBal]   = useState(null);
-  const [solBal,  setSBal]   = useState(null);
-  const [screen,  setScreen] = useState('main');   // main | send | receive
-  const [sendTo,  setSendTo] = useState('');
-  const [sendAmt, setSendAmt]= useState('');
-  const [msg,     setMsg]    = useState('');
-  const [busy,    setBusy]   = useState(false);
-  const [copied,  setCopied] = useState(false);
-  const [creating,setCreating]=useState(false);
+  const [wallet,    setWallet]    = useState(u.walletAddress || '');
+  const [wishBal,   setWBal]      = useState(null);
+  const [solBal,    setSBal]      = useState(null);
+  const [mintCfg,   setMintCfg]   = useState(false);
+  const [screen,    setScreen]    = useState('main');
+  const [sendTo,    setSendTo]    = useState('');
+  const [sendAmt,   setSendAmt]   = useState('');
+  const [msg,       setMsg]       = useState('');
+  const [busy,      setBusy]      = useState(false);
+  const [copied,    setCopied]    = useState(false);
+  const [creating,  setCreating]  = useState(false);
+  const [balLoading,setBalLoad]   = useState(false);
 
   // ── Auto-create or restore wallet on mount ─────────────────────────────────
   useEffect(() => {
     if (u.walletAddress) { loadBalances(u.walletAddress); return; }
-    // First visit — ask server to derive and store a wallet for this user
     setCreating(true);
     fetch(`/api/wallet?userId=${encodeURIComponent(u.id)}`)
       .then(r => r.json())
@@ -1171,43 +1160,33 @@ function WalletTab({ u, C }) {
       .finally(() => setCreating(false));
   }, []);
 
-  // React to walletAddress arriving from DB load after mount
   useEffect(() => {
     if (u.walletAddress && !wallet) { setWallet(u.walletAddress); loadBalances(u.walletAddress); }
   }, [u.walletAddress]);
 
-  // ── Balance fetch ──────────────────────────────────────────────────────────
+  // ── Balance fetch (server-side — avoids CORS on public Solana RPC) ─────────
   const loadBalances = async (addr) => {
+    setBalLoad(true);
     try {
-      if (!window.__web3) {
-        if (window.__solanaReady) await window.__solanaReady;
-        if (!window.__web3) return;
-      }
-      const { Connection, PublicKey } = window.__web3;
-      const conn = new Connection(RPC, 'confirmed');
-      const pk   = new PublicKey(addr);
-      const lam  = await conn.getBalance(pk);
-      setSBal((lam / 1e9).toFixed(4));
-      if (mintReady) {
-        const accts = await conn.getParsedTokenAccountsByOwner(pk, { mint: new PublicKey(WISH_MINT) });
-        setWBal(accts.value[0]?.account?.data?.parsed?.info?.tokenAmount?.uiAmount ?? 0);
-      } else { setWBal(0); }
+      const r = await fetch(`/api/walletBalance?address=${encodeURIComponent(addr)}`);
+      const d = await r.json();
+      if (!d.error) { setSBal(d.sol); setWBal(d.wish); setMintCfg(!!d.mintConfigured); }
     } catch(e) { console.warn('[balances]', e.message); }
+    finally { setBalLoad(false); }
   };
 
   // ── Send WISH coins (server-side signing) ──────────────────────────────────
   const send = async () => {
-    if (busy || !wallet || !sendTo.trim() || !sendAmt || !mintReady) return;
+    if (busy || !wallet || !sendTo.trim() || !sendAmt) return;
     setBusy(true); setMsg('');
     try {
       const r = await fetch('/api/wallet/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: u.id, toAddress: sendTo.trim(), amount: sendAmt }),
       });
       const d = await r.json();
       if (d.error) throw new Error(d.error);
-      setMsg('✅ Sent!  Tx: ' + (d.signature||'').slice(0,24) + '…');
+      setMsg('✅ Sent! Tx: ' + (d.signature||'').slice(0,24) + '…');
       setSendTo(''); setSendAmt(''); setScreen('main');
       loadBalances(wallet);
     } catch(e) { setMsg('❌ ' + (e.message || 'Send failed')); }
@@ -1216,132 +1195,188 @@ function WalletTab({ u, C }) {
 
   const copyAddr = async () => {
     try { await navigator.clipboard.writeText(wallet); } catch { /* ignore */ }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
 
-  // ── Shared micro-styles ────────────────────────────────────────────────────
-  const card = { background:C.s2, borderRadius:16, padding:16, marginBottom:14, border:`1px solid ${C.border}` };
-  const inp  = { background:C.s3, border:`1px solid ${C.border}`, borderRadius:10,
-                 padding:'10px 12px', color:C.white, fontSize:14, width:'100%', outline:'none', marginBottom:10 };
-  const pBtn = (bg, off) => ({ background: off?C.s3:bg, border:'none', borderRadius:12,
-                 padding:'13px 0', color:off?C.muted:'#fff', fontWeight:700, fontSize:14,
-                 cursor:off?'not-allowed':'pointer', width:'100%', opacity:busy?.65:1 });
   const back = () => { setScreen('main'); setMsg(''); };
+  const fmt  = n => (n === null) ? null : Number(n).toLocaleString(undefined, {maximumFractionDigits:4});
 
-  // ── Screens ───────────────────────────────────────────────────────────────
-
-  // Wallet not yet loaded
+  // ── Loading placeholder ────────────────────────────────────────────────────
   if (!wallet) return (
-    <div style={{padding:'60px 24px',textAlign:'center'}}>
-      <div style={{fontSize:48,marginBottom:16}}>👛</div>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'70px 24px',minHeight:320}}>
+      <div style={{fontSize:54,marginBottom:20,animation:'float 2.5s ease-in-out infinite'}}>🪙</div>
       {creating
-        ? <div style={{fontSize:14,color:C.muted}}>Creating your wallet…</div>
-        : <div style={{fontSize:13,color:'#f87171'}}>{msg || 'Could not load wallet. Refresh to try again.'}</div>}
+        ? <>
+            <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:12}}>Setting up your wallet…</div>
+            <div style={{display:'flex',gap:7}}>
+              {[0,1,2].map(i => <div key={i} style={{width:9,height:9,borderRadius:'50%',background:'#8b5cf6',animation:'dotPulse 1.2s ease infinite',animationDelay:`${i*0.22}s`}}/>)}
+            </div>
+          </>
+        : <div style={{fontSize:13,color:'#f87171',textAlign:'center',lineHeight:1.6}}>{msg || 'Could not load wallet. Refresh to try again.'}</div>}
     </div>
   );
 
-  // Send screen
+  // ── Send screen ────────────────────────────────────────────────────────────
   if (screen === 'send') return (
     <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
-        <button onClick={back} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',lineHeight:1}}>←</button>
-        <div style={{fontSize:16,fontWeight:700,color:C.white}}>Send Wish Coins</div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24}}>
+        <button onClick={back} style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,.07)',border:'none',color:C.white,fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
+        <div style={{fontSize:17,fontWeight:800,color:C.white}}>Send Wish Coins</div>
       </div>
-      <div style={card}>
-        <div style={{fontSize:12,color:C.muted,marginBottom:2}}>Available balance</div>
-        <div style={{fontSize:30,fontWeight:800,color:'#f59e0b',marginBottom:18}}>
-          {mintReady?(wishBal??'…'):0} <span style={{fontSize:14,color:C.muted}}>WISH</span>
-        </div>
-        <input style={inp} placeholder="Recipient wallet address" value={sendTo} onChange={e=>setSendTo(e.target.value)}/>
-        <input style={{...inp,marginBottom:16}} type="number" min="0" placeholder="Amount (WISH)" value={sendAmt} onChange={e=>setSendAmt(e.target.value)}/>
-        <button onClick={send} disabled={busy||!mintReady||!sendTo||!sendAmt}
-          style={pBtn('linear-gradient(135deg,#f59e0b,#d97706)', !mintReady||!sendTo||!sendAmt)}>
-          {busy?'⏳  Sending…':'Confirm Send'}
-        </button>
-        {!mintReady && <div style={{fontSize:11,color:C.muted,marginTop:8,textAlign:'center'}}>Token not configured yet</div>}
+      <div style={{background:'linear-gradient(135deg,rgba(245,158,11,.12),rgba(249,115,22,.08))',border:'1px solid rgba(245,158,11,.25)',borderRadius:14,padding:'12px 16px',marginBottom:20,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontSize:12,color:'rgba(255,255,255,.45)'}}>Available balance</span>
+        <span style={{fontWeight:800,color:'#f59e0b',fontSize:18}}>{mintCfg?(wishBal??'…'):0} <span style={{fontSize:12,opacity:.6}}>WISH</span></span>
       </div>
-      {msg && <div style={{background:C.s3,borderRadius:12,padding:'10px 14px',
-        color:msg.startsWith('✅')?'#34d399':'#f87171',fontSize:12,fontFamily:'monospace'}}>{msg}</div>}
+      <input style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,padding:'14px 16px',color:C.white,fontSize:14,width:'100%',outline:'none',marginBottom:12,boxSizing:'border-box'}}
+        placeholder="Recipient wallet address" value={sendTo} onChange={e=>setSendTo(e.target.value)}/>
+      <input style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,padding:'14px 16px',color:C.white,fontSize:22,fontWeight:700,width:'100%',outline:'none',marginBottom:20,boxSizing:'border-box'}}
+        type="number" min="0" placeholder="0" value={sendAmt} onChange={e=>setSendAmt(e.target.value)}/>
+      <button onClick={send} disabled={busy||!mintCfg||!sendTo||!sendAmt}
+        style={{width:'100%',padding:'16px 0',background:(!mintCfg||!sendTo||!sendAmt)?'rgba(255,255,255,.06)':'linear-gradient(135deg,#f59e0b,#f97316)',border:'none',borderRadius:14,color:(!mintCfg||!sendTo||!sendAmt)?'rgba(255,255,255,.25)':'#fff',fontWeight:800,fontSize:16,cursor:(!mintCfg||!sendTo||!sendAmt)?'not-allowed':'pointer',opacity:busy?.7:1}}>
+        {busy?'⏳ Sending…':'📤 Confirm Send'}
+      </button>
+      {!mintCfg && <div style={{fontSize:11,color:'rgba(255,255,255,.25)',marginTop:10,textAlign:'center'}}>WISH token not configured yet</div>}
+      {msg && <div style={{marginTop:14,background:msg.startsWith('✅')?'rgba(52,211,153,.08)':'rgba(248,113,113,.08)',border:`1px solid ${msg.startsWith('✅')?'rgba(52,211,153,.25)':'rgba(248,113,113,.25)'}`,borderRadius:12,padding:'10px 14px',color:msg.startsWith('✅')?'#34d399':'#f87171',fontSize:12,fontFamily:'monospace'}}>{msg}</div>}
     </div>
   );
 
-  // Receive screen
+  // ── Receive screen ─────────────────────────────────────────────────────────
   if (screen === 'receive') return (
     <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
-        <button onClick={back} style={{background:'none',border:'none',color:C.muted,fontSize:22,cursor:'pointer',lineHeight:1}}>←</button>
-        <div style={{fontSize:16,fontWeight:700,color:C.white}}>Receive</div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24}}>
+        <button onClick={back} style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,.07)',border:'none',color:C.white,fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
+        <div style={{fontSize:17,fontWeight:800,color:C.white}}>Receive</div>
       </div>
-      <div style={{...card,textAlign:'center'}}>
-        <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Send WISH or SOL to this address</div>
-        <img src={`https://api.qrserver.com/v1/create-qr-code/?data=${wallet}&size=180x180&bgcolor=1a1333&color=f59e0b&margin=10`}
-          alt="QR" style={{borderRadius:12,marginBottom:16,width:180,height:180}}/>
-        <div style={{fontSize:11,color:'#f59e0b',fontFamily:'monospace',wordBreak:'break-all',padding:'0 8px',marginBottom:16,lineHeight:1.6}}>
+      <div style={{background:'linear-gradient(145deg,#1a0833,#120f2e)',border:'1px solid rgba(139,92,246,.2)',borderRadius:22,padding:'24px 20px',textAlign:'center'}}>
+        <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:1.5,textTransform:'uppercase',marginBottom:18}}>Send SOL or WISH to this address</div>
+        <div style={{display:'inline-block',padding:10,background:'#fff',borderRadius:18,marginBottom:20,boxShadow:'0 0 50px rgba(139,92,246,.35)'}}>
+          <img src={`https://api.qrserver.com/v1/create-qr-code/?data=${wallet}&size=180x180&bgcolor=ffffff&color=1a0833&margin=8`}
+            alt="QR" style={{display:'block',borderRadius:10,width:180,height:180}}/>
+        </div>
+        <div style={{fontSize:11,color:'#a78bfa',fontFamily:'monospace',wordBreak:'break-all',lineHeight:1.8,background:'rgba(139,92,246,.08)',borderRadius:12,padding:'10px 14px',marginBottom:20}}>
           {wallet}
         </div>
         <button onClick={copyAddr}
-          style={pBtn(copied?'#34d399':'linear-gradient(135deg,#8b5cf6,#6d28d9)', false)}>
-          {copied ? '✓  Copied!' : '📋  Copy Address'}
+          style={{width:'100%',padding:'15px 0',background:copied?'linear-gradient(135deg,#34d399,#10b981)':'linear-gradient(135deg,#8b5cf6,#7c3aed)',border:'none',borderRadius:14,color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',transition:'all .25s',boxShadow:copied?'0 4px 20px rgba(52,211,153,.3)':'0 4px 20px rgba(139,92,246,.3)'}}>
+          {copied ? '✓ Copied!' : '📋 Copy Address'}
         </button>
       </div>
     </div>
   );
 
-  // Main wallet screen
+  // ── Main screen ────────────────────────────────────────────────────────────
   return (
-    <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
+    <div style={{paddingBottom:32,animation:'up .3s ease'}}>
 
-      {/* Balance hero */}
-      <div style={{background:'linear-gradient(135deg,#1a0a3e,#2d1060,#1a0a3e)',
-          borderRadius:22,padding:'24px 20px',marginBottom:16,
-          border:'1px solid rgba(245,158,11,.25)',
-          boxShadow:'0 8px 32px rgba(245,158,11,.1)'}}>
-        <div style={{fontSize:11,color:'rgba(255,255,255,.45)',letterSpacing:1.2,textTransform:'uppercase',marginBottom:4}}>
-          Wish Coin Balance
-        </div>
-        <div style={{fontSize:44,fontWeight:900,color:'#f59e0b',letterSpacing:-1,marginBottom:4,lineHeight:1.1}}>
-          {mintReady?(wishBal??'…'):'—'}
-        </div>
-        <div style={{fontSize:13,color:'rgba(255,255,255,.4)',marginBottom:22}}>
-          WISH&nbsp;&nbsp;·&nbsp;&nbsp;{solBal??'…'} SOL
+      {/* Hero balance card */}
+      <div style={{background:'linear-gradient(145deg,#1a0833 0%,#2d1060 50%,#0d1840 100%)',borderBottom:'1px solid rgba(139,92,246,.18)',padding:'28px 20px 22px',position:'relative',overflow:'hidden'}}>
+        {/* Ambient glow blobs */}
+        <div style={{position:'absolute',top:-50,right:-30,width:180,height:180,borderRadius:'50%',background:'radial-gradient(circle,rgba(245,158,11,.18),transparent 70%)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:-40,left:-20,width:140,height:140,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.22),transparent 70%)',pointerEvents:'none'}}/>
+
+        {/* Header row */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+          <div style={{fontSize:30,animation:'float 3s ease-in-out infinite',lineHeight:1}}>🪙</div>
+          <div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:1.8,textTransform:'uppercase'}}>Wish Wallet</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,.2)',letterSpacing:.3}}>Solana Network</div>
+          </div>
+          {/* Refresh button */}
+          <button onClick={()=>loadBalances(wallet)} title="Refresh balances"
+            style={{marginLeft:'auto',width:32,height:32,borderRadius:8,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',color:'rgba(255,255,255,.4)',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:balLoading?'spin 1s linear infinite':'none'}}>
+            ↻
+          </button>
         </div>
 
-        {/* Send / Receive buttons */}
-        <div style={{display:'flex',gap:12}}>
+        {/* WISH balance — big hero number */}
+        <div style={{marginBottom:10}}>
+          <div style={{
+            fontSize:50,fontWeight:900,letterSpacing:-2,lineHeight:1,
+            background:'linear-gradient(135deg,#fde68a 0%,#f59e0b 40%,#f97316 100%)',
+            WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+            filter:'drop-shadow(0 2px 16px rgba(245,158,11,.5))',
+          }}>
+            {balLoading && wishBal === null
+              ? <span style={{display:'inline-block',width:120,height:48,background:'rgba(255,255,255,.08)',borderRadius:10,animation:'shimmer 1.4s infinite',verticalAlign:'middle',backgroundSize:'600px 100%',backgroundImage:'linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.04) 75%)'}}/>
+              : (fmt(wishBal) ?? '—')}
+          </div>
+          <div style={{fontSize:12,color:'rgba(255,255,255,.3)',marginTop:3,letterSpacing:1.2,textTransform:'uppercase'}}>Wish Coins</div>
+        </div>
+
+        {/* SOL pill */}
+        <div style={{display:'inline-flex',alignItems:'center',gap:6,background:'rgba(255,255,255,.07)',borderRadius:20,padding:'5px 13px',marginBottom:24,border:'1px solid rgba(255,255,255,.06)'}}>
+          <span style={{fontSize:13,color:'rgba(255,255,255,.35)'}}>◎</span>
+          <span style={{fontSize:13,fontWeight:600,color:'rgba(255,255,255,.55)'}}>
+            {balLoading && solBal === null ? '…' : (solBal ?? '—')} SOL
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <button onClick={()=>{setScreen('send');setMsg('');}}
-            style={{flex:1,background:'rgba(245,158,11,.18)',border:'1px solid rgba(245,158,11,.35)',
-              borderRadius:12,padding:'12px 0',color:'#f59e0b',fontWeight:700,fontSize:14,cursor:'pointer'}}>
-            📤  Send
+            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(245,158,11,.22),rgba(249,115,22,.18))',border:'1px solid rgba(245,158,11,.35)',borderRadius:14,color:'#fbbf24',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
+            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+            📤 Send
           </button>
           <button onClick={()=>setScreen('receive')}
-            style={{flex:1,background:'rgba(139,92,246,.18)',border:'1px solid rgba(139,92,246,.35)',
-              borderRadius:12,padding:'12px 0',color:'#a78bfa',fontWeight:700,fontSize:14,cursor:'pointer'}}>
-            📥  Receive
+            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(124,58,237,.18))',border:'1px solid rgba(139,92,246,.35)',borderRadius:14,color:'#c4b5fd',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
+            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+            📥 Receive
           </button>
         </div>
       </div>
 
-      {/* Address row */}
-      <div style={{...card,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <div>
-          <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Wallet Address</div>
-          <div style={{fontSize:12,color:C.white,fontFamily:'monospace'}}>
-            {wallet.slice(0,8)}…{wallet.slice(-8)}
+      {/* Token row */}
+      <div style={{margin:'14px 16px 0',background:'rgba(245,158,11,.04)',border:'1px solid rgba(245,158,11,.1)',borderRadius:18,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,boxShadow:'0 4px 14px rgba(245,158,11,.35)'}}>🪙</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>Wish Coin</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>WISH · Solana</div>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:18,fontWeight:800,color:'#f59e0b'}}>
+              {balLoading && wishBal === null ? <span style={{opacity:.4}}>…</span> : (fmt(wishBal) ?? '—')}
+            </div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>WISH</div>
           </div>
         </div>
-        <button onClick={copyAddr} style={{background:'none',border:`1px solid ${C.border}`,
-          borderRadius:8,padding:'6px 12px',color:copied?'#34d399':C.muted,fontSize:12,cursor:'pointer'}}>
-          {copied?'✓':'📋 Copy'}
-        </button>
       </div>
 
-      {/* Refresh */}
-      <button onClick={()=>loadBalances(wallet)} disabled={busy}
-        style={{width:'100%',background:'none',border:`1px solid ${C.border}`,
-          borderRadius:12,padding:'11px 0',color:C.muted,fontSize:13,cursor:'pointer'}}>
-        ↻  Refresh Balances
-      </button>
+      {/* SOL row */}
+      <div style={{margin:'10px 16px 0',background:'rgba(99,102,241,.04)',border:'1px solid rgba(99,102,241,.1)',borderRadius:18,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#9945FF,#14F195)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 4px 14px rgba(153,69,255,.25)'}}>◎</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>Solana</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>SOL · Native</div>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:18,fontWeight:800,color:'#a78bfa'}}>
+              {balLoading && solBal === null ? <span style={{opacity:.4}}>…</span> : (solBal ?? '—')}
+            </div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>SOL</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Wallet address row */}
+      <div style={{margin:'10px 16px 0',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.07)',borderRadius:16,padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:5}}>Wallet Address</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,.6)',fontFamily:'monospace',letterSpacing:.4}}>
+            {wallet.slice(0,6)}…{wallet.slice(-6)}
+          </div>
+        </div>
+        <button onClick={copyAddr}
+          style={{padding:'8px 14px',background:copied?'rgba(52,211,153,.12)':'rgba(255,255,255,.06)',border:`1px solid ${copied?'rgba(52,211,153,.35)':'rgba(255,255,255,.1)'}`,borderRadius:10,color:copied?'#34d399':'rgba(255,255,255,.45)',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .2s'}}>
+          {copied ? '✓ Copied' : '📋 Copy'}
+        </button>
+      </div>
     </div>
   );
 }
