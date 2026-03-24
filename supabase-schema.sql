@@ -24,7 +24,8 @@ CREATE TABLE users (
   "extraSpins"    integer DEFAULT 0,
   "mineStartedAt" bigint  DEFAULT NULL,  -- epoch ms when current session began; NULL = no active session
   "mineBoosts"    integer DEFAULT 0,     -- boosts applied in current session
-  lang            text    DEFAULT 'en'   -- UI language preference
+  lang            text    DEFAULT 'en',  -- UI language preference
+  tokens          integer DEFAULT 0      -- Wish Tokens earned via conversion
 );
 
 -- Migration SQL (run against existing DB instead of DROP/CREATE):
@@ -33,3 +34,4 @@ CREATE TABLE users (
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS "mineStartedAt" bigint  DEFAULT NULL;
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS "mineBoosts"    integer DEFAULT 0;
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS lang            text    DEFAULT 'en';
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens          integer DEFAULT 0;

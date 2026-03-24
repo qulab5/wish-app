@@ -198,6 +198,7 @@ const C = {
 const APP_NAME       = "Wish";
 const APP_TAGLINE    = "Earn & Reward Platform";
 const USD_PER_POINT  = 0.001;
+const PTS_PER_TOKEN  = 1000;   // 1000 pts = 1 Wish Token
 const REFERRAL_BONUS = 300;
 const MINING_CYCLE   = 8 * 60 * 60;
 const SUN_CYCLE      = 4 * 60 * 60;
@@ -276,7 +277,11 @@ const TR = {
        noAcc:"Don't have an account?", haveAcc:"Already have an account?",
        signUp:"Create Account", signIn:"Sign In", continue:"Continue",
        welcomeBack:"Welcome Back!", joinWish:"Join Wish Today",
-       home:"Home", earn:"Earn", tasks:"Tasks", leaders:"Leaders", mining:"Mining", wallet:"Wallet",
+       home:"Home", earn:"Earn", tasks:"Tasks", leaders:"Leaders", mining:"Mining", wallet:"Wallet", convert:"Convert",
+       convertTitle:"Convert Points", convertSub:"Turn points into Wish Tokens",
+       convRate:"Conversion Rate", convBalance:"Your Points Balance", convTokens:"Wish Tokens",
+       convBtn:"Convert Now", convSuccess:"Converted!", convNone:"Not enough points",
+       convHistory:"Total Tokens Earned",
        logout:"Logout", logoutQ:"Are you sure you want to logout?", yes:"Yes, Logout", cancel:"Cancel",
        profile:"My Profile", exchange:"Exchange", soon:"SOON", language:"Language",
        totalPts:"Total Points", usdBal:"USD Balance", adsLeft:"Ads Left",
@@ -298,7 +303,11 @@ const TR = {
        noAcc:"اکاؤنٹ نہیں ہے؟", haveAcc:"پہلے سے اکاؤنٹ ہے؟",
        signUp:"اکاؤنٹ بنائیں", signIn:"لاگ ان کریں", continue:"جاری رکھیں",
        welcomeBack:"خوش آمدید!", joinWish:"Wish میں شامل ہوں",
-       home:"ہوم", earn:"کمائیں", tasks:"کام", leaders:"رہنما", mining:"مائننگ", wallet:"والٹ",
+       home:"ہوم", earn:"کمائیں", tasks:"کام", leaders:"رہنما", mining:"مائننگ", wallet:"والٹ", convert:"کنورٹ",
+       convertTitle:"پوائنٹس کنورٹ", convertSub:"پوائنٹس کو وِش ٹوکن میں بدلیں",
+       convRate:"تبادلہ شرح", convBalance:"آپ کے پوائنٹس", convTokens:"وِش ٹوکن",
+       convBtn:"ابھی کنورٹ کریں", convSuccess:"کنورٹ ہو گیا!", convNone:"کافی پوائنٹس نہیں",
+       convHistory:"کل ٹوکن",
        logout:"لاگ آؤٹ", logoutQ:"کیا آپ لاگ آؤٹ کرنا چاہتے ہیں؟", yes:"ہاں", cancel:"منسوخ",
        profile:"میری پروفائل", exchange:"ایکسچینج", soon:"جلد", language:"زبان",
        totalPts:"کل پوائنٹس", usdBal:"USD بیلنس", adsLeft:"باقی اشتہار",
@@ -1116,6 +1125,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [mineStarted,setMS]    = useState(false);
   const [mineAdShow,setMAd]    = useState(false);
   const [mineBoosts,setMineBoosts] = useState(0);
+  const [convSuccess,setConvS] = useState(false);  // flash "Converted!" feedback
   const [langMenu,setLM]      = useState(false);
   const [avatarPick,setAP]    = useState(false);
   const fileInputRef          = React.useRef(null);
@@ -1156,7 +1166,7 @@ function MainApp({user,onLogout,lang,setLang}){
         dbLoaded.current = true;
         if(!d.user) return;
         const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
-               spinNextFree:snf,extraSpins:es,lang:dbLang}=d.user;
+               spinNextFree:snf,extraSpins:es,lang:dbLang,tokens:dbTokens}=d.user;
         // Restore language preference from DB (cross-device)
         if(dbLang){ setLang(dbLang); Security.save('lang',dbLang); }
         setU(p=>({...p,
@@ -1165,6 +1175,7 @@ function MainApp({user,onLogout,lang,setLang}){
           // value UP; a DB value lower than localStorage means a save failed.
           pts: Math.max(pts ?? 0, p.pts),
           usd: Math.max(usd ?? 0, p.usd),
+          tokens: Math.max(dbTokens ?? 0, p.tokens ?? 0),
           avatar:avatar||p.avatar,
           name:name||p.name
         }));
@@ -1217,7 +1228,7 @@ function MainApp({user,onLogout,lang,setLang}){
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
-          tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins})
+          tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins})
       }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[auto-save]',d);}).catch(e=>console.error('[auto-save]',e));
     },2000);
     return()=>clearTimeout(t);
@@ -1283,6 +1294,21 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(e=>console.error('[spin save network]',e));
       if(newEs<=0) setSAP(true);
     },4200);
+  };
+  const doConvert=()=>{
+    const tokensToMint=Math.floor(uRef.current.pts/PTS_PER_TOKEN);
+    if(tokensToMint<=0) return;
+    const ptsUsed=tokensToMint*PTS_PER_TOKEN;
+    const newPts=uRef.current.pts-ptsUsed;
+    const newTokens=(uRef.current.tokens??0)+tokensToMint;
+    setU(p=>({...p, pts:newPts, tokens:newTokens}));
+    setConvS(true);
+    setTimeout(()=>setConvS(false),2500);
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:uRef.current.id,email:uRef.current.email,
+        pts:newPts,tokens:newTokens})
+    }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[convert save]',d);})
+      .catch(e=>console.error('[convert save]',e));
   };
   const watchSpinAd=()=>{
     showRewardedAd(()=>{
@@ -1618,6 +1644,80 @@ function MainApp({user,onLogout,lang,setLang}){
         </div>
       </div>
     ),
+    convert:(()=>{
+      const tokens=u.tokens??0;
+      const canMint=Math.floor(u.pts/PTS_PER_TOKEN);
+      const ptsUsed=canMint*PTS_PER_TOKEN;
+      return(
+      <div style={{padding:"0 16px 24px"}}>
+        {/* Hero */}
+        <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:"24px 20px",marginBottom:16,textAlign:"center",position:"relative",overflow:"hidden"}}>
+          <div style={{position:"absolute",top:-24,right:-24,fontSize:90,opacity:.08,pointerEvents:"none"}}>🔄</div>
+          <div style={{fontSize:32,marginBottom:6}}>🔄</div>
+          <div style={{fontSize:20,fontWeight:800,color:"#fff",marginBottom:4}}>{L("convertTitle")}</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,.7)"}}>{L("convertSub")}</div>
+        </div>
+
+        {/* Points balance */}
+        <div style={{background:C.s2,borderRadius:16,padding:20,marginBottom:12,border:`1px solid ${C.border}`}}>
+          <div style={{fontSize:12,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:.08,marginBottom:8}}>{L("convBalance")}</div>
+          <div style={{fontSize:36,fontWeight:900,color:C.white,letterSpacing:-1}}>{u.pts.toLocaleString()}</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:2}}>pts available</div>
+        </div>
+
+        {/* Conversion rate */}
+        <div style={{background:C.s2,borderRadius:16,padding:"14px 20px",marginBottom:12,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <span style={{fontSize:13,color:C.muted,fontWeight:600}}>{L("convRate")}</span>
+          <span style={{fontSize:14,fontWeight:800,color:C.brandLt}}>{PTS_PER_TOKEN.toLocaleString()} pts = 1 🪙</span>
+        </div>
+
+        {/* Conversion preview */}
+        <div style={{background:C.s3,borderRadius:16,padding:20,marginBottom:20,border:`1px solid ${C.border}`}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div style={{textAlign:"center",flex:1}}>
+              <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:.08,marginBottom:4}}>You Give</div>
+              <div style={{fontSize:26,fontWeight:900,color:C.white}}>{ptsUsed.toLocaleString()}</div>
+              <div style={{fontSize:12,color:C.muted}}>pts</div>
+            </div>
+            <div style={{fontSize:24,color:C.brandLt,padding:"0 8px"}}>→</div>
+            <div style={{textAlign:"center",flex:1}}>
+              <div style={{fontSize:11,color:C.muted,fontWeight:700,textTransform:"uppercase",letterSpacing:.08,marginBottom:4}}>You Get</div>
+              <div style={{fontSize:26,fontWeight:900,color:C.brandLt}}>{canMint.toLocaleString()}</div>
+              <div style={{fontSize:12,color:C.muted}}>🪙 {L("convTokens")}</div>
+            </div>
+          </div>
+          {u.pts>0&&canMint===0&&(
+            <div style={{fontSize:12,color:C.muted,textAlign:"center",background:"rgba(255,255,255,.04)",borderRadius:8,padding:"6px 10px"}}>
+              Need {(PTS_PER_TOKEN-u.pts).toLocaleString()} more pts to convert
+            </div>
+          )}
+        </div>
+
+        {/* Convert button */}
+        <button
+          onClick={doConvert}
+          disabled={canMint===0}
+          style={{width:"100%",padding:"15px",borderRadius:14,border:"none",cursor:canMint>0?"pointer":"not-allowed",
+            background:convSuccess
+              ?`linear-gradient(135deg,${C.green},#16a34a)`
+              :canMint>0
+                ?`linear-gradient(135deg,${C.brand},${C.pink})`
+                :"rgba(255,255,255,.08)",
+            color:canMint>0||convSuccess?"#fff":C.muted,fontWeight:800,fontSize:16,
+            transition:"all .25s",transform:convSuccess?"scale(1.02)":"scale(1)",
+            boxShadow:canMint>0&&!convSuccess?`0 4px 20px ${C.brand}55`:"none"}}
+        >
+          {convSuccess?"✅  "+L("convSuccess"):canMint>0?L("convBtn"):L("convNone")}
+        </button>
+
+        {/* Token balance */}
+        <div style={{background:C.s2,borderRadius:16,padding:"14px 20px",marginTop:16,border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <span style={{fontSize:13,color:C.muted}}>{L("convHistory")}</span>
+          <span style={{fontSize:18,fontWeight:800,color:C.gold}}>🪙 {tokens.toLocaleString()}</span>
+        </div>
+      </div>
+      );
+    })(),
     profile:(
       <div style={{padding:"0 16px 16px"}}>
         {/* Profile Header */}
@@ -1702,6 +1802,7 @@ function MainApp({user,onLogout,lang,setLang}){
     {id:"home",icon:"🏠",label:L("home")},
     {id:"earn",icon:"📺",label:L("earn")},
     {id:"tasks",icon:"✅",label:L("tasks")},
+    {id:"convert",icon:"🔄",label:L("convert")},
     {id:"wallet",icon:"💰",label:L("wallet")},
   ];
 
