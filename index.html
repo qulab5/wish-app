@@ -1195,11 +1195,21 @@ function WalletTab({ u, C }) {
 
       if (!window.__phantomInstance) {
         try {
-          window.__phantomInstance = createPhantom({
+          // Provide an element container so the SDK can render its UI in-page
+          if (!document.getElementById('__ph-root')) {
+            const el = document.createElement('div');
+            el.id = '__ph-root';
+            document.body.appendChild(el);
+          }
+          let inst = createPhantom({
             appId: PHANTOM_ID,
+            element: document.getElementById('__ph-root'),
+            namespace: window.location.host,
             zIndex: 10000,
-            hideLauncherBeforeOnboarded: true,  // hide floating button until user connects
           });
+          // createPhantom may be async — await if it returned a Promise
+          if (inst && typeof inst.then === 'function') inst = await inst;
+          window.__phantomInstance = inst;
         } catch(e) {
           setSdkInfo('createPhantom() threw: ' + e.message);
           setPhase('ready');
@@ -1208,18 +1218,32 @@ function WalletTab({ u, C }) {
       }
 
       const ph = window.__phantomInstance;
-      setSdkInfo('ph ready | show:' + typeof ph.show + ' solana:' + typeof ph.solana);
+
+      // The wallet adapter may be at ph.solana OR injected into window.phantom.solana
+      // Wait a tick for any async SDK side-effects to settle
+      await new Promise(r => setTimeout(r, 150));
+      const solana = ph?.solana || window.phantom?.solana;
+
+      // Show all available keys so we can diagnose any remaining API mismatch
+      const ownKeys = ph ? Object.keys(ph) : [];
+      const protoKeys = ph ? Object.getOwnPropertyNames(Object.getPrototypeOf(ph) || {}).filter(k => k !== 'constructor') : [];
+      const allKeys = [...new Set([...ownKeys, ...protoKeys])].slice(0, 10).join(',');
+      setSdkInfo(`ph:[${allKeys||'empty'}] solana:${typeof solana} win.phantom:${window.phantom ? 'yes' : 'no'}`);
+
+      if (!solana) { setPhase('ready'); return; }
+
+      // Store the solana adapter for use in connect()
+      window.__phantomSolana = solana;
 
       // Listen for connect/disconnect events
-      if (ph.solana?.on) {
-        ph.solana.on('connect', (publicKey) => {
+      if (solana.on) {
+        solana.on('connect', (publicKey) => {
           if (window.__phConnectTimer) { clearTimeout(window.__phConnectTimer); window.__phConnectTimer = null; }
           const addr = publicKey.toString();
           setWallet(addr);
           setPhase('connected');
           setSdkInfo('');
-          // Collapse the Phantom widget after successful sign-in
-          if (typeof ph.hide === 'function') ph.hide();
+          if (typeof ph?.hide === 'function') ph.hide();
           const { id, email, walletAddress: existing } = uRef.current;
           fetch('/api/user', { method:'POST', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({ id, email, walletAddress: addr }) }).catch(()=>{});
@@ -1229,14 +1253,14 @@ function WalletTab({ u, C }) {
           }
           loadBalances(addr);
         });
-        ph.solana.on('disconnect', () => {
+        solana.on('disconnect', () => {
           setPhase('ready'); setWallet(''); setSBal(null); setWBal(null);
         });
       }
 
       // Restore existing session if already connected
-      if (ph.solana?.isConnected && ph.solana.publicKey) {
-        const addr = ph.solana.publicKey.toString();
+      if (solana.isConnected && solana.publicKey) {
+        const addr = solana.publicKey.toString();
         setWallet(addr);
         setPhase('connected');
         setSdkInfo('');
@@ -1284,35 +1308,33 @@ function WalletTab({ u, C }) {
   // UI (an iframe). The user then clicks "Sign in with Google" inside that UI.
   // Success is signalled by ph.solana.on('connect', ...) — not by a Promise.
   const connect = () => {
-    const ph = window.__phantomInstance;
-    if (!ph) { setMsg('Wallet SDK not ready — please refresh and try again.'); return; }
+    const ph     = window.__phantomInstance;
+    const solana = window.__phantomSolana;
+
+    if (!solana) { setMsg('Wallet not ready — please refresh and try again.'); return; }
 
     setPhase('connecting'); setMsg('');
 
-    // Safety valve — always recover the button if user closes the widget without signing in
     const timer = setTimeout(() => {
       setPhase(p => p === 'connecting' ? 'ready' : p);
       setMsg(m => !m ? 'Sign-in closed or timed out. Tap the button to try again.' : m);
-    }, 120000);  // 2 min — user might be slow with Google sign-in
-
-    // Store timer so the 'connect' event handler can clear it
+    }, 120000);
     window.__phConnectTimer = timer;
 
-    if (typeof ph.show === 'function') {
-      // ph.show() reveals the in-page embedded wallet UI with Google sign-in
+    // ph.show() opens the embedded in-page sign-in UI (preferred)
+    if (typeof ph?.show === 'function') {
       ph.show();
-    } else if (ph.solana?.connect) {
-      // Fallback: direct connect (for older/different SDK versions)
-      ph.solana.connect().catch(e => {
-        clearTimeout(timer);
-        setPhase('ready');
-        setMsg(e?.message || 'Sign-in failed.');
-      });
-    } else {
-      clearTimeout(timer);
-      setPhase('ready');
-      setMsg('SDK version mismatch — debug info: ' + sdkInfo);
     }
+
+    // solana.connect() triggers auth — works whether the SDK uses show() or a direct flow
+    solana.connect({ onlyIfTrusted: false }).catch(e => {
+      clearTimeout(timer);
+      window.__phConnectTimer = null;
+      setPhase('ready');
+      const m = e?.message || '';
+      setMsg(m.includes('cancel') || m.includes('reject') || e?.code === 4001
+        ? 'Sign-in cancelled.' : (m || 'Sign-in failed. Please try again.'));
+    });
   };
 
   // ── Send WISH coins ────────────────────────────────────────────────────────
@@ -1336,7 +1358,8 @@ function WalletTab({ u, C }) {
       }
       tx.add(createTransferInstruction(fromAta, toAta, fromPk,
         BigInt(Math.round(parseFloat(sendAmt) * 10 ** WISH_DEC))));
-      const sig = await ph.solana.sendTransaction(tx, conn);
+      const solana = window.__phantomSolana || ph?.solana;
+      const sig = await solana.sendTransaction(tx, conn);
       setMsg('✅ Sent!  Tx: ' + sig.slice(0,24) + '…');
       setSendTo(''); setSendAmt('');
       setScreen('main');
