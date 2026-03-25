@@ -11,13 +11,13 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.action === 'adminData') {
       const { data: users, error: uErr } = await supabase
         .from('users')
-        .select('id, name, email, pts, usd, tokens, active, joined, walletAddress, refCode')
+        .select('*')
         .order('pts', { ascending: false });
       if (uErr) throw uErr;
 
       const { data: txs, error: tErr } = await supabase
         .from('transactions')
-        .select('id, fromUserId, toUserId, fromAddress, toAddress, amount, createdAt')
+        .select('*')
         .order('createdAt', { ascending: false })
         .limit(50);
       if (tErr) throw tErr;
