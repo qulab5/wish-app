@@ -1179,10 +1179,20 @@ function WalletTab({ u, C, setU }) {
       const d = await r.json();
       if (!d.error) {
         setSBal(d.sol);
-        // Use on-chain balance only when WISH_COIN_MINT is configured;
-        // otherwise show the in-app token balance stored in the DB.
         setMintCfg(!!d.mintConfigured);
-        setWBal(d.mintConfigured ? d.wish : (u.tokens ?? 0));
+        if (d.mintConfigured) {
+          setWBal(d.wish);
+        } else {
+          // Fetch fresh token balance from DB so the refresh button shows
+          // the real value even when the in-memory state is stale.
+          try {
+            const ur = await fetch(`/api/user?email=${encodeURIComponent(u.email)}`);
+            const ud = await ur.json();
+            const fresh = ud.user?.tokens ?? u.tokens ?? 0;
+            setWBal(fresh);
+            setU(p => ({ ...p, tokens: fresh }));
+          } catch { setWBal(u.tokens ?? 0); }
+        }
       }
     } catch(e) { console.warn('[balances]', e.message); }
     finally { setBalLoad(false); }
@@ -1515,7 +1525,7 @@ function MainApp({user,onLogout,lang,setLang}){
           // value UP; a DB value lower than localStorage means a save failed.
           pts: Math.max(pts ?? 0, p.pts),
           usd: Math.max(usd ?? 0, p.usd),
-          tokens: Math.max(dbTokens ?? 0, p.tokens ?? 0),
+          tokens: dbTokens ?? p.tokens ?? 0,
           avatar:avatar||p.avatar,
           name:name||p.name,
           refCode:       dbRefCode||p.refCode||null,
