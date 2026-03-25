@@ -1123,206 +1123,460 @@ function AuthScreen({onLogin,lang}){
 /* ═══════════════════════════════════════════════
    ADMIN PANEL
 ═══════════════════════════════════════════════ */
+const AUDIT_KEY  = 'wish_admin_audit';
+const readAudit  = () => { try { return JSON.parse(localStorage.getItem(AUDIT_KEY)||'[]'); } catch { return []; } };
+const writeAudit = (e) => { try { localStorage.setItem(AUDIT_KEY, JSON.stringify(e)); } catch {} };
+
+function MiniBarChart({ data, color='#8b5cf6' }) {
+  if (!data.length) return null;
+  const max = Math.max(...data.map(d=>d.v), 1);
+  const W=280, bw=Math.max(8, W/data.length-8);
+  return (
+    <svg width="100%" height="120" viewBox={`0 0 ${W} 120`} preserveAspectRatio="none">
+      {data.map((d,i)=>{
+        const bh=Math.max(3,(d.v/max)*88);
+        const x=i*(W/data.length)+(W/data.length-bw)/2;
+        return (
+          <g key={i}>
+            <rect x={x} y={100-bh} width={bw} height={bh} fill={color} rx={3} opacity={.75}/>
+            <text x={x+bw/2} y={115} textAnchor="middle" fill="rgba(255,255,255,.35)" fontSize={8}>{d.label}</text>
+            <text x={x+bw/2} y={96-bh} textAnchor="middle" fill={color} fontSize={8} fontWeight="700">{d.v>999?(d.v/1000).toFixed(1)+'k':d.v}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function UserModal({ title, initial, busy, msg, onSave, onClose, isEdit }) {
+  const [form, setForm] = useState({
+    name: initial.name||'', email: initial.email||'', pass: '',
+    phone: initial.phone||'', pts: initial.pts??0, tokens: initial.tokens??0,
+    active: initial.active??true, isAdmin: initial.isAdmin??false,
+  });
+  const set = (k,v) => setForm(p=>({...p,[k]:v}));
+  const inp = (label,key,opts={}) => (
+    <div>
+      <div style={{fontSize:10,color:'rgba(255,255,255,.4)',letterSpacing:.8,textTransform:'uppercase',marginBottom:4}}>{label}</div>
+      <input {...opts} value={form[key]} onChange={e=>set(key,e.target.value)}
+        style={{width:'100%',background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,
+          padding:'9px 11px',color:C.white,fontSize:13,outline:'none',boxSizing:'border-box',
+          opacity:(opts.disabled?.6:1),...(opts.style||{})}}/>
+    </div>
+  );
+  const submit = () => {
+    const p = { name:form.name, pts:Number(form.pts), tokens:Number(form.tokens), active:form.active, isAdmin:form.isAdmin };
+    if (form.pass) p.pass = form.pass;
+    if (!isEdit) { p.email = form.email; p.phone = form.phone; }
+    onSave(p);
+  };
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200,padding:16}}>
+      <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:20,padding:20,width:'100%',maxWidth:400,maxHeight:'90vh',overflowY:'auto',animation:'up .2s ease'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+          <div style={{fontWeight:800,fontSize:16}}>{title}</div>
+          <button onClick={onClose} style={{width:30,height:30,borderRadius:8,border:'none',background:'rgba(255,255,255,.06)',color:C.white,fontSize:18,cursor:'pointer',lineHeight:1}}>×</button>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {inp('Full Name','name',{placeholder:'Full name'})}
+          {isEdit
+            ? <div><div style={{fontSize:10,color:'rgba(255,255,255,.4)',letterSpacing:.8,textTransform:'uppercase',marginBottom:4}}>Email</div>
+                <div style={{background:'rgba(255,255,255,.03)',border:`1px solid ${C.border}`,borderRadius:9,padding:'9px 11px',color:'rgba(255,255,255,.4)',fontSize:13}}>{initial.email}</div></div>
+            : inp('Email','email',{placeholder:'Email address',type:'email'})}
+          {inp('Password','pass',{placeholder:isEdit?'Leave blank to keep current':'Password',type:'password'})}
+          {!isEdit && inp('Phone','phone',{placeholder:'Phone number'})}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            {inp('Points','pts',{type:'number',min:0})}
+            {inp('Tokens','tokens',{type:'number',min:0})}
+          </div>
+          <div style={{display:'flex',gap:16,paddingTop:4}}>
+            {[['active','Active'],['isAdmin','Admin role']].map(([k,label])=>(
+              <label key={k} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:13,color:'rgba(255,255,255,.7)'}}>
+                <input type="checkbox" checked={!!form[k]} onChange={e=>set(k,e.target.checked)} style={{accentColor:C.brand,width:14,height:14}}/>
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+        {msg && <div style={{marginTop:10,fontSize:12,padding:'8px 10px',borderRadius:8,background:msg.startsWith('✅')?'rgba(52,211,153,.08)':'rgba(248,113,113,.08)',color:msg.startsWith('✅')?'#34d399':'#f87171'}}>{msg}</div>}
+        <div style={{display:'flex',gap:8,marginTop:16}}>
+          <button onClick={onClose} style={{flex:1,padding:'10px 0',borderRadius:10,border:`1px solid ${C.border}`,background:'rgba(255,255,255,.05)',color:'rgba(255,255,255,.55)',fontWeight:700,fontSize:13,cursor:'pointer'}}>Cancel</button>
+          <button onClick={submit} disabled={busy} style={{flex:2,padding:'10px 0',borderRadius:10,border:'none',background:'linear-gradient(135deg,#8b5cf6,#7c3aed)',color:'#fff',fontWeight:700,fontSize:13,cursor:busy?'not-allowed':'pointer',opacity:busy?.6:1}}>
+            {busy?'Saving…':isEdit?'Save Changes':'Create User'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminPasswordReset({ adminUser, addAudit }) {
+  const [pass,setPass]=useState(''); const [pass2,setPass2]=useState('');
+  const [msg,setMsg]=useState('');   const [busy,setBusy]=useState(false);
+  const save = async () => {
+    if (pass.length<6) { setMsg('Min 6 characters'); return; }
+    if (pass!==pass2)  { setMsg('Passwords do not match'); return; }
+    setBusy(true); setMsg('');
+    try {
+      const r=await fetch('/api/user?action=adminUpdate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:adminUser.id,pass})});
+      const d=await r.json();
+      if (d.error) throw new Error(d.error);
+      addAudit('Changed admin password');
+      setMsg('✅ Password updated'); setPass(''); setPass2('');
+    } catch(e) { setMsg('❌ '+e.message); }
+    finally    { setBusy(false); }
+  };
+  return (
+    <div style={{background:C.s1,border:`1px solid ${C.border}`,borderRadius:16,padding:16}}>
+      <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Change Admin Password</div>
+      <div style={{display:'flex',flexDirection:'column',gap:8,maxWidth:300}}>
+        {[['New password',pass,setPass],['Confirm password',pass2,setPass2]].map(([ph,val,fn])=>(
+          <input key={ph} type="password" value={val} onChange={e=>fn(e.target.value)} placeholder={ph}
+            style={{background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,padding:'9px 12px',color:C.white,fontSize:13,outline:'none'}}/>
+        ))}
+        <button onClick={save} disabled={busy} style={{padding:'9px 0',borderRadius:9,background:'linear-gradient(135deg,#8b5cf6,#7c3aed)',border:'none',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',opacity:busy?.6:1}}>
+          {busy?'Saving…':'Update Password'}
+        </button>
+        {msg && <div style={{fontSize:12,color:msg.startsWith('✅')?'#34d399':'#f87171'}}>{msg}</div>}
+      </div>
+    </div>
+  );
+}
+
 function AdminPanel({user,onExit}){
-  const [tab,    setTab]    = useState('dashboard');
-  const [users,  setUsers]  = useState([]);
-  const [txs,    setTxs]    = useState([]);
-  const [loading,setLoad]   = useState(true);
-  const [err,    setErr]    = useState('');
-  const [search, setSrch]   = useState('');
-  const [busy,   setBusy]   = useState({});
+  const [tab,      setTab]    = useState('dashboard');
+  const [users,    setUsers]  = useState([]);
+  const [txs,      setTxs]    = useState([]);
+  const [loading,  setLoad]   = useState(true);
+  const [err,      setErr]    = useState('');
+  const [search,   setSrch]   = useState('');
+  const [fStatus,  setFS]     = useState('all');
+  const [fRole,    setFR]     = useState('all');
+  const [editU,    setEditU]  = useState(null);
+  const [showCreate,setCreate]= useState(false);
+  const [modalBusy,setMBusy]  = useState(false);
+  const [modalMsg, setMMsg]   = useState('');
+  const [rowBusy,  setRBusy]  = useState({});
+  const [auditLog, setAudit]  = useState(readAudit);
+
+  const addAudit = (action) => {
+    const entry={action,ts:new Date().toISOString(),by:user.email};
+    const next=[entry,...auditLog].slice(0,200);
+    setAudit(next); writeAudit(next);
+  };
 
   const load = () => {
     setLoad(true); setErr('');
     fetch('/api/user?action=adminData')
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { setErr(d.error); return; }
-        setUsers(d.users || []);
-        setTxs(d.txs || []);
-      })
-      .catch(e => setErr(e.message))
-      .finally(() => setLoad(false));
+      .then(r=>r.json())
+      .then(d=>{ if(d.error){setErr(d.error);return;} setUsers(d.users||[]); setTxs(d.txs||[]); })
+      .catch(e=>setErr(e.message))
+      .finally(()=>setLoad(false));
   };
-
   useEffect(load, []);
 
+  const visible = users.filter(u=>{
+    if (fStatus==='active'   && !u.active)  return false;
+    if (fStatus==='inactive' &&  u.active)  return false;
+    if (fRole  ==='admin'    && !u.isAdmin) return false;
+    if (fRole  ==='user'     &&  u.isAdmin) return false;
+    if (search){ const q=search.toLowerCase(); return (u.name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q); }
+    return true;
+  });
+
   const toggleActive = async (u) => {
-    setBusy(b => ({...b, [u.id]: true}));
-    await fetch('/api/user?action=adminUpdate', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ userId: u.id, active: !u.active }),
-    });
-    setUsers(prev => prev.map(x => x.id === u.id ? {...x, active: !u.active} : x));
-    setBusy(b => ({...b, [u.id]: false}));
+    setRBusy(b=>({...b,[u.id]:true}));
+    await fetch('/api/user?action=adminUpdate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:u.id,active:!u.active})});
+    addAudit(`${u.active?'Disabled':'Enabled'} user: ${u.email}`);
+    setUsers(prev=>prev.map(x=>x.id===u.id?{...x,active:!u.active}:x));
+    setRBusy(b=>({...b,[u.id]:false}));
   };
 
-  const totalTokens = users.reduce((s, u) => s + (u.tokens ?? 0), 0);
-  const totalPts    = users.reduce((s, u) => s + (u.pts    ?? 0), 0);
-  const activeCount = users.filter(u => u.active).length;
+  const saveEdit = async (form) => {
+    setMBusy(true); setMMsg('');
+    try {
+      const r=await fetch('/api/user?action=adminUpdate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:editU.id,...form})});
+      const d=await r.json(); if(d.error) throw new Error(d.error);
+      addAudit(`Edited user: ${editU.email}`);
+      setUsers(prev=>prev.map(x=>x.id===editU.id?{...x,...form}:x)); setEditU(null);
+    } catch(e){setMMsg(e.message);} finally{setMBusy(false);}
+  };
 
-  const filteredUsers = users.filter(u =>
-    !search ||
-    u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const createUser = async (form) => {
+    setMBusy(true); setMMsg('');
+    try {
+      const uid='u'+Date.now();
+      const nu={id:uid,name:form.name,email:form.email,pass:form.pass,phone:form.phone||'',
+                pts:Number(form.pts||0),usd:0,tokens:Number(form.tokens||0),isAdmin:false,active:true,
+                joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),
+                country:'🌍',tasksDone:{},adLeft:5,refCode:null,refBy:null,refPts:0,refs:[]};
+      const r=await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(nu)});
+      const d=await r.json(); if(d.error) throw new Error(d.error);
+      addAudit(`Created user: ${form.email}`);
+      setUsers(prev=>[nu,...prev]); setCreate(false);
+    } catch(e){setMMsg(e.message);} finally{setMBusy(false);}
+  };
 
-  const card = (label, value, sub, accent) => (
-    <div style={{background:C.s2,border:`1px solid ${accent}33`,borderRadius:16,padding:'16px 18px',flex:1,minWidth:0}}>
-      <div style={{fontSize:11,color:'rgba(255,255,255,.4)',letterSpacing:1.2,textTransform:'uppercase',marginBottom:6}}>{label}</div>
-      <div style={{fontSize:26,fontWeight:900,color:accent,lineHeight:1}}>{value}</div>
-      {sub && <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:4}}>{sub}</div>}
+  const exportCSV = () => {
+    const hdr=['ID','Name','Email','Points','Tokens','USD','Active','Admin','Joined'];
+    const rows=visible.map(u=>[u.id,u.name,u.email,u.pts??0,u.tokens??0,u.usd??0,u.active?'Yes':'No',u.isAdmin?'Yes':'No',u.joined||'']);
+    const csv=[hdr,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download=`wish-users-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    addAudit(`Exported ${visible.length} users to CSV`);
+  };
+
+  const totalTokens=users.reduce((s,u)=>s+(u.tokens??0),0);
+  const totalPts   =users.reduce((s,u)=>s+(u.pts??0),0);
+  const activeCount=users.filter(u=>u.active).length;
+  const topByPts   =[...users].sort((a,b)=>(b.pts??0)-(a.pts??0)).slice(0,6).map(u=>({label:(u.name||'?').split(' ')[0].slice(0,7),v:u.pts??0}));
+  const topByTok   =[...users].sort((a,b)=>(b.tokens??0)-(a.tokens??0)).slice(0,6).map(u=>({label:(u.name||'?').split(' ')[0].slice(0,7),v:u.tokens??0}));
+
+  const card=(label,val,sub,accent)=>(
+    <div style={{background:C.s2,border:`1px solid ${accent}33`,borderRadius:16,padding:'14px 16px',flex:1,minWidth:110}}>
+      <div style={{fontSize:10,color:'rgba(255,255,255,.4)',letterSpacing:1.2,textTransform:'uppercase',marginBottom:5}}>{label}</div>
+      <div style={{fontSize:24,fontWeight:900,color:accent,lineHeight:1}}>{typeof val==='number'?val.toLocaleString():val}</div>
+      {sub&&<div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:3}}>{sub}</div>}
     </div>
   );
-
-  const pill = (txt, active, onClick) => (
-    <button onClick={onClick} style={{padding:'8px 18px',borderRadius:20,border:'none',fontWeight:700,fontSize:13,cursor:'pointer',
-      background: active ? C.brand : 'rgba(255,255,255,.06)',
-      color:      active ? '#fff'  : 'rgba(255,255,255,.5)',
-      transition:'all .2s'}}>
-      {txt}
+  const navPill=(k,label)=>(
+    <button key={k} onClick={()=>setTab(k)} style={{padding:'10px 14px',border:'none',background:'none',
+      color:tab===k?C.brandLt:'rgba(255,255,255,.4)',fontWeight:tab===k?800:500,fontSize:13,cursor:'pointer',
+      borderBottom:tab===k?`2px solid ${C.brand}`:'2px solid transparent',whiteSpace:'nowrap',transition:'color .2s'}}>
+      {label}
     </button>
+  );
+  const fpill=(t,on,fn)=>(
+    <button onClick={fn} style={{padding:'5px 12px',borderRadius:20,border:'none',fontWeight:700,fontSize:11,cursor:'pointer',
+      background:on?C.brand:'rgba(255,255,255,.06)',color:on?'#fff':'rgba(255,255,255,.45)',transition:'all .2s'}}>{t}</button>
   );
 
   return (
     <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",color:C.white}}>
       <style>{CSS}</style>
 
-      {/* Header */}
-      <div style={{background:C.s1,borderBottom:`1px solid ${C.border}`,padding:'14px 20px',display:'flex',alignItems:'center',gap:12}}>
-        <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#8b5cf6,#6d28d9)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🛡️</div>
-        <div>
-          <div style={{fontWeight:800,fontSize:15}}>Wish Admin</div>
-          <div style={{fontSize:11,color:'rgba(255,255,255,.35)'}}>Signed in as {user.email}</div>
+      {/* ── Header ── */}
+      <div style={{background:C.s1,borderBottom:`1px solid ${C.border}`,padding:'11px 16px',display:'flex',alignItems:'center',gap:10,position:'sticky',top:0,zIndex:50}}>
+        <div style={{width:32,height:32,borderRadius:9,background:'linear-gradient(135deg,#8b5cf6,#6d28d9)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15}}>🛡️</div>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:800,fontSize:14}}>Wish Admin Panel</div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,.3)'}}>{user.email}</div>
         </div>
-        <button onClick={load} title="Refresh" style={{marginLeft:'auto',width:34,height:34,borderRadius:9,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,color:'rgba(255,255,255,.5)',fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:loading?'spin 1s linear infinite':'none'}}>↻</button>
-        <button onClick={onExit} style={{padding:'8px 16px',borderRadius:10,background:'rgba(239,68,68,.12)',border:'1px solid rgba(239,68,68,.25)',color:'#f87171',fontWeight:700,fontSize:13,cursor:'pointer'}}>Sign Out</button>
+        <button onClick={load} title="Refresh" style={{width:32,height:32,borderRadius:8,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,color:'rgba(255,255,255,.45)',fontSize:15,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:loading?'spin 1s linear infinite':'none'}}>↻</button>
+        <button onClick={onExit} style={{padding:'7px 13px',borderRadius:9,background:'rgba(239,68,68,.12)',border:'1px solid rgba(239,68,68,.25)',color:'#f87171',fontWeight:700,fontSize:12,cursor:'pointer'}}>Sign Out</button>
       </div>
 
-      <div style={{padding:'20px 16px',maxWidth:900,margin:'0 auto'}}>
+      {/* ── Tab nav ── */}
+      <div style={{background:C.s1,borderBottom:`1px solid ${C.border}`,padding:'0 14px',display:'flex',gap:2,overflowX:'auto'}}>
+        {navPill('dashboard','📊 Dashboard')}
+        {navPill('users','👥 Users')}
+        {navPill('transactions','🔄 Transactions')}
+        {navPill('audit','📋 Audit Log')}
+        {navPill('settings','⚙️ Settings')}
+      </div>
 
-        {/* Stat cards */}
-        <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
-          {card('Total Users',    users.length,  `${activeCount} active`,   C.brand)}
-          {card('Active Users',   activeCount,   `${users.length - activeCount} inactive`, C.green)}
-          {card('Total Tokens',   totalTokens.toLocaleString(), 'WISH coins', C.gold)}
-          {card('Total Points',   totalPts.toLocaleString(),    'earned pts', C.cyan)}
-        </div>
+      <div style={{padding:'14px',maxWidth:960,margin:'0 auto'}}>
+        {err&&<div style={{background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)',borderRadius:12,padding:'9px 13px',color:'#f87171',fontSize:12,marginBottom:12}}>{err}</div>}
 
-        {/* Tab bar */}
-        <div style={{display:'flex',gap:8,marginBottom:16}}>
-          {pill('👥 Users',        tab==='dashboard',    ()=>setTab('dashboard'))}
-          {pill('🔄 Transactions', tab==='transactions', ()=>setTab('transactions'))}
-        </div>
-
-        {err && <div style={{background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)',borderRadius:12,padding:'10px 14px',color:'#f87171',fontSize:13,marginBottom:14}}>{err}</div>}
-
-        {/* Users tab */}
-        {tab === 'dashboard' && (
-          <div style={{background:C.s1,borderRadius:18,border:`1px solid ${C.border}`,overflow:'hidden'}}>
-            <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
-              <input value={search} onChange={e=>setSrch(e.target.value)}
-                placeholder="Search name or email…"
-                style={{flex:1,background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 12px',color:C.white,fontSize:13,outline:'none'}}/>
-              <div style={{fontSize:12,color:'rgba(255,255,255,.3)',whiteSpace:'nowrap'}}>{filteredUsers.length} users</div>
+        {/* ════ DASHBOARD ════ */}
+        {tab==='dashboard'&&(
+          <>
+            <div style={{display:'flex',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+              {card('Total Users',   users.length,              `${activeCount} active`,          C.brand)}
+              {card('Active Users',  activeCount,               `${users.length-activeCount} off`, C.green)}
+              {card('Total Tokens',  totalTokens,               'WISH coins',                      C.gold)}
+              {card('Total Points',  totalPts,                  'earned pts',                      C.cyan)}
             </div>
-            {loading
-              ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>Loading…</div>
-              : filteredUsers.length === 0
-                ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>No users found</div>
-                : <div style={{overflowX:'auto'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                      <thead>
-                        <tr style={{background:'rgba(255,255,255,.03)'}}>
-                          {['Name','Email','Points','Tokens','Joined','Status',''].map(h=>(
-                            <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'rgba(255,255,255,.35)',fontWeight:600,fontSize:11,letterSpacing:.8,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredUsers.map((u,i)=>(
-                          <tr key={u.id} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?'transparent':'rgba(255,255,255,.015)'}}>
-                            <td style={{padding:'10px 14px'}}>
-                              <div style={{fontWeight:700,color:C.white}}>{u.name||'—'}</div>
-                              <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2}}>{u.id}</div>
-                            </td>
-                            <td style={{padding:'10px 14px',color:'rgba(255,255,255,.6)'}}>{u.email}</td>
-                            <td style={{padding:'10px 14px',color:C.brandLt,fontWeight:700}}>{(u.pts||0).toLocaleString()}</td>
-                            <td style={{padding:'10px 14px',color:C.gold,fontWeight:700}}>{(u.tokens||0).toLocaleString()}</td>
-                            <td style={{padding:'10px 14px',color:'rgba(255,255,255,.4)',whiteSpace:'nowrap'}}>{u.joined||'—'}</td>
-                            <td style={{padding:'10px 14px'}}>
-                              <span style={{padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:700,
-                                background: u.active ? 'rgba(16,185,129,.12)' : 'rgba(239,68,68,.12)',
-                                color:      u.active ? '#34d399'              : '#f87171',
-                                border:     `1px solid ${u.active ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)'}`}}>
-                                {u.active ? 'Active' : 'Inactive'}
-                              </span>
-                            </td>
-                            <td style={{padding:'10px 14px'}}>
-                              <button onClick={()=>toggleActive(u)} disabled={!!busy[u.id]}
-                                style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:'rgba(255,255,255,.05)',color:'rgba(255,255,255,.6)',fontSize:12,cursor:'pointer',fontWeight:600,opacity:busy[u.id]?.5:1}}>
-                                {busy[u.id] ? '…' : u.active ? 'Disable' : 'Enable'}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+              <div style={{background:C.s1,border:`1px solid ${C.border}`,borderRadius:16,padding:'14px'}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:'rgba(255,255,255,.55)'}}>🏆 Top Users by Points</div>
+                {loading?<div style={{color:'rgba(255,255,255,.3)',fontSize:12,padding:'20px 0',textAlign:'center'}}>Loading…</div>:<MiniBarChart data={topByPts} color={C.brand}/>}
+              </div>
+              <div style={{background:C.s1,border:`1px solid ${C.border}`,borderRadius:16,padding:'14px'}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:8,color:'rgba(255,255,255,.55)'}}>🪙 Top Token Holders</div>
+                {loading?<div style={{color:'rgba(255,255,255,.3)',fontSize:12,padding:'20px 0',textAlign:'center'}}>Loading…</div>:<MiniBarChart data={topByTok} color={C.gold}/>}
+              </div>
+            </div>
+            <div style={{background:C.s1,border:`1px solid ${C.border}`,borderRadius:16,padding:'14px'}}>
+              <div style={{fontSize:12,fontWeight:700,marginBottom:10,color:'rgba(255,255,255,.55)'}}>🔄 Recent Transactions</div>
+              {txs.length===0&&!loading&&<div style={{color:'rgba(255,255,255,.3)',fontSize:12}}>No transactions yet</div>}
+              {txs.slice(0,5).map((t,i)=>{
+                const fU=users.find(u=>u.id===t.fromUserId), tU=users.find(u=>u.id===t.toUserId);
+                return (
+                  <div key={t.id||i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 0',borderBottom:i<4?`1px solid ${C.border}`:'none'}}>
+                    <div style={{fontSize:12}}><span style={{fontWeight:600}}>{fU?.name||'Unknown'}</span><span style={{color:'rgba(255,255,255,.3)',margin:'0 6px'}}>→</span><span style={{fontWeight:600}}>{tU?.name||'Unknown'}</span></div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <span style={{color:C.gold,fontWeight:800,fontSize:13}}>{t.amount} WISH</span>
+                      <span style={{color:'rgba(255,255,255,.3)',fontSize:11}}>{t.createdAt?new Date(t.createdAt).toLocaleDateString():'—'}</span>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* ════ USERS ════ */}
+        {tab==='users'&&(
+          <div style={{background:C.s1,borderRadius:18,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+            <div style={{padding:'11px 13px',borderBottom:`1px solid ${C.border}`,display:'flex',flexWrap:'wrap',gap:7,alignItems:'center'}}>
+              <input value={search} onChange={e=>setSrch(e.target.value)} placeholder="Search name or email…"
+                style={{flex:1,minWidth:150,background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,padding:'7px 11px',color:C.white,fontSize:13,outline:'none'}}/>
+              <div style={{display:'flex',gap:4'}}>
+                {fpill('All',      fStatus==='all',      ()=>setFS('all'))}
+                {fpill('Active',   fStatus==='active',   ()=>setFS('active'))}
+                {fpill('Inactive', fStatus==='inactive', ()=>setFS('inactive'))}
+                {fpill('Admins',   fRole  ==='admin',    ()=>setFR(fRole==='admin'?'all':'admin'))}
+              </div>
+              <button onClick={exportCSV} style={{padding:'6px 11px',borderRadius:8,background:'rgba(16,185,129,.1)',border:'1px solid rgba(16,185,129,.2)',color:'#34d399',fontWeight:700,fontSize:11,cursor:'pointer'}}>📥 CSV</button>
+              <button onClick={()=>{setCreate(true);setMMsg('');}} style={{padding:'6px 11px',borderRadius:8,background:'linear-gradient(135deg,#8b5cf6,#7c3aed)',border:'none',color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer'}}>+ New User</button>
+            </div>
+            <div style={{padding:'5px 13px 7px',fontSize:11,color:'rgba(255,255,255,.3)'}}>Showing {visible.length} of {users.length} users</div>
+            {loading?<div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>Loading…</div>
+              :visible.length===0?<div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>No users match filters</div>
+              :<div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                  <thead><tr style={{background:'rgba(255,255,255,.03)'}}>
+                    {['Name','Email','Points','Tokens','Role','Status','Joined','Actions'].map(h=>(
+                      <th key={h} style={{padding:'8px 11px',textAlign:'left',color:'rgba(255,255,255,.3)',fontWeight:600,fontSize:10,letterSpacing:.7,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {visible.map((u,i)=>(
+                      <tr key={u.id} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?'transparent':'rgba(255,255,255,.012)'}}>
+                        <td style={{padding:'8px 11px'}}><div style={{fontWeight:700}}>{u.name||'—'}</div><div style={{fontSize:9,color:'rgba(255,255,255,.22)',marginTop:1,fontFamily:'monospace'}}>{u.id}</div></td>
+                        <td style={{padding:'8px 11px',color:'rgba(255,255,255,.5)',fontSize:11}}>{u.email}</td>
+                        <td style={{padding:'8px 11px',color:C.brandLt,fontWeight:700}}>{(u.pts||0).toLocaleString()}</td>
+                        <td style={{padding:'8px 11px',color:C.gold,fontWeight:700}}>{(u.tokens||0).toLocaleString()}</td>
+                        <td style={{padding:'8px 11px'}}>
+                          <span style={{padding:'2px 7px',borderRadius:20,fontSize:10,fontWeight:700,
+                            background:u.isAdmin?'rgba(139,92,246,.15)':'rgba(255,255,255,.06)',
+                            color:u.isAdmin?C.brandLt:'rgba(255,255,255,.4)',
+                            border:`1px solid ${u.isAdmin?'rgba(139,92,246,.3)':'rgba(255,255,255,.08)'}`}}>
+                            {u.isAdmin?'Admin':'User'}
+                          </span>
+                        </td>
+                        <td style={{padding:'8px 11px'}}>
+                          <span style={{padding:'2px 7px',borderRadius:20,fontSize:10,fontWeight:700,
+                            background:u.active?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)',
+                            color:u.active?'#34d399':'#f87171',
+                            border:`1px solid ${u.active?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`}}>
+                            {u.active?'Active':'Inactive'}
+                          </span>
+                        </td>
+                        <td style={{padding:'8px 11px',color:'rgba(255,255,255,.35)',fontSize:11,whiteSpace:'nowrap'}}>{u.joined||'—'}</td>
+                        <td style={{padding:'8px 11px'}}>
+                          <div style={{display:'flex',gap:4}}>
+                            <button onClick={()=>{setEditU(u);setMMsg('');}} style={{padding:'3px 9px',borderRadius:6,border:`1px solid ${C.border}`,background:'rgba(139,92,246,.1)',color:C.brandLt,fontSize:11,cursor:'pointer',fontWeight:600}}>Edit</button>
+                            <button onClick={()=>toggleActive(u)} disabled={!!rowBusy[u.id]} style={{padding:'3px 9px',borderRadius:6,border:`1px solid ${C.border}`,background:'rgba(255,255,255,.05)',color:'rgba(255,255,255,.5)',fontSize:11,cursor:'pointer',fontWeight:600,opacity:rowBusy[u.id]?.5:1}}>
+                              {rowBusy[u.id]?'…':u.active?'Disable':'Enable'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             }
           </div>
         )}
 
-        {/* Transactions tab */}
-        {tab === 'transactions' && (
+        {/* ════ TRANSACTIONS ════ */}
+        {tab==='transactions'&&(
           <div style={{background:C.s1,borderRadius:18,border:`1px solid ${C.border}`,overflow:'hidden'}}>
-            <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <div style={{fontWeight:700,fontSize:14}}>Recent Transactions</div>
-              <div style={{fontSize:12,color:'rgba(255,255,255,.3)'}}>{txs.length} records</div>
+            <div style={{padding:'11px 13px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{fontWeight:700,fontSize:14}}>All Transactions</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,.3)'}}>{txs.length} records</div>
             </div>
-            {loading
-              ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>Loading…</div>
-              : txs.length === 0
-                ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>No transactions yet</div>
-                : <div style={{overflowX:'auto'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                      <thead>
-                        <tr style={{background:'rgba(255,255,255,.03)'}}>
-                          {['From','To','Amount','Date'].map(h=>(
-                            <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'rgba(255,255,255,.35)',fontWeight:600,fontSize:11,letterSpacing:.8,textTransform:'uppercase'}}>{h}</th>
-                          ))}
+            {loading?<div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>Loading…</div>
+              :txs.length===0?<div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>No transactions yet</div>
+              :<div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                  <thead><tr style={{background:'rgba(255,255,255,.03)'}}>
+                    {['From','To','Amount','Date'].map(h=>(
+                      <th key={h} style={{padding:'8px 11px',textAlign:'left',color:'rgba(255,255,255,.3)',fontWeight:600,fontSize:10,letterSpacing:.7,textTransform:'uppercase'}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {txs.map((t,i)=>{
+                      const fU=users.find(u=>u.id===t.fromUserId), tU=users.find(u=>u.id===t.toUserId);
+                      return (
+                        <tr key={t.id||i} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?'transparent':'rgba(255,255,255,.012)'}}>
+                          <td style={{padding:'8px 11px'}}><div style={{fontWeight:600}}>{fU?.name||t.fromUserId||'—'}</div>{t.fromAddress&&<div style={{fontSize:9,color:'rgba(255,255,255,.22)',fontFamily:'monospace',marginTop:1}}>{t.fromAddress.slice(0,14)}…</div>}</td>
+                          <td style={{padding:'8px 11px'}}><div style={{fontWeight:600}}>{tU?.name||t.toUserId||'—'}</div>{t.toAddress&&<div style={{fontSize:9,color:'rgba(255,255,255,.22)',fontFamily:'monospace',marginTop:1}}>{t.toAddress.slice(0,14)}…</div>}</td>
+                          <td style={{padding:'8px 11px'}}><span style={{fontWeight:800,color:C.gold,fontSize:14}}>{t.amount}</span><span style={{fontSize:10,color:'rgba(255,255,255,.3)',marginLeft:4}}>WISH</span></td>
+                          <td style={{padding:'8px 11px',color:'rgba(255,255,255,.35)',fontSize:11,whiteSpace:'nowrap'}}>{t.createdAt?new Date(t.createdAt).toLocaleString():'—'}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {txs.map((t,i)=>{
-                          const fromUser = users.find(u=>u.id===t.fromUserId);
-                          const toUser   = users.find(u=>u.id===t.toUserId);
-                          const dt = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
-                          return (
-                            <tr key={t.id||i} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?'transparent':'rgba(255,255,255,.015)'}}>
-                              <td style={{padding:'10px 14px'}}>
-                                <div style={{fontWeight:600,color:C.white}}>{fromUser?.name||t.fromUserId||'—'}</div>
-                                <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{t.fromAddress?.slice(0,12)+'…'||''}</div>
-                              </td>
-                              <td style={{padding:'10px 14px'}}>
-                                <div style={{fontWeight:600,color:C.white}}>{toUser?.name||t.toUserId||'—'}</div>
-                                <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{t.toAddress?.slice(0,12)+'…'||''}</div>
-                              </td>
-                              <td style={{padding:'10px 14px'}}>
-                                <span style={{fontWeight:800,color:C.gold,fontSize:15}}>{t.amount}</span>
-                                <span style={{fontSize:10,color:'rgba(255,255,255,.3)',marginLeft:4}}>WISH</span>
-                              </td>
-                              <td style={{padding:'10px 14px',color:'rgba(255,255,255,.4)',fontSize:12,whiteSpace:'nowrap'}}>{dt}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             }
           </div>
         )}
+
+        {/* ════ AUDIT LOG ════ */}
+        {tab==='audit'&&(
+          <div style={{background:C.s1,borderRadius:18,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+            <div style={{padding:'11px 13px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{fontWeight:700,fontSize:14}}>Admin Audit Log</div>
+              <button onClick={()=>{writeAudit([]);setAudit([]);}} style={{padding:'4px 10px',borderRadius:7,border:'1px solid rgba(239,68,68,.2)',background:'rgba(239,68,68,.08)',color:'#f87171',fontSize:11,cursor:'pointer',fontWeight:600}}>Clear</button>
+            </div>
+            {auditLog.length===0
+              ?<div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>No entries yet — admin actions will appear here.</div>
+              :<div style={{maxHeight:520,overflowY:'auto'}}>
+                {auditLog.map((e,i)=>(
+                  <div key={i} style={{display:'flex',gap:10,padding:'9px 13px',borderBottom:`1px solid ${C.border}`,background:i%2===0?'transparent':'rgba(255,255,255,.012)'}}>
+                    <div style={{width:6,height:6,borderRadius:'50%',background:C.brand,marginTop:5,flexShrink:0}}/>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:13}}>{e.action}</div>
+                      <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2}}>by {e.by} · {new Date(e.ts).toLocaleString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            }
+          </div>
+        )}
+
+        {/* ════ SETTINGS ════ */}
+        {tab==='settings'&&(
+          <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div style={{background:C.s1,border:`1px solid ${C.border}`,borderRadius:16,padding:16}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Admin Profile</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                {[['Name',user.name||'Admin'],['Email',user.email],['Role','Super Admin'],['Account ID',user.id]].map(([label,val])=>(
+                  <div key={label} style={{background:'rgba(255,255,255,.04)',borderRadius:10,padding:'10px 12px'}}>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:.8,textTransform:'uppercase',marginBottom:3}}>{label}</div>
+                    <div style={{fontSize:13,fontWeight:600,wordBreak:'break-all'}}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{background:C.s1,border:`1px solid ${C.border}`,borderRadius:16,padding:16}}>
+              <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>App Statistics</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                {[['Total Users',users.length],['Active Users',activeCount],['Inactive Users',users.length-activeCount],
+                  ['Admin Accounts',users.filter(u=>u.isAdmin).length],['Total WISH',totalTokens.toLocaleString()],
+                  ['Total Points',totalPts.toLocaleString()],['Transactions',txs.length],
+                  ['Wallet Users',users.filter(u=>u.walletAddress).length]
+                ].map(([label,val])=>(
+                  <div key={label} style={{background:'rgba(255,255,255,.04)',borderRadius:10,padding:'10px 12px'}}>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:.8,textTransform:'uppercase',marginBottom:3}}>{label}</div>
+                    <div style={{fontSize:16,fontWeight:800,color:C.brandLt}}>{val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <AdminPasswordReset adminUser={user} addAudit={addAudit}/>
+          </div>
+        )}
       </div>
+
+      {editU   && <UserModal title="Edit User"   initial={editU} busy={modalBusy} msg={modalMsg} onSave={saveEdit}    onClose={()=>setEditU(null)}  isEdit/>}
+      {showCreate && <UserModal title="Create User" initial={{}}   busy={modalBusy} msg={modalMsg} onSave={createUser}  onClose={()=>setCreate(false)}/>}
     </div>
   );
 }

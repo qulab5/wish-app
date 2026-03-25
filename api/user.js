@@ -40,13 +40,16 @@ export default async function handler(req, res) {
       return res.status(200).json({ user: data || null });
     }
 
-    // ── POST /api/user?action=adminUpdate  (admin: toggle active/tokens) ──
+    // ── POST /api/user?action=adminUpdate  (admin: update any user fields) ──
     if (req.method === 'POST' && req.query.action === 'adminUpdate') {
-      const { userId, active, tokens } = req.body ?? {};
+      const { userId, ...fields } = req.body ?? {};
       if (!userId) return res.status(400).json({ error: 'userId required' });
-      const update = {};
-      if (active  !== undefined) update.active  = active;
-      if (tokens  !== undefined) update.tokens  = tokens;
+      const allowed = ['active', 'tokens', 'pts', 'usd', 'name', 'pass', 'isAdmin', 'phone'];
+      const update  = {};
+      for (const k of allowed) {
+        if (fields[k] !== undefined) update[k] = fields[k];
+      }
+      if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing to update' });
       const { error } = await supabase.from('users').update(update).eq('id', userId);
       if (error) throw error;
       return res.status(200).json({ success: true });
