@@ -1134,7 +1134,7 @@ function AdminPanel({user,onExit}){
 
   const load = () => {
     setLoad(true); setErr('');
-    fetch('/api/admin?action=data')
+    fetch('/api/user?action=adminData')
       .then(r => r.json())
       .then(d => {
         if (d.error) { setErr(d.error); return; }
@@ -1149,7 +1149,7 @@ function AdminPanel({user,onExit}){
 
   const toggleActive = async (u) => {
     setBusy(b => ({...b, [u.id]: true}));
-    await fetch('/api/admin', {
+    await fetch('/api/user?action=adminUpdate', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ userId: u.id, active: !u.active }),
     });

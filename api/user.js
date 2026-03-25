@@ -7,6 +7,24 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
+    // ── GET /api/user?action=adminData  (all users + recent txs) ─
+    if (req.method === 'GET' && req.query.action === 'adminData') {
+      const { data: users, error: uErr } = await supabase
+        .from('users')
+        .select('id, name, email, pts, usd, tokens, active, joined, walletAddress, refCode')
+        .order('pts', { ascending: false });
+      if (uErr) throw uErr;
+
+      const { data: txs, error: tErr } = await supabase
+        .from('transactions')
+        .select('id, fromUserId, toUserId, fromAddress, toAddress, amount, createdAt')
+        .order('createdAt', { ascending: false })
+        .limit(50);
+      if (tErr) throw tErr;
+
+      return res.status(200).json({ users: users || [], txs: txs || [] });
+    }
+
     // ── GET /api/user?email=… or ?refCode=… ───────────────────
     if (req.method === 'GET') {
       const { email, refCode } = req.query;
@@ -20,6 +38,18 @@ export default async function handler(req, res) {
         .maybeSingle();
       if (error) throw error;
       return res.status(200).json({ user: data || null });
+    }
+
+    // ── POST /api/user?action=adminUpdate  (admin: toggle active/tokens) ──
+    if (req.method === 'POST' && req.query.action === 'adminUpdate') {
+      const { userId, active, tokens } = req.body ?? {};
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+      const update = {};
+      if (active  !== undefined) update.active  = active;
+      if (tokens  !== undefined) update.tokens  = tokens;
+      const { error } = await supabase.from('users').update(update).eq('id', userId);
+      if (error) throw error;
+      return res.status(200).json({ success: true });
     }
 
     // ── POST /api/user  (create or update) ───────────────────
