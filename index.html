@@ -1121,13 +1121,210 @@ function AuthScreen({onLogin,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   ADMIN PANEL (simplified - replace with your full version)
+   ADMIN PANEL
 ═══════════════════════════════════════════════ */
-function AdminPanel({user,onExit,lang}){
-  return <div style={{padding:20,color:"white"}}>
-    <h1>Admin Panel</h1>
-    <button onClick={onExit}>Exit</button>
-  </div>;
+function AdminPanel({user,onExit}){
+  const [tab,    setTab]    = useState('dashboard');
+  const [users,  setUsers]  = useState([]);
+  const [txs,    setTxs]    = useState([]);
+  const [loading,setLoad]   = useState(true);
+  const [err,    setErr]    = useState('');
+  const [search, setSrch]   = useState('');
+  const [busy,   setBusy]   = useState({});
+
+  const load = () => {
+    setLoad(true); setErr('');
+    fetch('/api/admin?action=data')
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setErr(d.error); return; }
+        setUsers(d.users || []);
+        setTxs(d.txs || []);
+      })
+      .catch(e => setErr(e.message))
+      .finally(() => setLoad(false));
+  };
+
+  useEffect(load, []);
+
+  const toggleActive = async (u) => {
+    setBusy(b => ({...b, [u.id]: true}));
+    await fetch('/api/admin', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ userId: u.id, active: !u.active }),
+    });
+    setUsers(prev => prev.map(x => x.id === u.id ? {...x, active: !u.active} : x));
+    setBusy(b => ({...b, [u.id]: false}));
+  };
+
+  const totalTokens = users.reduce((s, u) => s + (u.tokens ?? 0), 0);
+  const totalPts    = users.reduce((s, u) => s + (u.pts    ?? 0), 0);
+  const activeCount = users.filter(u => u.active).length;
+
+  const filteredUsers = users.filter(u =>
+    !search ||
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const card = (label, value, sub, accent) => (
+    <div style={{background:C.s2,border:`1px solid ${accent}33`,borderRadius:16,padding:'16px 18px',flex:1,minWidth:0}}>
+      <div style={{fontSize:11,color:'rgba(255,255,255,.4)',letterSpacing:1.2,textTransform:'uppercase',marginBottom:6}}>{label}</div>
+      <div style={{fontSize:26,fontWeight:900,color:accent,lineHeight:1}}>{value}</div>
+      {sub && <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:4}}>{sub}</div>}
+    </div>
+  );
+
+  const pill = (txt, active, onClick) => (
+    <button onClick={onClick} style={{padding:'8px 18px',borderRadius:20,border:'none',fontWeight:700,fontSize:13,cursor:'pointer',
+      background: active ? C.brand : 'rgba(255,255,255,.06)',
+      color:      active ? '#fff'  : 'rgba(255,255,255,.5)',
+      transition:'all .2s'}}>
+      {txt}
+    </button>
+  );
+
+  return (
+    <div style={{minHeight:'100vh',background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",color:C.white}}>
+      <style>{CSS}</style>
+
+      {/* Header */}
+      <div style={{background:C.s1,borderBottom:`1px solid ${C.border}`,padding:'14px 20px',display:'flex',alignItems:'center',gap:12}}>
+        <div style={{width:36,height:36,borderRadius:10,background:'linear-gradient(135deg,#8b5cf6,#6d28d9)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🛡️</div>
+        <div>
+          <div style={{fontWeight:800,fontSize:15}}>Wish Admin</div>
+          <div style={{fontSize:11,color:'rgba(255,255,255,.35)'}}>Signed in as {user.email}</div>
+        </div>
+        <button onClick={load} title="Refresh" style={{marginLeft:'auto',width:34,height:34,borderRadius:9,background:'rgba(255,255,255,.06)',border:`1px solid ${C.border}`,color:'rgba(255,255,255,.5)',fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:loading?'spin 1s linear infinite':'none'}}>↻</button>
+        <button onClick={onExit} style={{padding:'8px 16px',borderRadius:10,background:'rgba(239,68,68,.12)',border:'1px solid rgba(239,68,68,.25)',color:'#f87171',fontWeight:700,fontSize:13,cursor:'pointer'}}>Sign Out</button>
+      </div>
+
+      <div style={{padding:'20px 16px',maxWidth:900,margin:'0 auto'}}>
+
+        {/* Stat cards */}
+        <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
+          {card('Total Users',    users.length,  `${activeCount} active`,   C.brand)}
+          {card('Active Users',   activeCount,   `${users.length - activeCount} inactive`, C.green)}
+          {card('Total Tokens',   totalTokens.toLocaleString(), 'WISH coins', C.gold)}
+          {card('Total Points',   totalPts.toLocaleString(),    'earned pts', C.cyan)}
+        </div>
+
+        {/* Tab bar */}
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {pill('👥 Users',        tab==='dashboard',    ()=>setTab('dashboard'))}
+          {pill('🔄 Transactions', tab==='transactions', ()=>setTab('transactions'))}
+        </div>
+
+        {err && <div style={{background:'rgba(239,68,68,.08)',border:'1px solid rgba(239,68,68,.2)',borderRadius:12,padding:'10px 14px',color:'#f87171',fontSize:13,marginBottom:14}}>{err}</div>}
+
+        {/* Users tab */}
+        {tab === 'dashboard' && (
+          <div style={{background:C.s1,borderRadius:18,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+            <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',gap:10}}>
+              <input value={search} onChange={e=>setSrch(e.target.value)}
+                placeholder="Search name or email…"
+                style={{flex:1,background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,padding:'8px 12px',color:C.white,fontSize:13,outline:'none'}}/>
+              <div style={{fontSize:12,color:'rgba(255,255,255,.3)',whiteSpace:'nowrap'}}>{filteredUsers.length} users</div>
+            </div>
+            {loading
+              ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>Loading…</div>
+              : filteredUsers.length === 0
+                ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>No users found</div>
+                : <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                      <thead>
+                        <tr style={{background:'rgba(255,255,255,.03)'}}>
+                          {['Name','Email','Points','Tokens','Joined','Status',''].map(h=>(
+                            <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'rgba(255,255,255,.35)',fontWeight:600,fontSize:11,letterSpacing:.8,textTransform:'uppercase',whiteSpace:'nowrap'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredUsers.map((u,i)=>(
+                          <tr key={u.id} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?'transparent':'rgba(255,255,255,.015)'}}>
+                            <td style={{padding:'10px 14px'}}>
+                              <div style={{fontWeight:700,color:C.white}}>{u.name||'—'}</div>
+                              <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2}}>{u.id}</div>
+                            </td>
+                            <td style={{padding:'10px 14px',color:'rgba(255,255,255,.6)'}}>{u.email}</td>
+                            <td style={{padding:'10px 14px',color:C.brandLt,fontWeight:700}}>{(u.pts||0).toLocaleString()}</td>
+                            <td style={{padding:'10px 14px',color:C.gold,fontWeight:700}}>{(u.tokens||0).toLocaleString()}</td>
+                            <td style={{padding:'10px 14px',color:'rgba(255,255,255,.4)',whiteSpace:'nowrap'}}>{u.joined||'—'}</td>
+                            <td style={{padding:'10px 14px'}}>
+                              <span style={{padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:700,
+                                background: u.active ? 'rgba(16,185,129,.12)' : 'rgba(239,68,68,.12)',
+                                color:      u.active ? '#34d399'              : '#f87171',
+                                border:     `1px solid ${u.active ? 'rgba(16,185,129,.25)' : 'rgba(239,68,68,.25)'}`}}>
+                                {u.active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                            <td style={{padding:'10px 14px'}}>
+                              <button onClick={()=>toggleActive(u)} disabled={!!busy[u.id]}
+                                style={{padding:'5px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:'rgba(255,255,255,.05)',color:'rgba(255,255,255,.6)',fontSize:12,cursor:'pointer',fontWeight:600,opacity:busy[u.id]?.5:1}}>
+                                {busy[u.id] ? '…' : u.active ? 'Disable' : 'Enable'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+            }
+          </div>
+        )}
+
+        {/* Transactions tab */}
+        {tab === 'transactions' && (
+          <div style={{background:C.s1,borderRadius:18,border:`1px solid ${C.border}`,overflow:'hidden'}}>
+            <div style={{padding:'14px 16px',borderBottom:`1px solid ${C.border}`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div style={{fontWeight:700,fontSize:14}}>Recent Transactions</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,.3)'}}>{txs.length} records</div>
+            </div>
+            {loading
+              ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>Loading…</div>
+              : txs.length === 0
+                ? <div style={{padding:40,textAlign:'center',color:'rgba(255,255,255,.3)',fontSize:13}}>No transactions yet</div>
+                : <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                      <thead>
+                        <tr style={{background:'rgba(255,255,255,.03)'}}>
+                          {['From','To','Amount','Date'].map(h=>(
+                            <th key={h} style={{padding:'10px 14px',textAlign:'left',color:'rgba(255,255,255,.35)',fontWeight:600,fontSize:11,letterSpacing:.8,textTransform:'uppercase'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {txs.map((t,i)=>{
+                          const fromUser = users.find(u=>u.id===t.fromUserId);
+                          const toUser   = users.find(u=>u.id===t.toUserId);
+                          const dt = t.createdAt ? new Date(t.createdAt).toLocaleString() : '—';
+                          return (
+                            <tr key={t.id||i} style={{borderTop:`1px solid ${C.border}`,background:i%2===0?'transparent':'rgba(255,255,255,.015)'}}>
+                              <td style={{padding:'10px 14px'}}>
+                                <div style={{fontWeight:600,color:C.white}}>{fromUser?.name||t.fromUserId||'—'}</div>
+                                <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{t.fromAddress?.slice(0,12)+'…'||''}</div>
+                              </td>
+                              <td style={{padding:'10px 14px'}}>
+                                <div style={{fontWeight:600,color:C.white}}>{toUser?.name||t.toUserId||'—'}</div>
+                                <div style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{t.toAddress?.slice(0,12)+'…'||''}</div>
+                              </td>
+                              <td style={{padding:'10px 14px'}}>
+                                <span style={{fontWeight:800,color:C.gold,fontSize:15}}>{t.amount}</span>
+                                <span style={{fontSize:10,color:'rgba(255,255,255,.3)',marginLeft:4}}>WISH</span>
+                              </td>
+                              <td style={{padding:'10px 14px',color:'rgba(255,255,255,.4)',fontSize:12,whiteSpace:'nowrap'}}>{dt}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+            }
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════
