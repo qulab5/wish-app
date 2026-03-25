@@ -1422,7 +1422,7 @@ function AdminPanel({user,onExit}){
             <div style={{padding:'11px 13px',borderBottom:`1px solid ${C.border}`,display:'flex',flexWrap:'wrap',gap:7,alignItems:'center'}}>
               <input value={search} onChange={e=>setSrch(e.target.value)} placeholder="Search name or email…"
                 style={{flex:1,minWidth:150,background:'rgba(255,255,255,.05)',border:`1px solid ${C.border}`,borderRadius:9,padding:'7px 11px',color:C.white,fontSize:13,outline:'none'}}/>
-              <div style={{display:'flex',gap:4'}}>
+              <div style={{display:'flex',gap:4}}>
                 {fpill('All',      fStatus==='all',      ()=>setFS('all'))}
                 {fpill('Active',   fStatus==='active',   ()=>setFS('active'))}
                 {fpill('Inactive', fStatus==='inactive', ()=>setFS('inactive'))}
