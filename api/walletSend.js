@@ -1,5 +1,24 @@
 import { supabase } from './db.js';
 
+// Store each user's tx history in a dedicated system row: id = "txhist_{userId}"
+// The transactions JSON array is stored in the `name` column (same trick as announcements).
+const TXS_EMAIL = 'txhistory@sys.internal';
+
+async function readTxs(userId) {
+  const { data } = await supabase
+    .from('users').select('name').eq('id', `txhist_${userId}`).maybeSingle();
+  try { return data?.name ? JSON.parse(data.name) : []; } catch { return []; }
+}
+
+async function writeTxs(userId, txs) {
+  await supabase.from('users').upsert({
+    id:     `txhist_${userId}`,
+    email:  `txhist_${userId}@${TXS_EMAIL}`,
+    name:   JSON.stringify(txs.slice(0, 100)),
+    active: false, pts: 0, usd: 0,
+  }, { onConflict: 'id' });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -32,7 +51,7 @@ export default async function handler(req, res) {
     const newSenderBal    = senderBal - amount;
     const newRecipientBal = (recipient.tokens ?? 0) + amount;
 
-    // Update both balances atomically (best effort — no true DB transaction without RPC)
+    // Update both token balances
     const [se, re] = await Promise.all([
       supabase.from('users').update({ tokens: newSenderBal    }).eq('id', userId),
       supabase.from('users').update({ tokens: newRecipientBal }).eq('id', recipient.id),
@@ -40,33 +59,20 @@ export default async function handler(req, res) {
     if (se.error) throw se.error;
     if (re.error) throw re.error;
 
-    // Record transaction history (best-effort — gracefully skip if column missing)
-    const now = new Date().toISOString();
+    // Record in system-row transaction history for both users
+    const now  = new Date().toISOString();
     const txId = `tx_${Date.now()}`;
-    try {
-      const [sd, rd] = await Promise.all([
-        supabase.from('users').select('*').eq('id', userId).maybeSingle(),
-        supabase.from('users').select('*').eq('id', recipient.id).maybeSingle(),
-      ]);
-      const sTxs = Array.isArray(sd.data?.txHistory) ? sd.data.txHistory : [];
-      const rTxs = Array.isArray(rd.data?.txHistory) ? rd.data.txHistory : [];
-      await Promise.all([
-        supabase.from('users').update({
-          txHistory: [
-            { id: txId, type: 'sent', address: toAddress, amount, createdAt: now },
-            ...sTxs,
-          ].slice(0, 50),
-        }).eq('id', userId),
-        supabase.from('users').update({
-          txHistory: [
-            { id: txId + '_r', type: 'received', address: sender.walletAddress || '', amount, createdAt: now },
-            ...rTxs,
-          ].slice(0, 50),
-        }).eq('id', recipient.id),
-      ]);
-    } catch (_) {
-      // txHistory column may not exist in DB — non-critical, balance was already updated
-    }
+    const [sTxs, rTxs] = await Promise.all([readTxs(userId), readTxs(recipient.id)]);
+    await Promise.all([
+      writeTxs(userId, [
+        { id: txId, type: 'sent', address: toAddress, amount, createdAt: now },
+        ...sTxs,
+      ]),
+      writeTxs(recipient.id, [
+        { id: txId + '_r', type: 'received', address: sender.walletAddress || '', amount, createdAt: now },
+        ...rTxs,
+      ]),
+    ]);
 
     return res.status(200).json({ success: true, newBalance: newSenderBal });
   } catch (err) {
