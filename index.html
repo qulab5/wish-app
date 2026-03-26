@@ -5731,8 +5731,8 @@ function MainApp({user,onLogout,lang,setLang}){
             // 3. Upload to Supabase Storage — get back a permanent public URL,
             //    then save it to the DB immediately (don't rely on auto-save,
             //    which would send the huge data-URL and get rejected).
-            fetch("/api/upload-avatar",{method:"POST",headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({userId:u.id,imageData:dataUrl,mimeType:"image/jpeg"})
+            fetch("/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({action:"uploadAvatar",userId:u.id,imageData:dataUrl})
             })
             .then(r=>r.json())
             .then(d=>{

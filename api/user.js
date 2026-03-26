@@ -61,6 +61,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, id: data.id });
     }
 
+    // ── POST /api/user  action=uploadAvatar ──────────────────
+    if (req.method === 'POST' && req.body?.action === 'uploadAvatar') {
+      const { userId, imageData } = req.body;
+      if (!userId || !imageData) return res.status(400).json({ error: 'userId and imageData required' });
+      const { error } = await supabase.from('users').update({ avatar: imageData }).eq('id', userId);
+      if (error) throw error;
+      return res.status(200).json({ url: imageData });
+    }
+
     // ── POST /api/user  (upsert) ──────────────────────────────
     if (req.method === 'POST') {
       const body = req.body;
