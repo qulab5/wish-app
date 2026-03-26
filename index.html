@@ -4872,6 +4872,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [editName,setEN]      = useState(user.name);
   const [editEmail,setEE]     = useState(user.email);
   const [editPass,setEP]      = useState("");
+  const [editCurrPass,setECP] = useState("");
   const [profileMsg,setPMsg]  = useState("");
   const [sidebarOpen, setSO]  = useState(false);
   const [sidebarView, setSV]  = useState(null);
@@ -5016,6 +5017,17 @@ function MainApp({user,onLogout,lang,setLang}){
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
+
+  // Immediately save specific profile fields to DB + localStorage.
+  // Used for name/password changes so a quick refresh doesn't revert them
+  // (the 2s auto-save debounce is too slow for interactive saves).
+  const saveProfileField = (fields) => {
+    setU(p => ({...p, ...fields}));
+    Security.save('last_user', {...u, ...fields});
+    fetch('/api/user', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id: u.id, email: u.email, ...fields})
+    }).catch(()=>{});
+  };
 
   // Pts accumulated in the current mining session (updates every second as mineT ticks).
   // elapsed-time pts + boost pts — transferred to balance only on Claim.
@@ -5584,7 +5596,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Display Name</div>
             <div style={{display:"flex",gap:8}}>
               <input value={editName} onChange={e=>setEN(e.target.value)} style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="Your name"/>
-              <button onClick={()=>{if(editName.trim()){setU(p=>({...p,name:editName.trim()}));setPMsg("Name updated!");}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.brand,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Save</button>
+              <button onClick={()=>{if(editName.trim()){saveProfileField({name:editName.trim()});setPMsg("Name updated!");}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.brand,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Save</button>
             </div>
           </div>
 
@@ -5599,9 +5611,15 @@ function MainApp({user,onLogout,lang,setLang}){
 
           {/* Password */}
           <div>
-            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>New Password</div>
-            <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Min 6 characters"/>
-            <button onClick={()=>{if(editPass.length>=6){setU(p=>({...p,pass:editPass}));setEP("");setPMsg("Password updated!");}else setPMsg("Min 6 characters!");setTimeout(()=>setPMsg(""),2500);}} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>🔒 Update Password</button>
+            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Change Password</div>
+            <input value={editCurrPass} onChange={e=>setECP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Current password"/>
+            <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="New password (min 6 characters)"/>
+            <button onClick={()=>{
+              if(!editCurrPass){setPMsg("Enter your current password first.");setTimeout(()=>setPMsg(""),2500);return;}
+              if(editCurrPass!==u.pass){setPMsg("Current password is incorrect.");setTimeout(()=>setPMsg(""),2500);return;}
+              if(editPass.length<6){setPMsg("New password must be at least 6 characters.");setTimeout(()=>setPMsg(""),2500);return;}
+              saveProfileField({pass:editPass});setEP("");setECP("");setPMsg("Password updated!");setTimeout(()=>setPMsg(""),2500);
+            }} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>🔒 Update Password</button>
           </div>
 
           {profileMsg&&(
@@ -5964,7 +5982,7 @@ function MainApp({user,onLogout,lang,setLang}){
                 {editingField==="name"&&(
                   <div style={{display:"flex",gap:8,marginTop:12}}>
                     <input value={editName} onChange={e=>setEN(e.target.value)} style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="Your display name"/>
-                    <button onClick={()=>{if(editName.trim()){setU(p=>({...p,name:editName.trim()}));setPMsg("Name updated!");setEF(null);}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+                    <button onClick={()=>{if(editName.trim()){saveProfileField({name:editName.trim()});setPMsg("Name updated!");setEF(null);}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
                   </div>
                 )}
               </div>
@@ -5997,8 +6015,14 @@ function MainApp({user,onLogout,lang,setLang}){
                 </div>
                 {editingField==="pass"&&(
                   <div style={{marginTop:12}}>
-                    <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Min 6 characters"/>
-                    <button onClick={()=>{if(editPass.length>=6){setU(p=>({...p,pass:editPass}));setEP("");setPMsg("Password updated!");setEF(null);}else setPMsg("Min 6 characters!");setTimeout(()=>setPMsg(""),2500);}} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE PASSWORD</button>
+                    <input value={editCurrPass} onChange={e=>setECP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Current password"/>
+                    <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="New password (min 6 characters)"/>
+                    <button onClick={()=>{
+                      if(!editCurrPass){setPMsg("Enter your current password first.");setTimeout(()=>setPMsg(""),2500);return;}
+                      if(editCurrPass!==u.pass){setPMsg("Current password is incorrect.");setTimeout(()=>setPMsg(""),2500);return;}
+                      if(editPass.length<6){setPMsg("New password must be at least 6 characters.");setTimeout(()=>setPMsg(""),2500);return;}
+                      saveProfileField({pass:editPass});setEP("");setECP("");setPMsg("Password updated!");setEF(null);setTimeout(()=>setPMsg(""),2500);
+                    }} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE PASSWORD</button>
                   </div>
                 )}
               </div>
