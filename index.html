@@ -220,6 +220,8 @@ const PERMISSIONS = {
     "assign_moderator",
     "view_settings",
     "edit_settings",
+    "manage_api_keys",
+    "manage_webhooks",
   ],
   moderator: [
     "view_dashboard",
@@ -1069,6 +1071,103 @@ function AuthScreen({onLogin,lang}){
 }
 
 /* ═══════════════════════════════════════════════
+   API KEY & WEBHOOK CONSTANTS
+═══════════════════════════════════════════════ */
+const API_KEY_SCOPES = [
+  { id:"read:users",    label:"Read Users",       group:"Users"   },
+  { id:"write:users",   label:"Write Users",      group:"Users"   },
+  { id:"read:stats",    label:"Read Stats",        group:"Analytics"},
+  { id:"read:rewards",  label:"Read Rewards",      group:"Rewards" },
+  { id:"write:rewards", label:"Write Rewards",     group:"Rewards" },
+  { id:"read:tasks",    label:"Read Tasks",        group:"Tasks"   },
+  { id:"write:tasks",   label:"Write Tasks",       group:"Tasks"   },
+];
+
+const WEBHOOK_EVENTS = [
+  { id:"user.registered",   label:"User Registered",    group:"Users"   },
+  { id:"user.activated",    label:"User Activated",     group:"Users"   },
+  { id:"user.deactivated",  label:"User Deactivated",   group:"Users"   },
+  { id:"reward.earned",     label:"Reward Earned",      group:"Rewards" },
+  { id:"reward.redeemed",   label:"Reward Redeemed",    group:"Rewards" },
+  { id:"task.completed",    label:"Task Completed",     group:"Tasks"   },
+  { id:"withdrawal.requested", label:"Withdrawal Requested", group:"Finance"},
+];
+
+// Generates a random hex string of given length
+function randHex(len){
+  const arr = new Uint8Array(len/2);
+  crypto.getRandomValues(arr);
+  return Array.from(arr,b=>b.toString(16).padStart(2,"0")).join("");
+}
+function makeApiKey(){ return `wsh_live_${randHex(32)}`; }
+function makeWebhookSecret(){ return `whsec_${randHex(24)}`; }
+function keyPrefix(full){ return full.slice(0,14)+"…"; }
+function fmtDate(iso){ return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
+
+const INITIAL_API_KEYS = [
+  {
+    id:"ak_1", name:"Mobile App",
+    prefix:"wsh_live_a3f9",
+    fullKey:null, // never shown again after creation
+    scopes:["read:users","read:stats","read:rewards","read:tasks"],
+    status:"active",
+    createdAt:"2025-01-10T09:00:00Z",
+    lastUsed:"2025-03-20T14:32:00Z",
+  },
+  {
+    id:"ak_2", name:"Analytics Dashboard",
+    prefix:"wsh_live_7c21",
+    fullKey:null,
+    scopes:["read:stats","read:users"],
+    status:"active",
+    createdAt:"2025-02-01T11:00:00Z",
+    lastUsed:"2025-03-25T08:10:00Z",
+  },
+  {
+    id:"ak_3", name:"Legacy Integration",
+    prefix:"wsh_live_bb04",
+    fullKey:null,
+    scopes:["read:users","write:rewards"],
+    status:"revoked",
+    createdAt:"2024-12-15T07:00:00Z",
+    lastUsed:"2025-01-05T19:45:00Z",
+  },
+];
+
+const INITIAL_WEBHOOKS = [
+  {
+    id:"wh_1", name:"Reward Notifier",
+    url:"https://hooks.example.com/wish/rewards",
+    events:["reward.earned","reward.redeemed"],
+    secret:"whsec_demo1234567890",
+    status:"active",
+    createdAt:"2025-01-12T10:00:00Z",
+    lastTriggered:"2025-03-25T16:00:00Z",
+    failCount:0,
+  },
+  {
+    id:"wh_2", name:"User Lifecycle",
+    url:"https://my-crm.example.com/webhooks/wish",
+    events:["user.registered","user.activated","user.deactivated"],
+    secret:"whsec_crmdemo9876",
+    status:"active",
+    createdAt:"2025-02-05T08:30:00Z",
+    lastTriggered:"2025-03-24T11:20:00Z",
+    failCount:2,
+  },
+  {
+    id:"wh_3", name:"Finance Alerts",
+    url:"https://finance.internal/wh",
+    events:["withdrawal.requested"],
+    secret:"whsec_financedemo",
+    status:"inactive",
+    createdAt:"2025-01-20T15:00:00Z",
+    lastTriggered:null,
+    failCount:0,
+  },
+];
+
+/* ═══════════════════════════════════════════════
    ADMIN PANEL — RBAC
 ═══════════════════════════════════════════════ */
 function RoleBadge({role}){
@@ -1423,6 +1522,484 @@ function AdminSettings(){
   );
 }
 
+/* ── ScopeCheckboxes helper ────────────────────── */
+function ScopeGrid({items, selected, onChange, color=C.brand}){
+  const groups = [...new Set(items.map(i=>i.group))];
+  return (
+    <div>
+      {groups.map(g=>(
+        <div key={g} style={{marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.35)",letterSpacing:1,marginBottom:6}}>{g.toUpperCase()}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {items.filter(i=>i.group===g).map(item=>{
+              const on = selected.includes(item.id);
+              return (
+                <button key={item.id} onClick={()=>onChange(on?selected.filter(s=>s!==item.id):[...selected,item.id])}
+                  style={{
+                    padding:"5px 11px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+                    background:on?`${color}22`:"rgba(255,255,255,.04)",
+                    border:`1px solid ${on?color:"rgba(255,255,255,.12)"}`,
+                    color:on?color:"rgba(255,255,255,.45)",
+                    transition:"all .15s",
+                  }}
+                >{on?"✓ ":""}{item.label}</button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── API Keys Tab ──────────────────────────────── */
+function AdminApiKeys(){
+  const [keys,setKeys] = useState(INITIAL_API_KEYS);
+  const [modal,setModal] = useState(null);  // null | "create" | "edit" | "revoke" | "created"
+  const [form,setForm] = useState({name:"",scopes:[]});
+  const [editId,setEditId] = useState(null);
+  const [revokeId,setRevokeId] = useState(null);
+  const [newKeyFull,setNewKeyFull] = useState("");
+  const [copied,setCopied] = useState(false);
+  const [showSecret,setShowSecret] = useState({});
+
+  const openCreate = () => { setForm({name:"",scopes:[]}); setModal("create"); };
+  const openEdit   = (k) => { setEditId(k.id); setForm({name:k.name,scopes:[...k.scopes]}); setModal("edit"); };
+  const openRevoke = (k) => { setRevokeId(k.id); setModal("revoke"); };
+
+  const createKey = () => {
+    if(!form.name.trim()||!form.scopes.length) return;
+    const full = makeApiKey();
+    const k = {
+      id:`ak_${Date.now()}`, name:form.name.trim(),
+      prefix:full.slice(0,14), fullKey:full,
+      scopes:form.scopes, status:"active",
+      createdAt:new Date().toISOString(), lastUsed:null,
+    };
+    setKeys(prev=>[k,...prev]);
+    setNewKeyFull(full);
+    setModal("created");
+  };
+
+  const saveEdit = () => {
+    if(!form.name.trim()||!form.scopes.length) return;
+    setKeys(prev=>prev.map(k=>k.id===editId?{...k,name:form.name.trim(),scopes:form.scopes}:k));
+    setModal(null);
+  };
+
+  const revokeKey = () => {
+    setKeys(prev=>prev.map(k=>k.id===revokeId?{...k,status:"revoked",fullKey:null}:k));
+    setModal(null);
+  };
+
+  const copyKey = () => {
+    navigator.clipboard.writeText(newKeyFull).catch(()=>{});
+    setCopied(true);
+    setTimeout(()=>setCopied(false),2000);
+  };
+
+  const activeKeys  = keys.filter(k=>k.status==="active");
+  const revokedKeys = keys.filter(k=>k.status==="revoked");
+
+  const KeyCard = ({k}) => (
+    <div className="user-row" style={{flexDirection:"column",alignItems:"stretch",gap:10}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{
+          width:36,height:36,borderRadius:9,flexShrink:0,
+          background:k.status==="active"?"rgba(16,185,129,.15)":"rgba(239,68,68,.1)",
+          border:`1px solid ${k.status==="active"?"rgba(16,185,129,.3)":"rgba(239,68,68,.2)"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+        }}>🔑</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:C.white,fontSize:14}}>{k.name}</span>
+            <span style={{
+              fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,
+              background:k.status==="active"?"rgba(16,185,129,.15)":"rgba(239,68,68,.1)",
+              color:k.status==="active"?C.green:C.red,
+              border:`1px solid ${k.status==="active"?"rgba(16,185,129,.3)":"rgba(239,68,68,.2)"}`,
+            }}>{k.status==="active"?"● ACTIVE":"✕ REVOKED"}</span>
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:2,fontFamily:"monospace"}}>
+            {k.prefix}{"●".repeat(16)}
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>
+            Created {fmtDate(k.createdAt)}
+            {k.lastUsed&&<span> · Last used {fmtDate(k.lastUsed)}</span>}
+            {!k.lastUsed&&<span style={{color:"rgba(255,255,255,.2)"}}> · Never used</span>}
+          </div>
+        </div>
+        {k.status==="active"&&(
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            <button onClick={()=>openEdit(k)} style={{background:"rgba(139,92,246,.12)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Edit</button>
+            <button onClick={()=>openRevoke(k)} style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Revoke</button>
+          </div>
+        )}
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:46}}>
+        {k.scopes.map(s=>(
+          <span key={s} style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:6,background:"rgba(139,92,246,.1)",color:C.brandLt,border:`1px solid ${C.border}`}}>{s}</span>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <div>
+          <div style={{fontWeight:700,color:C.white,fontSize:15}}>API Keys</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>{activeKeys.length} active · {revokedKeys.length} revoked</div>
+        </div>
+        <button onClick={openCreate} style={{background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",color:"#fff",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${C.brand}60`}}>+ New Key</button>
+      </div>
+
+      <div style={{background:"rgba(245,158,11,.07)",border:"1px solid rgba(245,158,11,.2)",borderRadius:11,padding:"10px 14px",marginBottom:18,display:"flex",gap:9,alignItems:"flex-start"}}>
+        <span style={{fontSize:15,flexShrink:0}}>⚠️</span>
+        <span style={{fontSize:12,color:"rgba(255,255,255,.55)",lineHeight:1.5}}>API keys grant programmatic access to your platform. Keep them secret — never share or commit them to source control. A key's full value is only shown once at creation.</span>
+      </div>
+
+      {activeKeys.length>0&&(
+        <div style={{marginBottom:20}}>
+          {activeKeys.map(k=><KeyCard key={k.id} k={k}/>)}
+        </div>
+      )}
+
+      {revokedKeys.length>0&&(
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,.25)",letterSpacing:1,marginBottom:10}}>REVOKED KEYS</div>
+          {revokedKeys.map(k=><KeyCard key={k.id} k={k}/>)}
+        </div>
+      )}
+
+      {/* Create / Edit modal */}
+      {(modal==="create"||modal==="edit")&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s1,borderRadius:"20px 20px 16px 16px",padding:24,width:"100%",maxWidth:480,border:`1px solid ${C.border}`,maxHeight:"90vh",overflowY:"auto"}}>
+            <div style={{fontWeight:800,fontSize:17,color:C.white,marginBottom:4}}>{modal==="create"?"Create New API Key":"Edit API Key"}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:20}}>{modal==="create"?"The full key is shown once — copy it immediately.":"You can update the key name and its permission scopes."}</div>
+
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Key Name <span style={{color:C.red}}>*</span></div>
+              <input className="inp-base" placeholder="e.g. Mobile App, CI/CD Pipeline…" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
+            </div>
+
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Permission Scopes <span style={{color:C.red}}>*</span></div>
+              <ScopeGrid items={API_KEY_SCOPES} selected={form.scopes} onChange={s=>setForm(p=>({...p,scopes:s}))} color={C.brand}/>
+              {form.scopes.length===0&&<div style={{fontSize:11,color:C.red,marginTop:6}}>⚠ Select at least one scope</div>}
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:12,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button
+                onClick={modal==="create"?createKey:saveEdit}
+                disabled={!form.name.trim()||!form.scopes.length}
+                style={{background:(!form.name.trim()||!form.scopes.length)?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",borderRadius:12,padding:12,color:(!form.name.trim()||!form.scopes.length)?"rgba(255,255,255,.3)":"#fff",fontWeight:700,cursor:(!form.name.trim()||!form.scopes.length)?"default":"pointer"}}
+              >{modal==="create"?"Generate Key":"Save Changes"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Key created — show full key once */}
+      {modal==="created"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s1,borderRadius:20,padding:24,width:"100%",maxWidth:420,border:`1px solid rgba(16,185,129,.3)`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:8}}>🔑</div>
+            <div style={{fontWeight:800,fontSize:16,color:C.white,textAlign:"center",marginBottom:4}}>API Key Created!</div>
+            <div style={{fontSize:12,color:C.red,textAlign:"center",fontWeight:700,marginBottom:16}}>Copy this key now — it won't be shown again.</div>
+            <div style={{
+              background:"rgba(0,0,0,.4)",border:`1px solid ${C.border2}`,borderRadius:10,padding:"12px 14px",
+              fontFamily:"monospace",fontSize:12,color:C.green,wordBreak:"break-all",marginBottom:14,
+            }}>{newKeyFull}</div>
+            <button onClick={copyKey} style={{
+              width:"100%",padding:12,borderRadius:12,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,
+              background:copied?`linear-gradient(135deg,${C.green},#047857)`:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              color:"#fff",marginBottom:10,transition:"background .3s",
+            }}>{copied?"✓ Copied!":"📋 Copy to Clipboard"}</button>
+            <button onClick={()=>{setModal(null);setNewKeyFull("");}} style={{width:"100%",padding:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.s3,color:C.white,fontWeight:600,cursor:"pointer",fontSize:14}}>I've saved it — Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Revoke confirm */}
+      {modal==="revoke"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid rgba(239,68,68,.25)`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>🚫</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>Revoke "{keys.find(k=>k.id===revokeId)?.name}"?</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>This key will stop working immediately. This cannot be undone.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={revokeKey} style={{background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}>Revoke Key</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Webhooks Tab ──────────────────────────────── */
+function AdminWebhooks(){
+  const [hooks,setHooks] = useState(INITIAL_WEBHOOKS);
+  const [modal,setModal] = useState(null); // null | "create" | "edit" | "delete" | "test"
+  const [form,setForm]   = useState({name:"",url:"",events:[],secret:""});
+  const [editId,setEditId]   = useState(null);
+  const [deleteId,setDeleteId] = useState(null);
+  const [testId,setTestId]   = useState(null);
+  const [testResult,setTestResult] = useState(null);
+  const [showSecret,setShowSecret] = useState({});
+  const [urlErr,setUrlErr] = useState("");
+
+  const validateUrl = v => {
+    try { new URL(v); setUrlErr(""); return true; }
+    catch { setUrlErr("Enter a valid HTTPS URL"); return false; }
+  };
+
+  const openCreate = () => {
+    setForm({name:"",url:"",events:[],secret:makeWebhookSecret()});
+    setUrlErr("");
+    setModal("create");
+  };
+  const openEdit = (h) => {
+    setEditId(h.id);
+    setForm({name:h.name,url:h.url,events:[...h.events],secret:h.secret});
+    setUrlErr("");
+    setModal("edit");
+  };
+  const openDelete = (h) => { setDeleteId(h.id); setModal("delete"); };
+  const openTest   = (h) => { setTestId(h.id); setTestResult(null); setModal("test"); };
+
+  const createHook = () => {
+    if(!form.name.trim()||!validateUrl(form.url)||!form.events.length) return;
+    const h = {
+      id:`wh_${Date.now()}`, name:form.name.trim(),
+      url:form.url.trim(), events:form.events,
+      secret:form.secret||makeWebhookSecret(),
+      status:"active",
+      createdAt:new Date().toISOString(),
+      lastTriggered:null, failCount:0,
+    };
+    setHooks(prev=>[h,...prev]);
+    setModal(null);
+  };
+
+  const saveEdit = () => {
+    if(!form.name.trim()||!validateUrl(form.url)||!form.events.length) return;
+    setHooks(prev=>prev.map(h=>h.id===editId?{...h,name:form.name.trim(),url:form.url.trim(),events:form.events,secret:form.secret}:h));
+    setModal(null);
+  };
+
+  const deleteHook  = () => { setHooks(prev=>prev.filter(h=>h.id!==deleteId)); setModal(null); };
+  const toggleHook  = (id) => setHooks(prev=>prev.map(h=>h.id===id?{...h,status:h.status==="active"?"inactive":"active"}:h));
+  const regenerateSecret = () => setForm(p=>({...p,secret:makeWebhookSecret()}));
+
+  const runTest = () => {
+    setTestResult("loading");
+    setTimeout(()=>{
+      const ok = Math.random()>0.25;
+      setTestResult(ok
+        ? { ok:true,  status:200, body:'{"received":true,"event":"test.ping"}', ms:Math.floor(120+Math.random()*180) }
+        : { ok:false, status:503, body:'Service Unavailable',                   ms:Math.floor(5000+Math.random()*3000) }
+      );
+    }, 1200);
+  };
+
+  const HookCard = ({h}) => (
+    <div className="user-row" style={{flexDirection:"column",alignItems:"stretch",gap:10}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+        <div style={{
+          width:36,height:36,borderRadius:9,flexShrink:0,
+          background:h.status==="active"?"rgba(6,182,212,.12)":"rgba(255,255,255,.05)",
+          border:`1px solid ${h.status==="active"?"rgba(6,182,212,.3)":"rgba(255,255,255,.1)"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+        }}>🔗</div>
+
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:C.white,fontSize:14}}>{h.name}</span>
+            {h.failCount>0&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(245,158,11,.15)",color:C.gold,border:"1px solid rgba(245,158,11,.3)"}}>{h.failCount} fail{h.failCount!==1?"s":""}</span>}
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.url}</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>
+            Created {fmtDate(h.createdAt)}
+            {h.lastTriggered?<span> · Last fired {fmtDate(h.lastTriggered)}</span>:<span style={{color:"rgba(255,255,255,.2)"}}> · Never fired</span>}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
+          <button onClick={()=>toggleHook(h.id)}
+            className={`toggle ${h.status==="active"?"on":"off"}`}
+            title={h.status==="active"?"Disable":"Enable"}
+            style={{width:40,height:22,fontSize:0}}
+          />
+          <button onClick={()=>openTest(h)}   style={{background:"rgba(6,182,212,.1)",border:"1px solid rgba(6,182,212,.25)",color:C.cyan,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}>Test</button>
+          <button onClick={()=>openEdit(h)}   style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}>Edit</button>
+          <button onClick={()=>openDelete(h)} style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}>Delete</button>
+        </div>
+      </div>
+
+      {/* Events */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:46}}>
+        {h.events.map(e=>(
+          <span key={e} style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:6,background:"rgba(6,182,212,.08)",color:C.cyan,border:"1px solid rgba(6,182,212,.2)"}}>{e}</span>
+        ))}
+      </div>
+
+      {/* Secret row */}
+      <div style={{paddingLeft:46,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:11,color:"rgba(255,255,255,.3)",fontFamily:"monospace"}}>
+          {showSecret[h.id] ? h.secret : h.secret.slice(0,12)+"●".repeat(12)}
+        </span>
+        <button onClick={()=>setShowSecret(p=>({...p,[h.id]:!p[h.id]}))}
+          style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:C.muted,padding:0,lineHeight:1}}
+        >{showSecret[h.id]?"🙈":"👁"}</button>
+      </div>
+    </div>
+  );
+
+  const FormModal = ({isEdit}) => (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:999,padding:16}}>
+      <div style={{background:C.s1,borderRadius:"20px 20px 16px 16px",padding:24,width:"100%",maxWidth:480,border:`1px solid ${C.border}`,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{fontWeight:800,fontSize:17,color:C.white,marginBottom:20}}>{isEdit?"Edit Webhook":"Add Webhook"}</div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Name <span style={{color:C.red}}>*</span></div>
+          <input className="inp-base" placeholder="e.g. Reward Notifier" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Endpoint URL <span style={{color:C.red}}>*</span></div>
+          <input className="inp-base" placeholder="https://your-server.com/webhooks/wish" value={form.url}
+            onChange={e=>{setForm(p=>({...p,url:e.target.value}));if(urlErr)validateUrl(e.target.value);}}
+            onBlur={e=>validateUrl(e.target.value)}/>
+          {urlErr&&<div style={{fontSize:11,color:C.red,marginTop:4}}>⚠ {urlErr}</div>}
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Signing Secret</div>
+          <div style={{display:"flex",gap:8}}>
+            <input className="inp-base" readOnly value={form.secret} style={{fontFamily:"monospace",fontSize:11,flex:1}}/>
+            <button onClick={regenerateSecret} title="Regenerate" style={{background:"rgba(139,92,246,.12)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:10,padding:"0 12px",fontSize:13,cursor:"pointer",flexShrink:0}}>↺</button>
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:4}}>Used to verify payload signatures on your server.</div>
+        </div>
+
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Events to Subscribe <span style={{color:C.red}}>*</span></div>
+          <ScopeGrid items={WEBHOOK_EVENTS} selected={form.events} onChange={e=>setForm(p=>({...p,events:e}))} color={C.cyan}/>
+          {form.events.length===0&&<div style={{fontSize:11,color:C.red,marginTop:6}}>⚠ Select at least one event</div>}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:12,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+          <button
+            onClick={isEdit?saveEdit:createHook}
+            disabled={!form.name.trim()||!form.url.trim()||!form.events.length}
+            style={{
+              background:(!form.name.trim()||!form.url.trim()||!form.events.length)?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.cyan},#0284c7)`,
+              border:"none",borderRadius:12,padding:12,fontWeight:700,cursor:(!form.name.trim()||!form.url.trim()||!form.events.length)?"default":"pointer",
+              color:(!form.name.trim()||!form.url.trim()||!form.events.length)?"rgba(255,255,255,.3)":"#fff",
+            }}
+          >{isEdit?"Save Changes":"Add Webhook"}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <div>
+          <div style={{fontWeight:700,color:C.white,fontSize:15}}>Webhooks</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>
+            {hooks.filter(h=>h.status==="active").length} active · {hooks.filter(h=>h.status==="inactive").length} inactive
+          </div>
+        </div>
+        <button onClick={openCreate} style={{background:`linear-gradient(135deg,${C.cyan},#0284c7)`,border:"none",color:"#fff",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${C.cyan}60`}}>+ Add Webhook</button>
+      </div>
+
+      {hooks.map(h=><HookCard key={h.id} h={h}/>)}
+
+      {modal==="create" && <FormModal isEdit={false}/>}
+      {modal==="edit"   && <FormModal isEdit={true}/>}
+
+      {/* Delete confirm */}
+      {modal==="delete"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid rgba(239,68,68,.25)`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>🗑️</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>Delete "{hooks.find(h=>h.id===deleteId)?.name}"?</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>Your endpoint will stop receiving events immediately.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={deleteHook} style={{background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Test modal */}
+      {modal==="test"&&(()=>{
+        const h = hooks.find(x=>x.id===testId);
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+            <div style={{background:C.s1,borderRadius:20,padding:24,maxWidth:400,width:"100%",border:`1px solid ${C.border}`}}>
+              <div style={{fontWeight:800,fontSize:16,color:C.white,marginBottom:4}}>Test Webhook</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:16,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h?.url}</div>
+
+              {!testResult&&(
+                <div style={{textAlign:"center",padding:"20px 0"}}>
+                  <button onClick={runTest} style={{background:`linear-gradient(135deg,${C.cyan},#0284c7)`,border:"none",color:"#fff",borderRadius:12,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer"}}>🚀 Send Test Ping</button>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:10}}>Sends a <code style={{background:"rgba(255,255,255,.08)",padding:"1px 5px",borderRadius:4}}>test.ping</code> event to your endpoint.</div>
+                </div>
+              )}
+
+              {testResult==="loading"&&(
+                <div style={{textAlign:"center",padding:"24px 0",color:"rgba(255,255,255,.5)",fontSize:13}}>
+                  <div style={{fontSize:28,marginBottom:8,animation:"rotate 1s linear infinite",display:"inline-block"}}>⏳</div>
+                  <div>Sending request…</div>
+                </div>
+              )}
+
+              {testResult&&testResult!=="loading"&&(
+                <div>
+                  <div style={{
+                    background:testResult.ok?"rgba(16,185,129,.08)":"rgba(239,68,68,.08)",
+                    border:`1px solid ${testResult.ok?"rgba(16,185,129,.3)":"rgba(239,68,68,.3)"}`,
+                    borderRadius:12,padding:14,marginBottom:14,
+                  }}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                      <span style={{fontSize:20}}>{testResult.ok?"✅":"❌"}</span>
+                      <span style={{fontWeight:700,color:testResult.ok?C.green:C.red,fontSize:14}}>
+                        {testResult.ok?"Success":"Failed"}
+                      </span>
+                      <span style={{marginLeft:"auto",fontSize:11,color:"rgba(255,255,255,.4)",fontFamily:"monospace"}}>{testResult.ms}ms</span>
+                    </div>
+                    <div style={{display:"flex",gap:8,marginBottom:8}}>
+                      <span style={{
+                        fontSize:12,fontWeight:700,padding:"2px 8px",borderRadius:6,
+                        background:testResult.ok?"rgba(16,185,129,.15)":"rgba(239,68,68,.15)",
+                        color:testResult.ok?C.green:C.red,
+                      }}>HTTP {testResult.status}</span>
+                    </div>
+                    <div style={{fontFamily:"monospace",fontSize:11,color:"rgba(255,255,255,.6)",background:"rgba(0,0,0,.3)",padding:"8px 10px",borderRadius:8,wordBreak:"break-all"}}>{testResult.body}</div>
+                  </div>
+                  <button onClick={runTest} style={{width:"100%",background:"rgba(255,255,255,.05)",border:`1px solid ${C.border}`,borderRadius:10,padding:10,color:C.muted,fontSize:13,fontWeight:600,cursor:"pointer",marginBottom:8}}>Retry Test</button>
+                </div>
+              )}
+
+              <button onClick={()=>setModal(null)} style={{width:"100%",background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer",fontSize:14}}>Close</button>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 /* ── Main AdminPanel ───────────────────────────── */
 function AdminPanel({user, onExit, lang}){
   const role = user.role || (user.isAdmin ? "super_admin" : "user");
@@ -1433,6 +2010,8 @@ function AdminPanel({user, onExit, lang}){
     { id:"dashboard", label:"Dashboard", icon:"📊", perm:"view_dashboard" },
     { id:"users",     label:"Users",     icon:"👥", perm:"view_users" },
     { id:"roles",     label:"Roles",     icon:"🛡️", perm:"manage_roles" },
+    { id:"apikeys",   label:"API Keys",  icon:"🔑", perm:"manage_api_keys" },
+    { id:"webhooks",  label:"Webhooks",  icon:"🔗", perm:"manage_webhooks" },
     { id:"settings",  label:"Settings",  icon:"⚙️", perm:"view_settings" },
   ].filter(t=>can(user,t.perm));
 
@@ -1485,6 +2064,8 @@ function AdminPanel({user, onExit, lang}){
         {activeTab==="dashboard" && <AdminDashboard users={users} adminUser={user}/>}
         {activeTab==="users"     && <AdminUsers users={users} setUsers={setUsers} adminUser={user}/>}
         {activeTab==="roles"     && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="apikeys"   && <AdminApiKeys/>}
+        {activeTab==="webhooks"  && <AdminWebhooks/>}
         {activeTab==="settings"  && <AdminSettings/>}
       </div>
     </div>
