@@ -3489,13 +3489,20 @@ function AdminBroadcast({ users, adminUser }) {
     };
 
     try {
-      const res  = await fetch("/api/broadcast", {
+      const res = await fetch("/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
+      // Guard against non-JSON responses (e.g. Vercel HTML error pages)
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server returned HTTP ${res.status} (non-JSON response)`);
+      }
+
       const json = await res.json();
-      if (!json.success) throw new Error(json.error || `HTTP ${res.status}`);
+      if (!json.success) throw new Error(json.error || `Server error (HTTP ${res.status})`);
 
       const entry = {
         id: `bcast_${Date.now()}`, type, channel, subject: subject.trim(), body: body.trim(),
@@ -3512,10 +3519,13 @@ function AdminBroadcast({ users, adminUser }) {
       setSR({ ok: true, sent: json.sent, failed: json.failed, note: json.note, source: "live" });
       setSubject(""); setBody("");
     } catch (err) {
-      // Demo fallback — simulate delivery
-      if (err.message.includes("fetch") || err.message.startsWith("HTTP 5") || err.message.startsWith("HTTP 4")) {
+      // Demo fallback ONLY when the endpoint doesn't exist yet (local dev without API routes).
+      // A TypeError means the fetch itself failed (network down / endpoint absent).
+      // A real deployed API returning 4xx/5xx is a genuine error — show it, don't fake success.
+      const isNoEndpoint = (err instanceof TypeError) || err.message.includes("HTTP 404");
+      if (isNoEndpoint) {
         await new Promise(r => setTimeout(r, 1400));
-        const failed = Math.floor(preview.length * 0.05); // 5% simulated fail rate
+        const failed = Math.floor(preview.length * 0.05);
         const sent   = preview.length - failed;
         const entry  = {
           id: `bcast_${Date.now()}`, type, channel, subject: subject.trim(), body: body.trim(),
@@ -3531,7 +3541,7 @@ function AdminBroadcast({ users, adminUser }) {
         setSR({ ok: true, sent, failed, source: "demo" });
         setSubject(""); setBody("");
       } else {
-        setSR({ ok: false, error: err.message, source: "live" });
+        setSR({ ok: false, error: err.message });
       }
     } finally {
       setSending(false);
@@ -3797,8 +3807,34 @@ function AdminBroadcast({ users, adminUser }) {
           transition:"all .2s",
         }}
       >
-        {sending ? "⏳ Sending…" : sendMode==="scheduled" ? `🗓 Schedule ${typeInfo.icon} ${typeInfo.label}` : `${typeInfo.icon} Send ${typeInfo.label} to ${preview.length} user${preview.length!==1?"s":""}`}
+          {sending ? "⏳ Sending…" : sendMode==="scheduled" ? `🗓 Schedule ${typeInfo.icon} ${typeInfo.label}` : `${typeInfo.icon} Send ${typeInfo.label} to ${preview.length} user${preview.length!==1?"s":""}`}
       </button>
+
+      {/* Validation hints — shown only when button is disabled and user hasn't started sending */}
+      {!canSend && !sending && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center" }}>
+          {!subject.trim() && (
+            <span style={{ fontSize:11, color:"rgba(255,255,255,.35)", background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.1)", borderRadius:99, padding:"3px 10px" }}>
+              ✏️ Subject required
+            </span>
+          )}
+          {!body.trim() && (
+            <span style={{ fontSize:11, color:"rgba(255,255,255,.35)", background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.1)", borderRadius:99, padding:"3px 10px" }}>
+              ✏️ Message body required
+            </span>
+          )}
+          {preview.length === 0 && (
+            <span style={{ fontSize:11, color:"rgba(239,68,68,.6)", background:"rgba(239,68,68,.08)", border:"1px solid rgba(239,68,68,.2)", borderRadius:99, padding:"3px 10px" }}>
+              ⚠️ No recipients match filters
+            </span>
+          )}
+          {sendMode === "scheduled" && !scheduledFor && (
+            <span style={{ fontSize:11, color:"rgba(255,255,255,.35)", background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.1)", borderRadius:99, padding:"3px 10px" }}>
+              🕐 Schedule time required
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Send result */}
       {sendResult && (
