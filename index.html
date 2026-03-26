@@ -7,6 +7,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@200;300;400;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;background:#0d0b1e;font-family:'Plus Jakarta Sans',sans-serif;}
@@ -102,6 +104,36 @@
     color: white;
     padding: 10px;
   }
+  /* ── Splash screen ── */
+  .sp-logo-block{text-align:center;opacity:0;transform:translateY(40px);animation:spRiseIn 1.2s cubic-bezier(0.22,1,0.36,1) 1.4s forwards;}
+  @keyframes spRiseIn{to{opacity:1;transform:translateY(0);}}
+  .sp-logo-wish{font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(3rem,10vw,5rem);letter-spacing:0.06em;background:linear-gradient(160deg,#fff8e1 0%,#FFD700 30%,#FF8C00 60%,#C44DFF 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 30px rgba(255,180,0,0.8)) drop-shadow(0 2px 40px rgba(196,77,255,0.5));animation:spLogoShimmer 3s ease-in-out infinite;line-height:1;}
+  @keyframes spLogoShimmer{0%,100%{filter:drop-shadow(0 0 30px rgba(255,180,0,0.8)) drop-shadow(0 0 60px rgba(196,77,255,0.4));}50%{filter:drop-shadow(0 0 50px rgba(255,215,0,1)) drop-shadow(0 0 100px rgba(196,77,255,0.7));}}
+  .sp-logo-network{font-family:'Orbitron',monospace;font-size:clamp(0.55rem,2vw,0.75rem);font-weight:400;letter-spacing:0.02em;color:rgba(0,230,255,0.7);margin-top:4px;animation:spCyberFlicker 5s ease-in-out 3s infinite;}
+  @keyframes spCyberFlicker{0%,88%,100%{opacity:0.7;}90%,96%{opacity:0.15;}92%,98%{opacity:0.7;}}
+  .sp-tagline{font-family:'Exo 2',sans-serif;font-weight:200;font-size:clamp(0.6rem,2.2vw,0.8rem);letter-spacing:0.35em;color:rgba(255,255,255,0.3);text-transform:uppercase;margin-top:10px;}
+  .sp-panel{margin-top:28px;width:min(300px,85vw);background:rgba(255,255,255,0.03);border:1px solid rgba(196,77,255,0.2);border-radius:12px;padding:14px 18px;backdrop-filter:blur(8px);opacity:0;animation:spRiseIn 1s ease 2s forwards;pointer-events:auto;}
+  .sp-panel-row{display:flex;justify-content:space-between;align-items:center;font-family:'Orbitron',monospace;font-size:0.52rem;letter-spacing:0.15em;color:rgba(0,230,255,0.55);margin-bottom:6px;}
+  .sp-panel-val{color:#FFD700;animation:spNumPulse 1.8s ease-in-out infinite;}
+  @keyframes spNumPulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+  .sp-bar-wrap{height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;margin-bottom:14px;}
+  .sp-bar-inner{height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#7B2FBE,#C44DFF,#00E5FF);animation:spGrowBar 2.5s cubic-bezier(.4,0,.2,1) 2.5s forwards;position:relative;overflow:hidden;}
+  .sp-bar-inner::after{content:'';position:absolute;right:0;top:0;bottom:0;width:60px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.85));animation:spBarShine 1s ease-in-out infinite;}
+  @keyframes spGrowBar{to{width:72%;}}
+  @keyframes spBarShine{0%,100%{opacity:1;}50%{opacity:0;}}
+  .sp-bar-inner2{height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#FF5EAB,#FFD700);animation:spGrowBar2 3s cubic-bezier(.4,0,.2,1) 2.8s forwards;}
+  @keyframes spGrowBar2{to{width:48%;}}
+  .sp-status-row{display:flex;gap:6px;justify-content:center;margin-top:6px;}
+  .sp-sbadge{font-family:'Orbitron',monospace;font-size:0.42rem;letter-spacing:0.12em;padding:4px 10px;border-radius:20px;border:1px solid;}
+  .sp-s1{border-color:rgba(0,230,255,0.5);color:rgba(0,230,255,0.9);background:rgba(0,230,255,0.06);animation:spBadgePing 2s ease-in-out infinite;}
+  .sp-s2{border-color:rgba(255,215,0,0.5);color:rgba(255,215,0,0.9);background:rgba(255,215,0,0.06);animation:spBadgePing 2s ease-in-out 0.6s infinite;}
+  .sp-s3{border-color:rgba(196,77,255,0.5);color:rgba(196,77,255,0.9);background:rgba(196,77,255,0.06);animation:spBadgePing 2s ease-in-out 1.2s infinite;}
+  @keyframes spBadgePing{0%,100%{box-shadow:none;}50%{box-shadow:0 0 10px currentColor;}}
+  .sp-nav-dots{margin-top:20px;display:flex;gap:8px;opacity:0;animation:spRiseIn 1s ease 2.4s forwards;}
+  .sp-nd{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);}
+  .sp-nd.act{background:#FFD700;box-shadow:0 0 8px #FFD700;width:22px;border-radius:3px;}
+  .sp-tap-ripple{position:fixed;border-radius:50%;pointer-events:none;z-index:50;border:2px solid rgba(255,215,0,0.9);animation:spTapOut 0.8s ease forwards;transform:translate(-50%,-50%) scale(0);}
+  @keyframes spTapOut{to{transform:translate(-50%,-50%) scale(5);opacity:0;}}
 </style>
 </head>
 <body>
@@ -6506,66 +6538,233 @@ function PinKeypad({ onKey, disabled }) {
    Auto-navigates after 2.6s.
 ═══════════════════════════════════════════════ */
 function SplashScreen({ onDone }) {
-  useEffect(()=>{ const t=setTimeout(onDone,2600); return()=>clearTimeout(t); },[]);
+  const canvasRef = useRef(null);
+  const veilRef   = useRef(null);
+  const hashRef   = useRef(null);
+  const poolRef   = useRef(null);
+
+  useEffect(()=>{
+    const done = setTimeout(onDone, 5500);
+
+    // 2 s black → fade in
+    const veil = veilRef.current;
+    const veilFadeT = setTimeout(()=>{
+      veil.style.opacity = '0';
+      setTimeout(()=>{ if(veil) veil.style.display='none'; }, 1200);
+    }, 2000);
+
+    if (typeof THREE === 'undefined') return ()=>{ clearTimeout(done); clearTimeout(veilFadeT); };
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias:true, alpha:false });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x02000A);
+    scene.fog = new THREE.FogExp2(0x02000A, 0.035);
+
+    const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 300);
+    camera.position.set(0, 0.5, 7);
+
+    scene.add(new THREE.AmbientLight(0x1a0040, 1.5));
+    const goldLight = new THREE.PointLight(0xFFAA00, 8, 12);
+    goldLight.position.set(0, 0, 3); scene.add(goldLight);
+    const purpleLight = new THREE.PointLight(0xAA00FF, 5, 15);
+    purpleLight.position.set(3, 2, 2); scene.add(purpleLight);
+    const cyanLight = new THREE.PointLight(0x00E5FF, 3, 12);
+    cyanLight.position.set(-3, -1, 2); scene.add(cyanLight);
+    const rimLight = new THREE.DirectionalLight(0xffd700, 2);
+    rimLight.position.set(0, 5, -5); scene.add(rimLight);
+
+    // 3-D star
+    function buildStarGeo(outerR, innerR, pts, depth){
+      const shape = new THREE.Shape();
+      for(let i=0;i<pts*2;i++){
+        const r = i%2===0?outerR:innerR;
+        const ang = (i/(pts*2))*Math.PI*2-Math.PI/2;
+        i===0?shape.moveTo(Math.cos(ang)*r,Math.sin(ang)*r):shape.lineTo(Math.cos(ang)*r,Math.sin(ang)*r);
+      }
+      shape.closePath();
+      return new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelThickness:0.08,bevelSize:0.06,bevelSegments:5});
+    }
+    const starGeo = buildStarGeo(1.0,0.42,5,0.28); starGeo.center();
+    const starMat = new THREE.MeshStandardMaterial({color:0xFFD700,emissive:new THREE.Color(0xFF8C00),emissiveIntensity:0.6,metalness:0.7,roughness:0.15});
+    const starMesh = new THREE.Mesh(starGeo, starMat);
+    starMesh.position.set(0,2.4,0); scene.add(starMesh);
+
+    // Glow sprite
+    const gc2 = document.createElement('canvas'); gc2.width = gc2.height = 256;
+    const gctx = gc2.getContext('2d');
+    const grd = gctx.createRadialGradient(128,128,0,128,128,128);
+    grd.addColorStop(0,'rgba(255,220,80,0.9)'); grd.addColorStop(0.3,'rgba(255,150,0,0.5)');
+    grd.addColorStop(0.7,'rgba(180,50,255,0.2)'); grd.addColorStop(1,'transparent');
+    gctx.fillStyle=grd; gctx.fillRect(0,0,256,256);
+    const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(gc2),blending:THREE.AdditiveBlending,depthWrite:false}));
+    glowSprite.scale.set(5,5,1); glowSprite.position.set(0,2.4,0); scene.add(glowSprite);
+
+    // Orbit rings
+    function makeRing(radius,tube,color,rotX,rotZ){
+      const m = new THREE.Mesh(new THREE.TorusGeometry(radius,tube,2,80),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.55,blending:THREE.AdditiveBlending,depthWrite:false}));
+      m.rotation.x=rotX; m.rotation.z=rotZ; m.position.set(0,2.4,0); return m;
+    }
+    const ring1=makeRing(1.7,0.012,0xFFD700,Math.PI/2,0.3);
+    const ring2=makeRing(2.1,0.008,0xAA55FF,Math.PI*0.4,-0.2);
+    const ring3=makeRing(2.5,0.006,0x00E5FF,Math.PI*0.55,0.5);
+    scene.add(ring1,ring2,ring3);
+
+    const orbitDot = new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),new THREE.MeshBasicMaterial({color:0xFFD700,blending:THREE.AdditiveBlending}));
+    const orbitDot2 = new THREE.Mesh(new THREE.SphereGeometry(0.04,8,8),new THREE.MeshBasicMaterial({color:0xCC66FF,blending:THREE.AdditiveBlending}));
+    scene.add(orbitDot,orbitDot2);
+
+    // Galaxy particles
+    const N=4000,pos=new Float32Array(N*3),col=new Float32Array(N*3);
+    const pal=[new THREE.Color(0xffd700),new THREE.Color(0xff9500),new THREE.Color(0xcc66ff),new THREE.Color(0x00e5ff),new THREE.Color(0xffffff)];
+    for(let i=0;i<N;i++){
+      const arm=Math.floor(Math.random()*3),tt=Math.random();
+      const angle=arm*(Math.PI*2/3)+tt*Math.PI*4,r=1.5+tt*12,spread=(1-tt)*0.8+0.3;
+      pos[i*3]=Math.cos(angle)*r+(Math.random()-0.5)*spread; pos[i*3+1]=(Math.random()-0.5)*1.5; pos[i*3+2]=Math.sin(angle)*r+(Math.random()-0.5)*spread;
+      const c=pal[Math.floor(Math.random()*pal.length)]; col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+    }
+    const galaxyGeo=new THREE.BufferGeometry();
+    galaxyGeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    galaxyGeo.setAttribute('color',new THREE.BufferAttribute(col,3));
+    const galaxy=new THREE.Points(galaxyGeo,new THREE.PointsMaterial({size:0.08,vertexColors:true,sizeAttenuation:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.85}));
+    galaxy.position.y=-1; scene.add(galaxy);
+
+    // Dust
+    const D=600,dp=new Float32Array(D*3),dc=new Float32Array(D*3);
+    for(let i=0;i<D;i++){
+      dp[i*3]=(Math.random()-0.5)*16; dp[i*3+1]=(Math.random()-0.5)*12; dp[i*3+2]=(Math.random()-0.5)*10-2;
+      const b=0.6+Math.random()*0.4;
+      if(Math.random()<0.5){dc[i*3]=b;dc[i*3+1]=b*0.85;dc[i*3+2]=0;}else{dc[i*3]=b*0.7;dc[i*3+1]=0;dc[i*3+2]=b;}
+    }
+    const dustGeo=new THREE.BufferGeometry();
+    dustGeo.setAttribute('position',new THREE.BufferAttribute(dp,3));
+    dustGeo.setAttribute('color',new THREE.BufferAttribute(dc,3));
+    const dust=new THREE.Points(dustGeo,new THREE.PointsMaterial({size:0.04,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.7}));
+    scene.add(dust);
+
+    // Pulse rings
+    const pulsePool=[];
+    const pulseInterval=setInterval(()=>{
+      const m=new THREE.Mesh(new THREE.RingGeometry(0.1,0.14,48),new THREE.MeshBasicMaterial({color:0xFFAA00,transparent:true,opacity:0.9,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));
+      m.position.set(0,2.4,0.2); m.rotation.x=Math.PI/2; scene.add(m); pulsePool.push({mesh:m,r:0.1,life:1});
+    },1600);
+
+    // Hex floor
+    const hcols=[0x1a0040,0x2a0060,0x0d0035,0x150050];
+    for(let row=-7;row<=7;row++) for(let col=-7;col<=7;col++){
+      const hx=col*(0.45*2+0.04)*Math.sqrt(3)/2, hz=row*(0.45*2+0.04)*0.75+(col%2===0?0:(0.45+0.02)*0.75);
+      if(Math.sqrt(hx*hx+hz*hz)>6.5) continue;
+      const hex=new THREE.Mesh(new THREE.CylinderGeometry(0.45*0.95,0.45*0.95,0.06,6),new THREE.MeshStandardMaterial({color:hcols[Math.floor(Math.random()*hcols.length)],emissive:new THREE.Color(0x1a0040),emissiveIntensity:Math.random()*0.5,metalness:0.8,roughness:0.3}));
+      hex.position.set(hx,-2.5+Math.random()*0.05,hz); scene.add(hex);
+    }
+
+    // Mouse parallax
+    let mx=0,my=0,tx=0,ty=0;
+    const onMM=e=>{ mx=(e.clientX/innerWidth-0.5)*2; my=(e.clientY/innerHeight-0.5)*2; };
+    const onTM=e=>{ mx=(e.touches[0].clientX/innerWidth-0.5)*2; my=(e.touches[0].clientY/innerHeight-0.5)*2; };
+    document.addEventListener('mousemove',onMM);
+    document.addEventListener('touchmove',onTM,{passive:true});
+
+    // Tap burst
+    const onTap=e=>{
+      const rip=document.createElement('div'); rip.className='sp-tap-ripple';
+      rip.style.cssText='left:'+e.clientX+'px;top:'+e.clientY+'px;width:60px;height:60px;';
+      document.body.appendChild(rip); setTimeout(()=>rip.remove(),800);
+      for(let i=0;i<20;i++){
+        const p=new THREE.Mesh(new THREE.SphereGeometry(0.04+Math.random()*0.06,4,4),new THREE.MeshBasicMaterial({color:[0xFFD700,0xCC66FF,0x00E5FF][Math.floor(Math.random()*3)],blending:THREE.AdditiveBlending,transparent:true}));
+        p.position.set(0,2.4,0.5); scene.add(p);
+        const vx=(Math.random()-0.5)*0.25,vy=Math.random()*0.25+0.05,vz=(Math.random()-0.5)*0.25;
+        let life=1;
+        (function tick(){ p.position.x+=vx;p.position.y+=vy;p.position.z+=vz;life-=0.025;p.material.opacity=life;if(life>0)requestAnimationFrame(tick);else scene.remove(p); })();
+      }
+    };
+    document.addEventListener('click',onTap);
+
+    // Animate
+    const clock=new THREE.Clock();
+    let introT=0,rafId=0;
+    function animate(){
+      rafId=requestAnimationFrame(animate);
+      const t=clock.getElapsedTime();
+      if(introT<1){introT=Math.min(1,t*0.4);camera.position.z=14-introT*7;}
+      tx+=(mx-tx)*0.05; ty+=(my-ty)*0.05;
+      camera.position.x=tx*1.5; camera.position.y=0.5+(-ty*0.8);
+      camera.lookAt(0,1.2,0);
+      starMesh.rotation.y=t*0.6; starMesh.rotation.z=Math.sin(t*0.7)*0.25;
+      starMesh.position.y=2.4+Math.sin(t*1.1)*0.12;
+      glowSprite.position.y=starMesh.position.y;
+      goldLight.intensity=7+Math.sin(t*2)*3; purpleLight.intensity=4+Math.sin(t*1.3+1)*2;
+      goldLight.position.x=Math.sin(t*0.8)*2; goldLight.position.y=Math.cos(t*0.6)*2+1;
+      ring1.rotation.y=t*0.5; ring2.rotation.y=-t*0.35; ring3.rotation.y=t*0.2;
+      ring1.rotation.x=Math.PI/2+Math.sin(t*0.4)*0.15;
+      orbitDot.position.set(Math.cos(t*1.2)*1.7,2.4+Math.sin(t*1.2)*1.7*Math.sin(0.3),Math.sin(t*1.2)*1.7*Math.cos(0.3));
+      orbitDot2.position.set(Math.cos(-t*0.8+1)*2.1,2.4+Math.sin(-t*0.8+1)*2.1*Math.sin(0.4),Math.sin(-t*0.8+1)*2.1*Math.cos(0.4));
+      galaxy.rotation.y=t*0.04;
+      const dpa=dust.geometry.attributes.position.array;
+      for(let i=1;i<dpa.length;i+=3){dpa[i]+=0.002;if(dpa[i]>6)dpa[i]=-6;}
+      dust.geometry.attributes.position.needsUpdate=true; dust.rotation.y=t*0.01;
+      for(let i=pulsePool.length-1;i>=0;i--){
+        const pp=pulsePool[i]; pp.r+=0.04;pp.life-=0.018;
+        pp.mesh.scale.setScalar(pp.r/0.1); pp.mesh.material.opacity=pp.life*0.9;
+        if(pp.life<=0){scene.remove(pp.mesh);pulsePool.splice(i,1);}
+      }
+      renderer.render(scene,camera);
+    }
+    animate();
+
+    // Counters
+    let h=0,p=0;
+    const cT=setTimeout(()=>{
+      const hi=setInterval(()=>{ h=Math.min(h+0.055,4.72); if(hashRef.current) hashRef.current.textContent=h.toFixed(2)+' WNH/s'; if(h>=4.72)clearInterval(hi); },35);
+      const pi=setInterval(()=>{ p=Math.min(p+0.003,0.847); if(poolRef.current) poolRef.current.textContent=p.toFixed(3)+' WNC'; if(p>=0.847)clearInterval(pi); },35);
+    },2200);
+
+    // Resize
+    const onResize=()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); };
+    window.addEventListener('resize',onResize);
+
+    return ()=>{
+      clearTimeout(done); clearTimeout(veilFadeT); clearTimeout(cT);
+      clearInterval(pulseInterval);
+      cancelAnimationFrame(rafId);
+      document.removeEventListener('mousemove',onMM);
+      document.removeEventListener('touchmove',onTM);
+      document.removeEventListener('click',onTap);
+      window.removeEventListener('resize',onResize);
+      renderer.dispose();
+    };
+  },[]);
+
   return (
-    <div style={{
-      position:'fixed',inset:0,zIndex:9999,
-      background:'linear-gradient(160deg,#080616 0%,#13102a 52%,#0a0820 100%)',
-      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-      fontFamily:"'Plus Jakarta Sans',sans-serif",overflow:'hidden',
-    }}>
-      {/* Ambient orbs */}
-      <div style={{position:'absolute',top:'10%',left:'8%',width:240,height:240,borderRadius:'50%',
-        background:'radial-gradient(circle,rgba(139,92,246,.18),transparent 68%)',
-        animation:'float 4.5s ease infinite',pointerEvents:'none'}}/>
-      <div style={{position:'absolute',bottom:'16%',right:'6%',width:180,height:180,borderRadius:'50%',
-        background:'radial-gradient(circle,rgba(236,72,153,.13),transparent 68%)',
-        animation:'float 5.5s ease infinite reverse',pointerEvents:'none'}}/>
-      <div style={{position:'absolute',top:'55%',left:'55%',width:320,height:320,borderRadius:'50%',
-        background:'radial-gradient(circle,rgba(6,182,212,.06),transparent 68%)',
-        transform:'translate(-30%,-40%)',pointerEvents:'none'}}/>
-
-      {/* Swinging logo block — transform-origin at top-center = pendulum pivot */}
-      <div style={{
-        animation:'swing 1.7s cubic-bezier(.36,.07,.19,.97) .15s both',
-        transformOrigin:'center top',
-        display:'flex',flexDirection:'column',alignItems:'center',gap:12,
-      }}>
-        <div style={{
-          fontSize:84,lineHeight:1,
-          filter:'drop-shadow(0 0 32px rgba(139,92,246,.7)) drop-shadow(0 0 14px rgba(236,72,153,.35))',
-        }}>⭐</div>
-        <div style={{
-          fontSize:48,fontWeight:900,letterSpacing:-2,
-          background:'linear-gradient(100deg,#c4b5fd 0%,#a78bfa 40%,#ec4899 100%)',
-          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
-        }}>Wish</div>
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:'#02000A'}}>
+      <div ref={veilRef} style={{position:'fixed',inset:0,zIndex:999,background:'#02000A',opacity:1,transition:'opacity 1.2s ease'}}/>
+      <canvas ref={canvasRef} style={{position:'fixed',inset:0,zIndex:1,display:'block'}}/>
+      <div style={{position:'fixed',inset:0,zIndex:10,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',paddingBottom:'2vh',pointerEvents:'none'}}>
+        <div style={{flex:1}}/>
+        <div className="sp-logo-block">
+          <div className="sp-logo-wish">Wish</div>
+          <div className="sp-logo-network">Network Mining Protocol</div>
+          <div className="sp-tagline">Earn &nbsp;·&nbsp; Mine &nbsp;·&nbsp; Reward</div>
+        </div>
+        <div className="sp-panel">
+          <div className="sp-panel-row"><span>HASH POWER</span><span className="sp-panel-val" ref={hashRef}>0.00 WNH/s</span></div>
+          <div className="sp-bar-wrap"><div className="sp-bar-inner"/></div>
+          <div className="sp-panel-row"><span>REWARD POOL</span><span className="sp-panel-val" ref={poolRef}>0.000 WNC</span></div>
+          <div className="sp-bar-wrap"><div className="sp-bar-inner2"/></div>
+          <div className="sp-status-row">
+            <div className="sp-sbadge sp-s1">● ONLINE</div>
+            <div className="sp-sbadge sp-s2">⚡ MINING</div>
+            <div className="sp-sbadge sp-s3">✦ STAKING</div>
+          </div>
+        </div>
+        <div className="sp-nav-dots">
+          <div className="sp-nd"/><div className="sp-nd"/><div className="sp-nd act"/>
+        </div>
       </div>
-
-      {/* Tagline */}
-      <div style={{
-        marginTop:16,fontSize:13,color:'rgba(255,255,255,.35)',fontWeight:500,
-        letterSpacing:2.5,textTransform:'uppercase',
-        animation:'splashFade .7s ease .95s both',
-      }}>Earn &amp; Reward Platform</div>
-
-      {/* Dot loader */}
-      <div style={{position:'absolute',bottom:76,display:'flex',gap:9}}>
-        {[0,1,2].map(i=>(
-          <div key={i} style={{
-            width:7,height:7,borderRadius:'50%',
-            background:'rgba(139,92,246,.65)',
-            animation:`dotPulse 1.15s ease ${i*.19}s infinite`,
-          }}/>
-        ))}
-      </div>
-
-      {/* Version tag */}
-      <div style={{
-        position:'absolute',bottom:34,fontSize:11,
-        color:'rgba(255,255,255,.15)',fontWeight:500,letterSpacing:.5,
-        animation:'splashFade .5s ease 1.5s both',
-      }}>v1.0.0 · Wish Platform</div>
     </div>
   );
 }
@@ -7330,10 +7529,13 @@ function SecuritySettingsView({ user }) {
      logout → auth
 ═══════════════════════════════════════════════ */
 function WishApp(){
+  const [splashDone,setSplashDone] = useState(false);
   const [loggedUser,setLU] = useState(()=>Security.load('last_user',null));
   const [lang,setLang]     = useState(()=>Security.load('lang','en'));
   // unlocked=true when user just logged in (fresh), or has already passed the lock screen this session
   const [unlocked,setUnlocked] = useState(false);
+
+  if(!splashDone) return <SplashScreen onDone={()=>setSplashDone(true)}/>;
 
   const handleLogin  = (u) => { Security.save('last_user',u); setLU(u); setUnlocked(true); };
   const handleLogout = ()  => { Security.remove('last_user'); setLU(null); setUnlocked(false); };
