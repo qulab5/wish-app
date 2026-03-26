@@ -10,14 +10,11 @@ function checkAuth(req) {
 
 // Build audience query from filter criteria
 async function fetchRecipients(audience) {
-  let query = supabase.from('users').select('id, name, email, country, pts, active, role');
+  let query = supabase.from('users').select('id, name, email, country, pts, active');
 
   const filter = audience?.filter || 'all';
   if (filter === 'active')   query = query.eq('active', true);
   if (filter === 'inactive') query = query.eq('active', false);
-
-  // Exclude admins from broadcasts unless explicitly included
-  query = query.not('role', 'in', '("super_admin","moderator")');
 
   const { data, error } = await query;
   if (error) throw new Error(`Failed to fetch recipients: ${error.message}`);
