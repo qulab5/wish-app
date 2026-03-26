@@ -3586,16 +3586,17 @@ function AdminBroadcast({ users, adminUser }) {
       };
       setHistory(h => [entry, ...h]);
       setSR({ ok: true, sent: json.sent, failed: json.failed, note: json.note, source: "live" });
-      if (channel === "in_app" && sendMode === "now") {
-        try {
-          const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
-          localStorage.setItem('wish_announcements', JSON.stringify([
-            { id: entry.id, type, icon: BROADCAST_TYPES.find(t=>t.id===type)?.icon||"📢",
-              title: subject.trim(), body: body.trim(), sentAt: entry.sentAt, color: BROADCAST_TYPES.find(t=>t.id===type)?.color||C.brand },
-            ...prev
-          ]));
-        } catch {}
-      }
+      // Write every broadcast to the in-app announcements store so users see it
+      try {
+        const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
+        const ti = BROADCAST_TYPES.find(t=>t.id===type);
+        localStorage.setItem('wish_announcements', JSON.stringify([
+          { id: entry.id, type, icon: ti?.icon||"📢",
+            title: subject.trim(), body: body.trim(),
+            sentAt: new Date().toISOString(), color: ti?.color||C.brand },
+          ...prev
+        ]));
+      } catch {}
       setSubject(""); setBody("");
     } catch (err) {
       // Demo fallback ONLY when the endpoint doesn't exist yet (local dev without API routes).
@@ -3618,16 +3619,17 @@ function AdminBroadcast({ users, adminUser }) {
         };
         setHistory(h => [entry, ...h]);
         setSR({ ok: true, sent, failed, source: "demo" });
-        if (channel === "in_app" && sendMode === "now") {
-          try {
-            const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
-            localStorage.setItem('wish_announcements', JSON.stringify([
-              { id: entry.id, type, icon: BROADCAST_TYPES.find(t=>t.id===type)?.icon||"📢",
-                title: subject.trim(), body: body.trim(), sentAt: entry.sentAt, color: BROADCAST_TYPES.find(t=>t.id===type)?.color||C.brand },
-              ...prev
-            ]));
-          } catch {}
-        }
+        // Write every broadcast to the in-app announcements store so users see it
+        try {
+          const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
+          const ti = BROADCAST_TYPES.find(t=>t.id===type);
+          localStorage.setItem('wish_announcements', JSON.stringify([
+            { id: entry.id, type, icon: ti?.icon||"📢",
+              title: subject.trim(), body: body.trim(),
+              sentAt: new Date().toISOString(), color: ti?.color||C.brand },
+            ...prev
+          ]));
+        } catch {}
         setSubject(""); setBody("");
       } else {
         setSR({ ok: false, error: err.message });
@@ -5363,28 +5365,41 @@ function MainApp({user,onLogout,lang,setLang}){
             </div>
             {/* Menu Items */}
             <div style={{flex:1,overflowY:"auto",paddingTop:8}}>
-              {[
-                {icon:"👤",label:"Profile"},
-                {icon:"🏆",label:"Leader Board"},
-                {icon:"👥",label:"Referral Team"},
-                {icon:"📢",label:"Announcement"},
-                {icon:"📄",label:"White Paper"},
-                {icon:"🎧",label:"Support Portal"},
-                {icon:"🔐",label:"Security"},
-              ].map(item=>(
-                <button key={item.label} className="menu-item" onClick={()=>{
-                  if(item.label==="Profile"){setSO(false);setSV("profile");}
-                  else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
-                  else if(item.label==="Security"){setSO(false);setSV("security");}
-                  else if(item.label==="Referral Team"){setSO(false);setSV("referral");}
-                  else if(item.label==="Announcement"){setSO(false);setSV("announcements");}
-                  else setSO(false);
-                }}>
-                  <span style={{fontSize:20}}>{item.icon}</span>
-                  <span>{item.label}</span>
-                  <span style={{marginLeft:"auto",color:C.muted,fontSize:18}}>›</span>
-                </button>
-              ))}
+              {(()=>{
+                const anns = (()=>{try{return JSON.parse(localStorage.getItem('wish_announcements')||'[]');}catch{return [];}})();
+                const lastSeen = Number(localStorage.getItem('wish_ann_seen')||0);
+                const unread = anns.filter(a=>new Date(a.sentAt).getTime()>lastSeen).length;
+                return [
+                  {icon:"👤",label:"Profile"},
+                  {icon:"🏆",label:"Leader Board"},
+                  {icon:"👥",label:"Referral Team"},
+                  {icon:"📢",label:"Announcement",badge:unread},
+                  {icon:"📄",label:"White Paper"},
+                  {icon:"🎧",label:"Support Portal"},
+                  {icon:"🔐",label:"Security"},
+                ].map(item=>(
+                  <button key={item.label} className="menu-item" onClick={()=>{
+                    if(item.label==="Profile"){setSO(false);setSV("profile");}
+                    else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
+                    else if(item.label==="Security"){setSO(false);setSV("security");}
+                    else if(item.label==="Referral Team"){setSO(false);setSV("referral");}
+                    else if(item.label==="Announcement"){
+                      localStorage.setItem('wish_ann_seen', Date.now().toString());
+                      setSO(false);setSV("announcements");
+                    }
+                    else setSO(false);
+                  }}>
+                    <span style={{fontSize:20}}>{item.icon}</span>
+                    <span style={{flex:1}}>{item.label}</span>
+                    {item.badge>0&&(
+                      <span style={{background:"#ef4444",color:"#fff",fontSize:11,fontWeight:800,borderRadius:99,padding:"2px 7px",marginRight:6,minWidth:20,textAlign:"center"}}>
+                        {item.badge}
+                      </span>
+                    )}
+                    <span style={{color:C.muted,fontSize:18}}>›</span>
+                  </button>
+                ));
+              })()}
             </div>
           </div>
         </>
@@ -5771,8 +5786,7 @@ function MainApp({user,onLogout,lang,setLang}){
               {anns.length===0?(
                 <div style={{textAlign:"center",padding:"60px 20px"}}>
                   <div style={{fontSize:48,marginBottom:16}}>📭</div>
-                  <div style={{fontSize:16,fontWeight:700,color:C.white,marginBottom:8}}>No Announcements Yet</div>
-                  <div style={{fontSize:13,color:C.muted}}>Admin messages sent to you will appear here.</div>
+                  <div style={{fontSize:16,fontWeight:700,color:C.white}}>No Announcements Yet</div>
                 </div>
               ):(
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
