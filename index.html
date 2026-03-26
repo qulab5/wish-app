@@ -3586,6 +3586,16 @@ function AdminBroadcast({ users, adminUser }) {
       };
       setHistory(h => [entry, ...h]);
       setSR({ ok: true, sent: json.sent, failed: json.failed, note: json.note, source: "live" });
+      if (channel === "in_app" && sendMode === "now") {
+        try {
+          const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
+          localStorage.setItem('wish_announcements', JSON.stringify([
+            { id: entry.id, type, icon: BROADCAST_TYPES.find(t=>t.id===type)?.icon||"📢",
+              title: subject.trim(), body: body.trim(), sentAt: entry.sentAt, color: BROADCAST_TYPES.find(t=>t.id===type)?.color||C.brand },
+            ...prev
+          ]));
+        } catch {}
+      }
       setSubject(""); setBody("");
     } catch (err) {
       // Demo fallback ONLY when the endpoint doesn't exist yet (local dev without API routes).
@@ -3608,6 +3618,16 @@ function AdminBroadcast({ users, adminUser }) {
         };
         setHistory(h => [entry, ...h]);
         setSR({ ok: true, sent, failed, source: "demo" });
+        if (channel === "in_app" && sendMode === "now") {
+          try {
+            const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
+            localStorage.setItem('wish_announcements', JSON.stringify([
+              { id: entry.id, type, icon: BROADCAST_TYPES.find(t=>t.id===type)?.icon||"📢",
+                title: subject.trim(), body: body.trim(), sentAt: entry.sentAt, color: BROADCAST_TYPES.find(t=>t.id===type)?.color||C.brand },
+              ...prev
+            ]));
+          } catch {}
+        }
         setSubject(""); setBody("");
       } else {
         setSR({ ok: false, error: err.message });
@@ -4023,6 +4043,22 @@ function AdminPanel({user, onExit, lang}){
   const role = user.role || (user.isAdmin ? "super_admin" : "user");
   const [tab,setTab] = useState("dashboard");
   const [users,setUsers] = useState(INITIAL_USERS);
+
+  // Load real users from Supabase on mount; fall back to INITIAL_USERS on error
+  useEffect(()=>{
+    fetch('/api/user?action=adminData')
+      .then(r=>r.ok?r.json():Promise.reject(r.status))
+      .then(d=>{
+        if(d.users?.length){
+          setUsers(d.users.map(u=>({
+            ...u,
+            role:u.role||(u.isAdmin?'super_admin':'user'),
+            active:u.active??true,
+          })));
+        }
+      })
+      .catch(()=>{/* stay on INITIAL_USERS demo data */});
+  },[]);
 
   const tabs = [
     { id:"dashboard", label:"Dashboard", icon:"📊", perm:"view_dashboard" },
@@ -5341,6 +5377,7 @@ function MainApp({user,onLogout,lang,setLang}){
                   else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
                   else if(item.label==="Security"){setSO(false);setSV("security");}
                   else if(item.label==="Referral Team"){setSO(false);setSV("referral");}
+                  else if(item.label==="Announcement"){setSO(false);setSV("announcements");}
                   else setSO(false);
                 }}>
                   <span style={{fontSize:20}}>{item.icon}</span>
@@ -5715,6 +5752,49 @@ function MainApp({user,onLogout,lang,setLang}){
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        );
+      })()}
+      {/* ── Announcements view ── */}
+      {sidebarView==="announcements"&&(()=>{
+        const anns = (()=>{try{return JSON.parse(localStorage.getItem('wish_announcements')||'[]');}catch{return [];}})();
+        const typeColor={announcement:"#06b6d4",promotion:"#10b981",info:"#8b5cf6",warning:"#f59e0b"};
+        const typeIcon ={announcement:"📢",promotion:"🎁",info:"ℹ️",warning:"⚠️"};
+        return(
+          <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+            <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+              <div style={{fontSize:18,fontWeight:800,color:C.white}}>📢 Announcements</div>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"16px 16px 40px"}}>
+              {anns.length===0?(
+                <div style={{textAlign:"center",padding:"60px 20px"}}>
+                  <div style={{fontSize:48,marginBottom:16}}>📭</div>
+                  <div style={{fontSize:16,fontWeight:700,color:C.white,marginBottom:8}}>No Announcements Yet</div>
+                  <div style={{fontSize:13,color:C.muted}}>Admin messages sent to you will appear here.</div>
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  {anns.map(a=>{
+                    const col=typeColor[a.type]||C.brand;
+                    const icon=typeIcon[a.type]||"📢";
+                    return(
+                      <div key={a.id} style={{background:C.s2,border:`1px solid ${col}33`,borderRadius:16,padding:16,position:"relative",overflow:"hidden"}}>
+                        <div style={{position:"absolute",top:0,left:0,width:3,height:"100%",background:col,borderRadius:"4px 0 0 4px"}}/>
+                        <div style={{paddingLeft:8}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                            <span style={{fontSize:18}}>{icon}</span>
+                            <span style={{fontSize:14,fontWeight:700,color:C.white,flex:1}}>{a.title}</span>
+                            <span style={{fontSize:10,color:C.muted,flexShrink:0}}>{a.sentAt?new Date(a.sentAt).toLocaleDateString("en-US",{month:"short",day:"numeric"}):""}</span>
+                          </div>
+                          <div style={{fontSize:13,color:"rgba(255,255,255,.65)",lineHeight:1.6}}>{a.body}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         );
