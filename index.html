@@ -222,6 +222,7 @@ const PERMISSIONS = {
     "edit_settings",
     "manage_api_keys",
     "manage_webhooks",
+    "manage_email_templates",
   ],
   moderator: [
     "view_dashboard",
@@ -1168,6 +1169,175 @@ const INITIAL_WEBHOOKS = [
 ];
 
 /* ═══════════════════════════════════════════════
+   EMAIL TEMPLATES
+═══════════════════════════════════════════════ */
+// Merge tags available per template — used for reference panel + live preview substitution
+const EMAIL_TEMPLATE_VARS = {
+  otp_verification:    [["{{name}}","Recipient name"],["{{otp}}","6-digit OTP code"],["{{expiry_minutes}}","OTP expiry in minutes"],["{{app_name}}","App name"]],
+  welcome:             [["{{name}}","Recipient name"],["{{email}}","Recipient email"],["{{app_name}}","App name"],["{{login_url}}","Login URL"]],
+  reward_earned:       [["{{name}}","Recipient name"],["{{points}}","Points earned"],["{{total_points}}","New total points"],["{{usd_value}}","USD equivalent"],["{{app_name}}","App name"]],
+  withdrawal_approved: [["{{name}}","Recipient name"],["{{amount_usd}}","Withdrawal amount"],["{{method}}","Payment method"],["{{ref_id}}","Reference ID"],["{{app_name}}","App name"]],
+  withdrawal_rejected: [["{{name}}","Recipient name"],["{{amount_usd}}","Requested amount"],["{{reason}}","Rejection reason"],["{{app_name}}","App name"]],
+  account_suspended:   [["{{name}}","Recipient name"],["{{reason}}","Suspension reason"],["{{support_email}}","Support email"],["{{app_name}}","App name"]],
+};
+
+// Preview substitution values shown in the live preview
+const EMAIL_PREVIEW_VALUES = {
+  "{{name}}":           "Ahmad Ali",
+  "{{email}}":          "ahmad@wish.com",
+  "{{otp}}":            "483 921",
+  "{{expiry_minutes}}": "10",
+  "{{app_name}}":       "Wish",
+  "{{login_url}}":      "https://wish.app/login",
+  "{{points}}":         "500",
+  "{{total_points}}":   "48,700",
+  "{{usd_value}}":      "$0.50",
+  "{{amount_usd}}":     "$25.00",
+  "{{method}}":         "USDT (TRC-20)",
+  "{{ref_id}}":         "WD-20250325-0042",
+  "{{reason}}":         "Violation of platform terms of service.",
+  "{{support_email}}":  "support@wish.app",
+};
+
+function previewHtml(html, subject){
+  let out = html;
+  let subj = subject;
+  Object.entries(EMAIL_PREVIEW_VALUES).forEach(([k,v])=>{
+    const re = new RegExp(k.replace(/[{}]/g,"\\$&"),"g");
+    out  = out.replace(re,v);
+    subj = subj.replace(re,v);
+  });
+  return {html:out, subject:subj};
+}
+
+const BASE_HTML = (accentColor="#8b5cf6")=>`
+<div style="font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f8;padding:32px 16px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+    <div style="background:linear-gradient(135deg,${accentColor},#6d28d9);padding:28px 32px;text-align:center;">
+      <span style="font-size:32px;">✨</span>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:8px;">{{app_name}}</div>
+    </div>
+    <div style="padding:32px;">
+      BODY_PLACEHOLDER
+    </div>
+    <div style="background:#f9f9fb;padding:20px 32px;text-align:center;font-size:12px;color:#999;">
+      © 2025 {{app_name}} · You received this because you have an account with us.
+    </div>
+  </div>
+</div>`.trim();
+
+const INITIAL_EMAIL_TEMPLATES = [
+  {
+    id:"otp_verification",
+    name:"OTP Verification",
+    description:"Sent when a user requests a login or registration code.",
+    icon:"🔐",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Your {{app_name}} verification code",
+    html: BASE_HTML().replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Verify your identity</h2>
+      <p style="color:#555;margin:0 0 24px;line-height:1.6;">Hi {{name}}, use the code below to complete your sign-in. It expires in <strong>{{expiry_minutes}} minutes</strong>.</p>
+      <div style="text-align:center;margin:24px 0;">
+        <div style="display:inline-block;background:#f0ebff;border:2px dashed #8b5cf6;border-radius:12px;padding:18px 40px;font-size:38px;font-weight:900;letter-spacing:10px;color:#6d28d9;">{{otp}}</div>
+      </div>
+      <p style="color:#999;font-size:13px;text-align:center;">Never share this code with anyone.</p>`),
+  },
+  {
+    id:"welcome",
+    name:"Welcome",
+    description:"Sent immediately after a user creates their account.",
+    icon:"👋",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Welcome to {{app_name}}, {{name}}!",
+    html: BASE_HTML().replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Welcome aboard, {{name}}! 🎉</h2>
+      <p style="color:#555;margin:0 0 16px;line-height:1.6;">Your account is all set up and ready to go. Start earning points by completing tasks, watching ads, and spinning the reward wheel.</p>
+      <div style="background:#f0ebff;border-radius:12px;padding:16px 20px;margin:20px 0;">
+        <div style="font-size:13px;color:#6d28d9;font-weight:700;margin-bottom:8px;">✨ Quick Start</div>
+        <ul style="margin:0;padding-left:18px;color:#555;font-size:14px;line-height:2;">
+          <li>Complete your profile</li>
+          <li>Watch your first ad to earn points</li>
+          <li>Try the daily spin wheel</li>
+          <li>Invite friends for 300 bonus points each</li>
+        </ul>
+      </div>
+      <div style="text-align:center;margin-top:24px;">
+        <a href="{{login_url}}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;">Open {{app_name}}</a>
+      </div>`),
+  },
+  {
+    id:"reward_earned",
+    name:"Reward Earned",
+    description:"Sent when a user earns a significant reward or bonus.",
+    icon:"⭐",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"You just earned {{points}} points on {{app_name}}!",
+    html: BASE_HTML("#f59e0b").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">You earned a reward! 🎁</h2>
+      <p style="color:#555;margin:0 0 24px;line-height:1.6;">Great news, {{name}}! You've just earned <strong>{{points}} points</strong> on {{app_name}}.</p>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:20px;text-align:center;margin:0 0 20px;">
+        <div style="font-size:13px;color:#92400e;font-weight:700;margin-bottom:4px;">Points Earned</div>
+        <div style="font-size:42px;font-weight:900;color:#d97706;">+{{points}}</div>
+        <div style="font-size:13px;color:#b45309;margin-top:4px;">≈ {{usd_value}}</div>
+        <div style="height:1px;background:#fde68a;margin:12px 0;"></div>
+        <div style="font-size:12px;color:#92400e;">New total: <strong>{{total_points}} pts</strong></div>
+      </div>
+      <p style="color:#999;font-size:13px;text-align:center;">Keep earning — withdraw when you hit the minimum threshold!</p>`),
+  },
+  {
+    id:"withdrawal_approved",
+    name:"Withdrawal Approved",
+    description:"Sent when a withdrawal request is approved and processed.",
+    icon:"💸",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Your withdrawal of {{amount_usd}} has been approved",
+    html: BASE_HTML("#10b981").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Withdrawal Approved ✅</h2>
+      <p style="color:#555;margin:0 0 20px;line-height:1.6;">Hi {{name}}, your withdrawal request has been approved and is being processed.</p>
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:20px;margin:0 0 20px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr><td style="color:#6b7280;padding:6px 0;">Amount</td><td style="text-align:right;font-weight:700;color:#065f46;">{{amount_usd}}</td></tr>
+          <tr><td style="color:#6b7280;padding:6px 0;">Method</td><td style="text-align:right;color:#1f2937;">{{method}}</td></tr>
+          <tr><td style="color:#6b7280;padding:6px 0;">Reference</td><td style="text-align:right;color:#1f2937;font-family:monospace;">{{ref_id}}</td></tr>
+        </table>
+      </div>
+      <p style="color:#999;font-size:13px;text-align:center;">Funds typically arrive within 1–3 business days depending on your payment method.</p>`),
+  },
+  {
+    id:"withdrawal_rejected",
+    name:"Withdrawal Rejected",
+    description:"Sent when a withdrawal request cannot be processed.",
+    icon:"❌",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Update on your {{app_name}} withdrawal request",
+    html: BASE_HTML("#ef4444").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Withdrawal Not Processed</h2>
+      <p style="color:#555;margin:0 0 16px;line-height:1.6;">Hi {{name}}, unfortunately we were unable to process your withdrawal of <strong>{{amount_usd}}</strong>.</p>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+        <div style="font-size:12px;font-weight:700;color:#b91c1c;margin-bottom:4px;">Reason</div>
+        <div style="color:#7f1d1d;font-size:14px;line-height:1.6;">{{reason}}</div>
+      </div>
+      <p style="color:#555;font-size:14px;line-height:1.6;">Your balance has not been affected. If you believe this is an error, please contact us at <a href="mailto:{{support_email}}" style="color:#8b5cf6;">{{support_email}}</a>.</p>`),
+  },
+  {
+    id:"account_suspended",
+    name:"Account Suspended",
+    description:"Sent when a user's account is deactivated by an admin.",
+    icon:"🚫",
+    enabled:false,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Important notice about your {{app_name}} account",
+    html: BASE_HTML("#6b7280").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Account Suspended</h2>
+      <p style="color:#555;margin:0 0 16px;line-height:1.6;">Hi {{name}}, your {{app_name}} account has been suspended.</p>
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">Reason</div>
+        <div style="color:#4b5563;font-size:14px;line-height:1.6;">{{reason}}</div>
+      </div>
+      <p style="color:#555;font-size:14px;line-height:1.6;">To appeal this decision, contact us at <a href="mailto:{{support_email}}" style="color:#8b5cf6;">{{support_email}}</a>.</p>`),
+  },
+];
+
+/* ═══════════════════════════════════════════════
    ADMIN PANEL — RBAC
 ═══════════════════════════════════════════════ */
 function RoleBadge({role}){
@@ -2000,6 +2170,262 @@ function AdminWebhooks(){
   );
 }
 
+/* ── Email Templates Tab ───────────────────────── */
+function AdminEmailTemplates(){
+  const [templates,setTemplates] = useState(INITIAL_EMAIL_TEMPLATES);
+  const [editId,setEditId]       = useState(null); // template id being edited, or null = list view
+  const [previewMode,setPreview] = useState(false);
+  const [saved,setSaved]         = useState(false);
+  const [resetConfirm,setRC]     = useState(false);
+  const iframeRef                = React.useRef(null);
+
+  // Draft state while editing
+  const [draft,setDraft] = useState({subject:"",html:""});
+
+  const openEditor = (tpl) => {
+    setDraft({subject:tpl.subject, html:tpl.html});
+    setEditId(tpl.id);
+    setPreview(false);
+    setSaved(false);
+    setRC(false);
+  };
+
+  const closeEditor = () => { setEditId(null); setPreview(false); };
+
+  const saveDraft = () => {
+    setTemplates(prev=>prev.map(t=>t.id===editId
+      ? {...t, subject:draft.subject, html:draft.html, updatedAt:new Date().toISOString()}
+      : t
+    ));
+    setSaved(true);
+    setTimeout(()=>setSaved(false),2500);
+  };
+
+  const resetToDefault = () => {
+    const orig = INITIAL_EMAIL_TEMPLATES.find(t=>t.id===editId);
+    if(orig){ setDraft({subject:orig.subject, html:orig.html}); }
+    setRC(false);
+  };
+
+  const toggleEnabled = (id) => {
+    setTemplates(prev=>prev.map(t=>t.id===id?{...t,enabled:!t.enabled}:t));
+  };
+
+  // Insert a variable tag at cursor position in the active textarea
+  const insertVar = (tag, field) => {
+    const el = document.getElementById(`email-${field}`);
+    if(!el) return;
+    const s = el.selectionStart, e = el.selectionEnd;
+    const val = draft[field];
+    const next = val.slice(0,s)+tag+val.slice(e);
+    setDraft(p=>({...p,[field]:next}));
+    // restore cursor after React re-render
+    setTimeout(()=>{ el.focus(); el.setSelectionRange(s+tag.length,s+tag.length); },0);
+  };
+
+  // Update iframe preview whenever draft changes
+  React.useEffect(()=>{
+    if(!previewMode||!iframeRef.current) return;
+    const {html,subject} = previewHtml(draft.html, draft.subject);
+    const doc = iframeRef.current.contentDocument||iframeRef.current.contentWindow.document;
+    doc.open(); doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${subject}</title></head><body style="margin:0;">${html}</body></html>`); doc.close();
+  },[previewMode,draft]);
+
+  /* ── List view ── */
+  if(!editId){
+    return (
+      <div>
+        <div style={{fontWeight:700,color:C.white,fontSize:15,marginBottom:4}}>Email Templates</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:16}}>Edit the emails sent to your users. Changes are saved per-session.</div>
+
+        {templates.map(tpl=>(
+          <div key={tpl.id} className="user-row" style={{cursor:"default"}}>
+            <div style={{
+              width:40,height:40,borderRadius:10,flexShrink:0,
+              background:"rgba(139,92,246,.12)",border:`1px solid ${C.border}`,
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,
+            }}>{tpl.icon}</div>
+
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontWeight:700,color:C.white,fontSize:14}}>{tpl.name}</span>
+                <span style={{
+                  fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,
+                  background:tpl.enabled?"rgba(16,185,129,.13)":"rgba(255,255,255,.06)",
+                  color:tpl.enabled?C.green:"rgba(255,255,255,.35)",
+                  border:`1px solid ${tpl.enabled?"rgba(16,185,129,.3)":"rgba(255,255,255,.12)"}`,
+                }}>{tpl.enabled?"Enabled":"Disabled"}</span>
+              </div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tpl.description}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.25)",marginTop:2}}>Last edited {fmtDate(tpl.updatedAt)}</div>
+            </div>
+
+            <div style={{display:"flex",gap:8,flexShrink:0,alignItems:"center"}}>
+              <button
+                onClick={()=>toggleEnabled(tpl.id)}
+                className={`toggle ${tpl.enabled?"on":"off"}`}
+                title={tpl.enabled?"Disable this template":"Enable this template"}
+                style={{fontSize:0}}
+              />
+              <button
+                onClick={()=>openEditor(tpl)}
+                style={{background:`rgba(139,92,246,.12)`,border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}
+              >Edit</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  /* ── Editor view ── */
+  const tpl     = templates.find(t=>t.id===editId);
+  const vars    = EMAIL_TEMPLATE_VARS[editId]||[];
+  const {html:prevHtml,subject:prevSubject} = previewHtml(draft.html,draft.subject);
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:0,minHeight:0}}>
+      {/* Editor header */}
+      <div style={{
+        display:"flex",alignItems:"center",gap:10,
+        padding:"0 0 16px",borderBottom:`1px solid ${C.border}`,marginBottom:16,
+      }}>
+        <button onClick={closeEditor} style={{background:"rgba(255,255,255,.07)",border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:800,color:C.white,fontSize:15,display:"flex",alignItems:"center",gap:8}}>
+            <span>{tpl.icon}</span>{tpl.name}
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:1}}>{tpl.description}</div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button
+            onClick={()=>setPreview(p=>!p)}
+            style={{background:previewMode?`rgba(6,182,212,.15)`:"rgba(255,255,255,.06)",border:`1px solid ${previewMode?"rgba(6,182,212,.4)":C.border}`,color:previewMode?C.cyan:C.muted,borderRadius:8,padding:"7px 13px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+          >{previewMode?"✏️ Edit":"👁 Preview"}</button>
+          <button
+            onClick={()=>setRC(true)}
+            style={{background:"rgba(255,255,255,.05)",border:`1px solid ${C.border}`,color:"rgba(255,255,255,.4)",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+            title="Reset to original default"
+          >↺ Reset</button>
+          <button
+            onClick={saveDraft}
+            style={{
+              background:saved?`linear-gradient(135deg,${C.green},#047857)`:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              border:"none",color:"#fff",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,cursor:"pointer",
+              transition:"background .3s",minWidth:70,
+            }}
+          >{saved?"✓ Saved":"Save"}</button>
+        </div>
+      </div>
+
+      {previewMode ? (
+        /* ── Preview pane ── */
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{background:"rgba(6,182,212,.07)",border:"1px solid rgba(6,182,212,.2)",borderRadius:10,padding:"10px 14px"}}>
+            <span style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.35)",marginRight:8}}>SUBJECT</span>
+            <span style={{fontSize:13,color:C.white}}>{prevSubject}</span>
+          </div>
+          <div style={{
+            background:"#fff",borderRadius:12,overflow:"hidden",
+            border:`1px solid ${C.border}`,
+          }}>
+            <iframe
+              ref={iframeRef}
+              title="Email Preview"
+              style={{width:"100%",border:"none",minHeight:500,display:"block"}}
+              sandbox="allow-same-origin"
+            />
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.25)",textAlign:"center"}}>Preview uses sample values for merge tags</div>
+        </div>
+      ) : (
+        /* ── Edit pane ── */
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Subject */}
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Subject Line
+              <span style={{fontWeight:400,color:"rgba(255,255,255,.25)",marginLeft:6,fontSize:11}}>merge tags supported</span>
+            </div>
+            <input
+              id="email-subject"
+              className="inp-base"
+              value={draft.subject}
+              onChange={e=>setDraft(p=>({...p,subject:e.target.value}))}
+              placeholder="Email subject…"
+            />
+          </div>
+
+          {/* Variable reference chips — click to insert into subject */}
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.3)",letterSpacing:1,marginBottom:6}}>AVAILABLE MERGE TAGS — click to insert into subject or body</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {vars.map(([tag,desc])=>(
+                <div key={tag} style={{display:"flex",gap:0,borderRadius:8,overflow:"hidden",border:`1px solid ${C.border2}`}}>
+                  <button
+                    onClick={()=>insertVar(tag,"subject")}
+                    title={`Insert ${tag} into subject`}
+                    style={{background:"rgba(139,92,246,.12)",border:"none",color:C.brandLt,padding:"4px 9px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"monospace"}}
+                  >{tag}</button>
+                  <button
+                    onClick={()=>insertVar(tag,"html")}
+                    title={`Insert ${tag} into body`}
+                    style={{background:"rgba(139,92,246,.06)",border:"none",borderLeft:`1px solid ${C.border}`,color:"rgba(255,255,255,.35)",padding:"4px 8px",fontSize:10,cursor:"pointer"}}
+                  >body</button>
+                  <span style={{padding:"4px 9px",fontSize:11,color:"rgba(255,255,255,.3)",background:"transparent",display:"flex",alignItems:"center"}}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* HTML body */}
+          <div style={{flex:1}}>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              HTML Body
+              <span style={{fontWeight:400,color:"rgba(255,255,255,.25)",marginLeft:6,fontSize:11}}>{draft.html.length.toLocaleString()} chars</span>
+            </div>
+            <textarea
+              id="email-html"
+              value={draft.html}
+              onChange={e=>setDraft(p=>({...p,html:e.target.value}))}
+              spellCheck={false}
+              style={{
+                width:"100%",minHeight:340,
+                background:"rgba(0,0,0,.35)",
+                border:`1.5px solid ${C.border2}`,
+                color:"#e2e8f0",
+                borderRadius:12,padding:"14px 16px",
+                fontSize:12,fontFamily:"'DM Mono','Courier New',monospace",
+                lineHeight:1.7,
+                outline:"none",resize:"vertical",
+                transition:"border .2s",
+                boxSizing:"border-box",
+              }}
+              onFocus={e=>e.target.style.borderColor="rgba(139,92,246,.5)"}
+              onBlur={e=>e.target.style.borderColor="rgba(139,92,246,.25)"}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Reset confirm */}
+      {resetConfirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:30,textAlign:"center",marginBottom:10}}>↺</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>Reset to Default?</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>Your unsaved changes will be lost and the template will be restored to its original content.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setRC(false)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={resetToDefault} style={{background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}>Reset</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Main AdminPanel ───────────────────────────── */
 function AdminPanel({user, onExit, lang}){
   const role = user.role || (user.isAdmin ? "super_admin" : "user");
@@ -2012,6 +2438,7 @@ function AdminPanel({user, onExit, lang}){
     { id:"roles",     label:"Roles",     icon:"🛡️", perm:"manage_roles" },
     { id:"apikeys",   label:"API Keys",  icon:"🔑", perm:"manage_api_keys" },
     { id:"webhooks",  label:"Webhooks",  icon:"🔗", perm:"manage_webhooks" },
+    { id:"emails",    label:"Emails",    icon:"✉️", perm:"manage_email_templates" },
     { id:"settings",  label:"Settings",  icon:"⚙️", perm:"view_settings" },
   ].filter(t=>can(user,t.perm));
 
@@ -2066,6 +2493,7 @@ function AdminPanel({user, onExit, lang}){
         {activeTab==="roles"     && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
         {activeTab==="apikeys"   && <AdminApiKeys/>}
         {activeTab==="webhooks"  && <AdminWebhooks/>}
+        {activeTab==="emails"    && <AdminEmailTemplates/>}
         {activeTab==="settings"  && <AdminSettings/>}
       </div>
     </div>
