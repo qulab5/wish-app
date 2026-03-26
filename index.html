@@ -4982,14 +4982,15 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(()=>{ dbLoaded.current = true; });  // unlock even on network error
   },[]);
 
-  // Keep last_user in localStorage in sync with the live pts/usd so that a
-  // page refresh renders the correct value immediately (no 0-flash while the
-  // DB load is still in-flight).  Only runs after dbLoaded so the stale
-  // login-snapshot is never promoted back on top of a DB load.
+  // Keep last_user in localStorage in sync so page refreshes restore the
+  // session without forcing re-login.  Tracks pts, usd, name, and avatar.
+  // Skip base64 data-URLs (large upload preview) — only persist the real URL.
   useEffect(()=>{
     if(!dbLoaded.current) return;
-    Security.save('last_user',{...u});
-  },[u.pts,u.usd]);
+    const snap = {...u};
+    if(snap.avatar?.startsWith('data:')) delete snap.avatar;
+    Security.save('last_user', snap);
+  },[u.pts,u.usd,u.name,u.avatar]);
 
   // Persist spinNextFree to localStorage immediately on change so it survives
   // a page refresh even if the DB save hasn't completed yet.
@@ -5006,14 +5007,17 @@ function MainApp({user,onLogout,lang,setLang}){
     // would overwrite the DB 2 seconds after every page refresh.
     if(!dbLoaded.current) return;
     const t=setTimeout(()=>{
+      // Don't send base64 data-URLs — avatar gets saved via the explicit upload flow
+      const avatarVal = u.avatar?.startsWith('data:') ? undefined : u.avatar;
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
+          ...(avatarVal!==undefined?{avatar:avatarVal}:{}),
           tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins,
           refCode:u.refCode||null,refPts:u.refPts??0,refs:u.refs??[]})
       }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[auto-save]',d);}).catch(e=>console.error('[auto-save]',e));
     },2000);
     return()=>clearTimeout(t);
-  },[u.pts,u.usd,u.name,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
+  },[u.pts,u.usd,u.name,u.avatar,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
@@ -7307,11 +7311,11 @@ function SecuritySettingsView({ user }) {
      logout → auth
 ═══════════════════════════════════════════════ */
 function WishApp(){
-  const [loggedUser,setLU] = useState(null);
-  const [lang,setLang]     = useState("en");
+  const [loggedUser,setLU] = useState(()=>Security.load('last_user',null));
+  const [lang,setLang]     = useState(()=>Security.load('lang','en'));
 
-  const handleLogin=(u)=>{ setLU(u); };
-  const handleLogout=()=>{ setLU(null); };
+  const handleLogin  = (u) => { Security.save('last_user',u); setLU(u); };
+  const handleLogout = ()  => { Security.remove('last_user'); setLU(null); };
 
   const isAdminUser = loggedUser && (loggedUser.role==="super_admin"||loggedUser.role==="moderator"||loggedUser.isAdmin);
   if(!loggedUser) return <AuthScreen onLogin={handleLogin} lang={lang}/>;
