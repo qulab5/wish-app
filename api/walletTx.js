@@ -1,5 +1,11 @@
 import { supabase } from './db.js';
 
+async function readTxs(userId) {
+  const { data } = await supabase
+    .from('users').select('name').eq('id', `txhist_${userId}`).maybeSingle();
+  try { return data?.name ? JSON.parse(data.name) : []; } catch { return []; }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -11,15 +17,9 @@ export default async function handler(req, res) {
   if (!userId) return res.status(400).json({ error: 'userId required' });
 
   try {
-    // select('*') avoids column-not-found errors for optional fields like txHistory
-    const { data: user, error } = await supabase
-      .from('users').select('*').eq('id', userId).maybeSingle();
-    if (error) throw error;
-
-    const txs = Array.isArray(user?.txHistory) ? user.txHistory : [];
+    const txs = await readTxs(userId);
     return res.status(200).json({ txs });
   } catch (err) {
-    // Return empty gracefully — don't break the wallet UI over missing history
     console.error('[walletTx] error:', err.message);
     return res.status(200).json({ txs: [] });
   }
