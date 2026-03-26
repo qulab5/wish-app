@@ -984,11 +984,7 @@ function AuthScreen({onLogin,lang}){
     if(mode==="register"&&!form.name.trim()) e.name=L("required");
     if(mode==="register"&&!form.username.trim()) e.username="Username is required";
     if(mode==="register"&&!form.country) e.country="Please select your country";
-    if(method==="email"){
-      if(!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email=L("invalidEmail");
-    } else {
-      if(!form.phone.trim()) e.phone=L("invalidPhone");
-    }
+    if(!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email=L("invalidEmail");
     if(form.pass.length<6) e.pass="Min 6 characters";
     if(mode==="register"&&form.pass!==form.conf) e.conf="Passwords don't match";
     setErrs(e);
@@ -1001,16 +997,11 @@ function AuthScreen({onLogin,lang}){
     if(mode==="login"){
       let foundUser=null;
       // Check demo/admin users first (in-memory) for credentials
-      if(method==="email"){
-        foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
-      } else {
-        const fp=form.countryCode+form.phone;
-        foundUser=users.find(u=>u.phone===fp&&u.pass===form.pass)||null;
-      }
+      foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
       // Always fetch the DB record so we get the latest pts/usd/state.
       // For in-memory/demo users this merges their saved progress on top of the
       // hardcoded seed values; for real registered users it IS the source of truth.
-      if(foundUser&&!foundUser.isAdmin&&method==="email"){
+      if(foundUser&&!foundUser.isAdmin){
         try{
           const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
           const d=await r.json();
@@ -1170,14 +1161,6 @@ function AuthScreen({onLogin,lang}){
         <div style={{fontSize:14,color:C.muted}}>{mode==="login"?L("noAcc"):L("haveAcc")} <span onClick={()=>{setMode(mode==="login"?"register":"login");setErrs({});}} style={{color:C.brandLt,cursor:"pointer",fontWeight:700}}>{mode==="login"?L("signUp"):L("signIn")}</span></div>
       </div>
 
-      <div style={{display:"flex",background:"rgba(139,92,246,.08)",borderRadius:12,padding:4,marginBottom:22}}>
-        {["email","phone"].map(m=>(
-          <div key={m} onClick={()=>{setMethod(m);setErrs({});}} style={{flex:1,textAlign:"center",padding:"10px",borderRadius:10,cursor:"pointer",background:method===m?`linear-gradient(135deg,${C.brand},${C.brandDk})`:"transparent",color:method===m?C.white:C.muted,fontWeight:600,fontSize:13,transition:"all .2s"}}>
-            {m==="email"?"📧 Email":"📱 Phone"}
-          </div>
-        ))}
-      </div>
-
       <div style={{animation:"up .3s ease .05s both"}}>
         {mode==="register"&&<Inp label={L("name")} val={form.name} onChange={f("name")} err={errs.name} placeholder="Your full name" icon="👤"/>}
         {mode==="register"&&<Inp label="Username" val={form.username} onChange={f("username")} err={errs.username} placeholder="Choose a username" icon="🏷️"/>}
@@ -1199,19 +1182,7 @@ function AuthScreen({onLogin,lang}){
             {errs.country&&<div style={{fontSize:11,color:C.red,marginTop:4}}>⚠ {errs.country}</div>}
           </div>
         )}
-        {method==="email"
-          ?<Inp label={L("email")} type="email" val={form.email} onChange={f("email")} err={errs.email} placeholder="you@example.com" icon="📧"/>
-          :<Inp 
-              type="phone-with-code"
-              label={L("phone")}
-              val={form.phone}
-              onChange={(e)=>f("phone")(e.target.value)}
-              onCountryChange={(e)=>f("countryCode")(e.target.value)}
-              selectedCountry={form.countryCode}
-              err={errs.phone}
-              placeholder="123 456 7890"
-              icon="📱"
-            />}
+        <Inp label={L("email")} type="email" val={form.email} onChange={f("email")} err={errs.email} placeholder="you@example.com" icon="📧"/>
         
         <Inp label={L("password")} type="password" val={form.pass} onChange={f("pass")} err={errs.pass} placeholder="••••••••" icon="🔒"/>
         {mode==="register"&&<Inp label="Confirm Password" type="password" val={form.conf} onChange={f("conf")} err={errs.conf} placeholder="••••••••" icon="🔑"/>}
