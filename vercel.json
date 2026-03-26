@@ -26,6 +26,10 @@
       "dest": "/api/broadcast.js"
     },
     {
+      "src": "/api/announcements",
+      "dest": "/api/announcements.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }

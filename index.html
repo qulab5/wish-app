@@ -3586,17 +3586,6 @@ function AdminBroadcast({ users, adminUser }) {
       };
       setHistory(h => [entry, ...h]);
       setSR({ ok: true, sent: json.sent, failed: json.failed, note: json.note, source: "live" });
-      // Write every broadcast to the in-app announcements store so users see it
-      try {
-        const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
-        const ti = BROADCAST_TYPES.find(t=>t.id===type);
-        localStorage.setItem('wish_announcements', JSON.stringify([
-          { id: entry.id, type, icon: ti?.icon||"📢",
-            title: subject.trim(), body: body.trim(),
-            sentAt: new Date().toISOString(), color: ti?.color||C.brand },
-          ...prev
-        ]));
-      } catch {}
       setSubject(""); setBody("");
     } catch (err) {
       // Demo fallback ONLY when the endpoint doesn't exist yet (local dev without API routes).
@@ -3619,17 +3608,6 @@ function AdminBroadcast({ users, adminUser }) {
         };
         setHistory(h => [entry, ...h]);
         setSR({ ok: true, sent, failed, source: "demo" });
-        // Write every broadcast to the in-app announcements store so users see it
-        try {
-          const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
-          const ti = BROADCAST_TYPES.find(t=>t.id===type);
-          localStorage.setItem('wish_announcements', JSON.stringify([
-            { id: entry.id, type, icon: ti?.icon||"📢",
-              title: subject.trim(), body: body.trim(),
-              sentAt: new Date().toISOString(), color: ti?.color||C.brand },
-            ...prev
-          ]));
-        } catch {}
         setSubject(""); setBody("");
       } else {
         setSR({ ok: false, error: err.message });
@@ -4490,6 +4468,9 @@ function MainApp({user,onLogout,lang,setLang}){
   const [sidebarOpen, setSO]  = useState(false);
   const [sidebarView, setSV]  = useState(null);
   const [refCopied,  setRefCopied] = useState("");
+  const [annList, setAnnList]     = useState([]);
+  const [annToast, setAnnToast]   = useState(null);
+  const annToastShown = React.useRef(false);
   const [editingField, setEF] = useState(null);
   // Guard: auto-save must not fire until the initial DB load has finished.
   // Without this, the stale localStorage user (saved at login time) would be
@@ -4508,6 +4489,29 @@ function MainApp({user,onLogout,lang,setLang}){
     const iv=setInterval(()=>setMineT(t=>{if(t<=1){setMR(true);return 0;}return t-1;}),1000);
     return()=>clearInterval(iv);
   },[mineStarted,mineReady]);
+
+  // Fetch announcements from server and show toast for new ones
+  useEffect(()=>{
+    function loadAnns(){
+      fetch('/api/announcements')
+        .then(r=>r.ok?r.json():null)
+        .then(d=>{
+          if(!d?.announcements) return;
+          setAnnList(d.announcements);
+          const lastSeen = Number(localStorage.getItem('wish_ann_seen')||0);
+          const fresh = d.announcements.filter(a=>new Date(a.sentAt).getTime()>lastSeen);
+          if(fresh.length>0 && !annToastShown.current){
+            annToastShown.current = true;
+            setAnnToast(fresh[0]);
+            setTimeout(()=>setAnnToast(null), 7000);
+          }
+        })
+        .catch(()=>{});
+    }
+    loadAnns();
+    const iv = setInterval(loadAnns, 60000);
+    return ()=>clearInterval(iv);
+  },[]);
 
   // Load saved progress from MongoDB on first mount
   useEffect(()=>{
@@ -5340,6 +5344,18 @@ function MainApp({user,onLogout,lang,setLang}){
         rd.readAsDataURL(f);
         e.target.value="";
       }}/>
+      {/* Announcement Toast */}
+      {annToast&&(
+        <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:C.s2,border:`1px solid ${C.brand}`,borderRadius:16,padding:"12px 16px",boxShadow:"0 4px 24px rgba(0,0,0,.5)",display:"flex",alignItems:"center",gap:12,maxWidth:380,width:"calc(100% - 32px)",animation:"popIn .3s ease",cursor:"pointer"}} onClick={()=>{setAnnToast(null);localStorage.setItem('wish_ann_seen',Date.now().toString());annToastShown.current=false;setSV("announcements");}}>
+          <span style={{fontSize:22,flexShrink:0}}>{annToast.icon||"📢"}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12,color:C.brand,fontWeight:700,marginBottom:2}}>New Announcement</div>
+            <div style={{fontSize:13,fontWeight:700,color:C.white,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{annToast.title}</div>
+            {annToast.body&&<div style={{fontSize:12,color:C.muted,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{annToast.body}</div>}
+          </div>
+          <button onClick={e=>{e.stopPropagation();setAnnToast(null);}} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer",lineHeight:1,padding:"4px",flexShrink:0}}>✕</button>
+        </div>
+      )}
       {/* Sidebar Overlay */}
       {sidebarOpen&&(
         <>
@@ -5366,9 +5382,8 @@ function MainApp({user,onLogout,lang,setLang}){
             {/* Menu Items */}
             <div style={{flex:1,overflowY:"auto",paddingTop:8}}>
               {(()=>{
-                const anns = (()=>{try{return JSON.parse(localStorage.getItem('wish_announcements')||'[]');}catch{return [];}})();
                 const lastSeen = Number(localStorage.getItem('wish_ann_seen')||0);
-                const unread = anns.filter(a=>new Date(a.sentAt).getTime()>lastSeen).length;
+                const unread = annList.filter(a=>new Date(a.sentAt).getTime()>lastSeen).length;
                 return [
                   {icon:"👤",label:"Profile"},
                   {icon:"🏆",label:"Leader Board"},
@@ -5385,6 +5400,9 @@ function MainApp({user,onLogout,lang,setLang}){
                     else if(item.label==="Referral Team"){setSO(false);setSV("referral");}
                     else if(item.label==="Announcement"){
                       localStorage.setItem('wish_ann_seen', Date.now().toString());
+                      annToastShown.current = false;
+                      setAnnToast(null);
+                      fetch('/api/announcements').then(r=>r.ok?r.json():null).then(d=>{if(d?.announcements)setAnnList(d.announcements);}).catch(()=>{});
                       setSO(false);setSV("announcements");
                     }
                     else setSO(false);
@@ -5773,7 +5791,6 @@ function MainApp({user,onLogout,lang,setLang}){
       })()}
       {/* ── Announcements view ── */}
       {sidebarView==="announcements"&&(()=>{
-        const anns = (()=>{try{return JSON.parse(localStorage.getItem('wish_announcements')||'[]');}catch{return [];}})();
         const typeColor={announcement:"#06b6d4",promotion:"#10b981",info:"#8b5cf6",warning:"#f59e0b"};
         const typeIcon ={announcement:"📢",promotion:"🎁",info:"ℹ️",warning:"⚠️"};
         return(
@@ -5783,14 +5800,14 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:18,fontWeight:800,color:C.white}}>📢 Announcements</div>
             </div>
             <div style={{flex:1,overflowY:"auto",padding:"16px 16px 40px"}}>
-              {anns.length===0?(
+              {annList.length===0?(
                 <div style={{textAlign:"center",padding:"60px 20px"}}>
                   <div style={{fontSize:48,marginBottom:16}}>📭</div>
                   <div style={{fontSize:16,fontWeight:700,color:C.white}}>No Announcements Yet</div>
                 </div>
               ):(
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  {anns.map(a=>{
+                  {annList.map(a=>{
                     const col=typeColor[a.type]||C.brand;
                     const icon=typeIcon[a.type]||"📢";
                     return(
