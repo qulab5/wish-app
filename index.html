@@ -190,12 +190,56 @@ const MINING_S   = isSunday ? SUN_CYCLE : MINING_CYCLE;
    DEMO USERS DATABASE  (in-memory)
 ═══════════════════════════════════════════════ */
 const INITIAL_USERS = [
-  { id:"u1", name:"Ahmad Ali",   email:"ahmad@wish.com",   phone:"+92-300-1234567", pass:"ahmad123",  pts:48200, usd:48.20, joined:"Jan 2025", country:"🇵🇰", isAdmin:false, active:true },
-  { id:"u2", name:"Sara Khan",   email:"sara@wish.com",    phone:"+91-900-7654321", pass:"sara123",   pts:41500, usd:41.50, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, active:true },
-  { id:"u3", name:"Rahul Dev",   email:"rahul@wish.com",   phone:"+91-800-1111111", pass:"rahul123",  pts:35400, usd:35.40, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, active:true },
-  { id:"u4", name:"Zain Ahmed",  email:"zain@wish.com",    phone:"+92-333-9999999", pass:"zain123",   pts:29800, usd:29.80, joined:"Mar 2025", country:"🇵🇰", isAdmin:false, active:false },
-  { id:"admin", name:"Admin",    email:"admin@wish.com",   phone:"+1-000-0000000",  pass:"admin@123", pts:0,     usd:0,     joined:"Jan 2025", country:"🌍", isAdmin:true,  active:true },
+  { id:"u1", name:"Ahmad Ali",   email:"ahmad@wish.com",   phone:"+92-300-1234567", pass:"ahmad123",  pts:48200, usd:48.20, joined:"Jan 2025", country:"🇵🇰", isAdmin:false, role:"user",        active:true },
+  { id:"u2", name:"Sara Khan",   email:"sara@wish.com",    phone:"+91-900-7654321", pass:"sara123",   pts:41500, usd:41.50, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, role:"user",        active:true },
+  { id:"u3", name:"Rahul Dev",   email:"rahul@wish.com",   phone:"+91-800-1111111", pass:"rahul123",  pts:35400, usd:35.40, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, role:"user",        active:true },
+  { id:"u4", name:"Zain Ahmed",  email:"zain@wish.com",    phone:"+92-333-9999999", pass:"zain123",   pts:29800, usd:29.80, joined:"Mar 2025", country:"🇵🇰", isAdmin:false, role:"user",        active:false },
+  { id:"mod1", name:"Moderator", email:"mod@wish.com",     phone:"+1-111-1111111",  pass:"mod@123",   pts:0,     usd:0,     joined:"Jan 2025", country:"🌍", isAdmin:true,  role:"moderator",   active:true },
+  { id:"admin", name:"Admin",    email:"admin@wish.com",   phone:"+1-000-0000000",  pass:"admin@123", pts:0,     usd:0,     joined:"Jan 2025", country:"🌍", isAdmin:true,  role:"super_admin", active:true },
 ];
+
+/* ═══════════════════════════════════════════════
+   RBAC — ROLES & PERMISSIONS
+═══════════════════════════════════════════════ */
+const ROLES = {
+  super_admin: { label:"Super Admin", color:"#f59e0b", icon:"👑" },
+  moderator:   { label:"Moderator",   color:"#06b6d4", icon:"🛡️" },
+  user:        { label:"User",        color:"#8b5cf6", icon:"👤" },
+};
+
+// Permission flags — each key is a capability string
+const PERMISSIONS = {
+  super_admin: [
+    "view_dashboard",
+    "view_users",
+    "edit_users",
+    "delete_users",
+    "toggle_user_active",
+    "view_analytics",
+    "manage_roles",
+    "assign_moderator",
+    "view_settings",
+    "edit_settings",
+    "manage_api_keys",
+    "manage_webhooks",
+    "manage_email_templates",
+    "manage_rate_limits",
+    "manage_backups",
+    "send_broadcasts",
+  ],
+  moderator: [
+    "view_dashboard",
+    "view_users",
+    "toggle_user_active",
+    "view_analytics",
+  ],
+  user: [],
+};
+
+function can(user, permission){
+  const role = user.role || (user.isAdmin ? "super_admin" : "user");
+  return (PERMISSIONS[role] || []).includes(permission);
+}
 
 /* ═══════════════════════════════════════════════
    AD NETWORKS CONFIG  (default)
@@ -1031,13 +1075,2958 @@ function AuthScreen({onLogin,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   ADMIN PANEL (simplified - replace with your full version)
+   API KEY & WEBHOOK CONSTANTS
 ═══════════════════════════════════════════════ */
-function AdminPanel({user,onExit,lang}){
-  return <div style={{padding:20,color:"white"}}>
-    <h1>Admin Panel</h1>
-    <button onClick={onExit}>Exit</button>
-  </div>;
+const API_KEY_SCOPES = [
+  { id:"read:users",    label:"Read Users",       group:"Users"   },
+  { id:"write:users",   label:"Write Users",      group:"Users"   },
+  { id:"read:stats",    label:"Read Stats",        group:"Analytics"},
+  { id:"read:rewards",  label:"Read Rewards",      group:"Rewards" },
+  { id:"write:rewards", label:"Write Rewards",     group:"Rewards" },
+  { id:"read:tasks",    label:"Read Tasks",        group:"Tasks"   },
+  { id:"write:tasks",   label:"Write Tasks",       group:"Tasks"   },
+];
+
+const WEBHOOK_EVENTS = [
+  { id:"user.registered",   label:"User Registered",    group:"Users"   },
+  { id:"user.activated",    label:"User Activated",     group:"Users"   },
+  { id:"user.deactivated",  label:"User Deactivated",   group:"Users"   },
+  { id:"reward.earned",     label:"Reward Earned",      group:"Rewards" },
+  { id:"reward.redeemed",   label:"Reward Redeemed",    group:"Rewards" },
+  { id:"task.completed",    label:"Task Completed",     group:"Tasks"   },
+  { id:"withdrawal.requested", label:"Withdrawal Requested", group:"Finance"},
+];
+
+// Generates a random hex string of given length
+function randHex(len){
+  const arr = new Uint8Array(len/2);
+  crypto.getRandomValues(arr);
+  return Array.from(arr,b=>b.toString(16).padStart(2,"0")).join("");
+}
+function makeApiKey(){ return `wsh_live_${randHex(32)}`; }
+function makeWebhookSecret(){ return `whsec_${randHex(24)}`; }
+function keyPrefix(full){ return full.slice(0,14)+"…"; }
+function fmtDate(iso){ return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
+
+const INITIAL_API_KEYS = [
+  {
+    id:"ak_1", name:"Mobile App",
+    prefix:"wsh_live_a3f9",
+    fullKey:null, // never shown again after creation
+    scopes:["read:users","read:stats","read:rewards","read:tasks"],
+    status:"active",
+    createdAt:"2025-01-10T09:00:00Z",
+    lastUsed:"2025-03-20T14:32:00Z",
+  },
+  {
+    id:"ak_2", name:"Analytics Dashboard",
+    prefix:"wsh_live_7c21",
+    fullKey:null,
+    scopes:["read:stats","read:users"],
+    status:"active",
+    createdAt:"2025-02-01T11:00:00Z",
+    lastUsed:"2025-03-25T08:10:00Z",
+  },
+  {
+    id:"ak_3", name:"Legacy Integration",
+    prefix:"wsh_live_bb04",
+    fullKey:null,
+    scopes:["read:users","write:rewards"],
+    status:"revoked",
+    createdAt:"2024-12-15T07:00:00Z",
+    lastUsed:"2025-01-05T19:45:00Z",
+  },
+];
+
+const INITIAL_WEBHOOKS = [
+  {
+    id:"wh_1", name:"Reward Notifier",
+    url:"https://hooks.example.com/wish/rewards",
+    events:["reward.earned","reward.redeemed"],
+    secret:"whsec_demo1234567890",
+    status:"active",
+    createdAt:"2025-01-12T10:00:00Z",
+    lastTriggered:"2025-03-25T16:00:00Z",
+    failCount:0,
+  },
+  {
+    id:"wh_2", name:"User Lifecycle",
+    url:"https://my-crm.example.com/webhooks/wish",
+    events:["user.registered","user.activated","user.deactivated"],
+    secret:"whsec_crmdemo9876",
+    status:"active",
+    createdAt:"2025-02-05T08:30:00Z",
+    lastTriggered:"2025-03-24T11:20:00Z",
+    failCount:2,
+  },
+  {
+    id:"wh_3", name:"Finance Alerts",
+    url:"https://finance.internal/wh",
+    events:["withdrawal.requested"],
+    secret:"whsec_financedemo",
+    status:"inactive",
+    createdAt:"2025-01-20T15:00:00Z",
+    lastTriggered:null,
+    failCount:0,
+  },
+];
+
+/* ═══════════════════════════════════════════════
+   EMAIL TEMPLATES
+═══════════════════════════════════════════════ */
+// Merge tags available per template — used for reference panel + live preview substitution
+const EMAIL_TEMPLATE_VARS = {
+  otp_verification:    [["{{name}}","Recipient name"],["{{otp}}","6-digit OTP code"],["{{expiry_minutes}}","OTP expiry in minutes"],["{{app_name}}","App name"]],
+  welcome:             [["{{name}}","Recipient name"],["{{email}}","Recipient email"],["{{app_name}}","App name"],["{{login_url}}","Login URL"]],
+  reward_earned:       [["{{name}}","Recipient name"],["{{points}}","Points earned"],["{{total_points}}","New total points"],["{{usd_value}}","USD equivalent"],["{{app_name}}","App name"]],
+  withdrawal_approved: [["{{name}}","Recipient name"],["{{amount_usd}}","Withdrawal amount"],["{{method}}","Payment method"],["{{ref_id}}","Reference ID"],["{{app_name}}","App name"]],
+  withdrawal_rejected: [["{{name}}","Recipient name"],["{{amount_usd}}","Requested amount"],["{{reason}}","Rejection reason"],["{{app_name}}","App name"]],
+  account_suspended:   [["{{name}}","Recipient name"],["{{reason}}","Suspension reason"],["{{support_email}}","Support email"],["{{app_name}}","App name"]],
+};
+
+// Preview substitution values shown in the live preview
+const EMAIL_PREVIEW_VALUES = {
+  "{{name}}":           "Ahmad Ali",
+  "{{email}}":          "ahmad@wish.com",
+  "{{otp}}":            "483 921",
+  "{{expiry_minutes}}": "10",
+  "{{app_name}}":       "Wish",
+  "{{login_url}}":      "https://wish.app/login",
+  "{{points}}":         "500",
+  "{{total_points}}":   "48,700",
+  "{{usd_value}}":      "$0.50",
+  "{{amount_usd}}":     "$25.00",
+  "{{method}}":         "USDT (TRC-20)",
+  "{{ref_id}}":         "WD-20250325-0042",
+  "{{reason}}":         "Violation of platform terms of service.",
+  "{{support_email}}":  "support@wish.app",
+};
+
+function previewHtml(html, subject){
+  let out = html;
+  let subj = subject;
+  Object.entries(EMAIL_PREVIEW_VALUES).forEach(([k,v])=>{
+    const re = new RegExp(k.replace(/[{}]/g,"\\$&"),"g");
+    out  = out.replace(re,v);
+    subj = subj.replace(re,v);
+  });
+  return {html:out, subject:subj};
+}
+
+const BASE_HTML = (accentColor="#8b5cf6")=>`
+<div style="font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f8;padding:32px 16px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+    <div style="background:linear-gradient(135deg,${accentColor},#6d28d9);padding:28px 32px;text-align:center;">
+      <span style="font-size:32px;">✨</span>
+      <div style="color:#fff;font-size:22px;font-weight:800;margin-top:8px;">{{app_name}}</div>
+    </div>
+    <div style="padding:32px;">
+      BODY_PLACEHOLDER
+    </div>
+    <div style="background:#f9f9fb;padding:20px 32px;text-align:center;font-size:12px;color:#999;">
+      © 2025 {{app_name}} · You received this because you have an account with us.
+    </div>
+  </div>
+</div>`.trim();
+
+const INITIAL_EMAIL_TEMPLATES = [
+  {
+    id:"otp_verification",
+    name:"OTP Verification",
+    description:"Sent when a user requests a login or registration code.",
+    icon:"🔐",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Your {{app_name}} verification code",
+    html: BASE_HTML().replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Verify your identity</h2>
+      <p style="color:#555;margin:0 0 24px;line-height:1.6;">Hi {{name}}, use the code below to complete your sign-in. It expires in <strong>{{expiry_minutes}} minutes</strong>.</p>
+      <div style="text-align:center;margin:24px 0;">
+        <div style="display:inline-block;background:#f0ebff;border:2px dashed #8b5cf6;border-radius:12px;padding:18px 40px;font-size:38px;font-weight:900;letter-spacing:10px;color:#6d28d9;">{{otp}}</div>
+      </div>
+      <p style="color:#999;font-size:13px;text-align:center;">Never share this code with anyone.</p>`),
+  },
+  {
+    id:"welcome",
+    name:"Welcome",
+    description:"Sent immediately after a user creates their account.",
+    icon:"👋",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Welcome to {{app_name}}, {{name}}!",
+    html: BASE_HTML().replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Welcome aboard, {{name}}! 🎉</h2>
+      <p style="color:#555;margin:0 0 16px;line-height:1.6;">Your account is all set up and ready to go. Start earning points by completing tasks, watching ads, and spinning the reward wheel.</p>
+      <div style="background:#f0ebff;border-radius:12px;padding:16px 20px;margin:20px 0;">
+        <div style="font-size:13px;color:#6d28d9;font-weight:700;margin-bottom:8px;">✨ Quick Start</div>
+        <ul style="margin:0;padding-left:18px;color:#555;font-size:14px;line-height:2;">
+          <li>Complete your profile</li>
+          <li>Watch your first ad to earn points</li>
+          <li>Try the daily spin wheel</li>
+          <li>Invite friends for 300 bonus points each</li>
+        </ul>
+      </div>
+      <div style="text-align:center;margin-top:24px;">
+        <a href="{{login_url}}" style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;">Open {{app_name}}</a>
+      </div>`),
+  },
+  {
+    id:"reward_earned",
+    name:"Reward Earned",
+    description:"Sent when a user earns a significant reward or bonus.",
+    icon:"⭐",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"You just earned {{points}} points on {{app_name}}!",
+    html: BASE_HTML("#f59e0b").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">You earned a reward! 🎁</h2>
+      <p style="color:#555;margin:0 0 24px;line-height:1.6;">Great news, {{name}}! You've just earned <strong>{{points}} points</strong> on {{app_name}}.</p>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:20px;text-align:center;margin:0 0 20px;">
+        <div style="font-size:13px;color:#92400e;font-weight:700;margin-bottom:4px;">Points Earned</div>
+        <div style="font-size:42px;font-weight:900;color:#d97706;">+{{points}}</div>
+        <div style="font-size:13px;color:#b45309;margin-top:4px;">≈ {{usd_value}}</div>
+        <div style="height:1px;background:#fde68a;margin:12px 0;"></div>
+        <div style="font-size:12px;color:#92400e;">New total: <strong>{{total_points}} pts</strong></div>
+      </div>
+      <p style="color:#999;font-size:13px;text-align:center;">Keep earning — withdraw when you hit the minimum threshold!</p>`),
+  },
+  {
+    id:"withdrawal_approved",
+    name:"Withdrawal Approved",
+    description:"Sent when a withdrawal request is approved and processed.",
+    icon:"💸",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Your withdrawal of {{amount_usd}} has been approved",
+    html: BASE_HTML("#10b981").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Withdrawal Approved ✅</h2>
+      <p style="color:#555;margin:0 0 20px;line-height:1.6;">Hi {{name}}, your withdrawal request has been approved and is being processed.</p>
+      <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:20px;margin:0 0 20px;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr><td style="color:#6b7280;padding:6px 0;">Amount</td><td style="text-align:right;font-weight:700;color:#065f46;">{{amount_usd}}</td></tr>
+          <tr><td style="color:#6b7280;padding:6px 0;">Method</td><td style="text-align:right;color:#1f2937;">{{method}}</td></tr>
+          <tr><td style="color:#6b7280;padding:6px 0;">Reference</td><td style="text-align:right;color:#1f2937;font-family:monospace;">{{ref_id}}</td></tr>
+        </table>
+      </div>
+      <p style="color:#999;font-size:13px;text-align:center;">Funds typically arrive within 1–3 business days depending on your payment method.</p>`),
+  },
+  {
+    id:"withdrawal_rejected",
+    name:"Withdrawal Rejected",
+    description:"Sent when a withdrawal request cannot be processed.",
+    icon:"❌",
+    enabled:true,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Update on your {{app_name}} withdrawal request",
+    html: BASE_HTML("#ef4444").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Withdrawal Not Processed</h2>
+      <p style="color:#555;margin:0 0 16px;line-height:1.6;">Hi {{name}}, unfortunately we were unable to process your withdrawal of <strong>{{amount_usd}}</strong>.</p>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+        <div style="font-size:12px;font-weight:700;color:#b91c1c;margin-bottom:4px;">Reason</div>
+        <div style="color:#7f1d1d;font-size:14px;line-height:1.6;">{{reason}}</div>
+      </div>
+      <p style="color:#555;font-size:14px;line-height:1.6;">Your balance has not been affected. If you believe this is an error, please contact us at <a href="mailto:{{support_email}}" style="color:#8b5cf6;">{{support_email}}</a>.</p>`),
+  },
+  {
+    id:"account_suspended",
+    name:"Account Suspended",
+    description:"Sent when a user's account is deactivated by an admin.",
+    icon:"🚫",
+    enabled:false,
+    updatedAt:"2025-01-10T09:00:00Z",
+    subject:"Important notice about your {{app_name}} account",
+    html: BASE_HTML("#6b7280").replace("BODY_PLACEHOLDER",`<h2 style="margin:0 0 8px;color:#1a1a2e;font-size:20px;">Account Suspended</h2>
+      <p style="color:#555;margin:0 0 16px;line-height:1.6;">Hi {{name}}, your {{app_name}} account has been suspended.</p>
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px 20px;margin:0 0 20px;">
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">Reason</div>
+        <div style="color:#4b5563;font-size:14px;line-height:1.6;">{{reason}}</div>
+      </div>
+      <p style="color:#555;font-size:14px;line-height:1.6;">To appeal this decision, contact us at <a href="mailto:{{support_email}}" style="color:#8b5cf6;">{{support_email}}</a>.</p>`),
+  },
+];
+
+/* ═══════════════════════════════════════════════
+   RATE LIMIT CONSTANTS
+═══════════════════════════════════════════════ */
+const RL_CATEGORIES = {
+  auth:   { label:"Authentication", icon:"🔐", color:"#ec4899" },
+  api:    { label:"API Endpoints",  icon:"⚡", color:"#06b6d4" },
+  app:    { label:"App Actions",    icon:"🎮", color:"#f59e0b" },
+};
+
+const RL_PENALTIES = [
+  { id:"block",    label:"Block (429)",  desc:"Reject with HTTP 429 Too Many Requests" },
+  { id:"delay",    label:"Throttle",     desc:"Slow down — queue requests with a delay" },
+  { id:"log_only", label:"Log Only",     desc:"Allow but record the violation (monitoring)" },
+];
+
+const RL_SCOPES = [
+  { id:"ip",     label:"Per IP",   desc:"Limit per client IP address" },
+  { id:"user",   label:"Per User", desc:"Limit per authenticated user account" },
+  { id:"global", label:"Global",   desc:"Shared pool across all clients" },
+];
+
+// Formats a window in seconds to a readable string
+function fmtWindow(secs){
+  if(secs<60)   return `${secs}s`;
+  if(secs<3600) return `${secs/60}m`;
+  if(secs<86400) return `${secs/3600}h`;
+  return `${secs/86400}d`;
+}
+
+function fmtRate(limit, windowSecs){
+  return `${limit} / ${fmtWindow(windowSecs)}`;
+}
+
+const INITIAL_RATE_LIMITS = [
+  // ── Auth ──────────────────────────────────────
+  {
+    id:"rl_send_otp", category:"auth",
+    name:"Send OTP",
+    description:"Controls how often a client can request a new OTP code.",
+    endpoint:"POST /api/send-otp",
+    enabled:true,
+    limit:5, windowSecs:900,        // 5 per 15 min
+    scope:"ip", penalty:"block", blockDurationSecs:900,
+    hits24h:284, blocked24h:12,
+  },
+  {
+    id:"rl_verify_otp", category:"auth",
+    name:"Verify OTP",
+    description:"Prevents brute-forcing OTP codes.",
+    endpoint:"POST /api/verify-otp",
+    enabled:true,
+    limit:10, windowSecs:900,       // 10 per 15 min
+    scope:"ip", penalty:"block", blockDurationSecs:1800,
+    hits24h:271, blocked24h:3,
+  },
+  {
+    id:"rl_login_attempts", category:"auth",
+    name:"Login Attempts",
+    description:"Hard lockout after repeated failed password attempts.",
+    endpoint:"POST /api/send-otp",
+    enabled:true,
+    limit:3, windowSecs:600,        // 3 per 10 min (failed only)
+    scope:"ip", penalty:"block", blockDurationSecs:3600,
+    hits24h:41, blocked24h:7,
+  },
+  // ── API ───────────────────────────────────────
+  {
+    id:"rl_user_read", category:"api",
+    name:"User Read",
+    description:"Throttles GET requests to the user profile endpoint.",
+    endpoint:"GET /api/user",
+    enabled:true,
+    limit:60, windowSecs:60,        // 60 per min
+    scope:"user", penalty:"block", blockDurationSecs:60,
+    hits24h:14302, blocked24h:0,
+  },
+  {
+    id:"rl_user_write", category:"api",
+    name:"User Write",
+    description:"Limits how frequently a user can save profile changes.",
+    endpoint:"POST /api/user",
+    enabled:true,
+    limit:30, windowSecs:60,        // 30 per min
+    scope:"user", penalty:"delay", blockDurationSecs:30,
+    hits24h:8841, blocked24h:19,
+  },
+  {
+    id:"rl_api_global", category:"api",
+    name:"Global API Burst",
+    description:"Hard ceiling across all API traffic — protects infrastructure.",
+    endpoint:"ALL /api/*",
+    enabled:true,
+    limit:500, windowSecs:10,       // 500 per 10s globally
+    scope:"global", penalty:"block", blockDurationSecs:5,
+    hits24h:23443, blocked24h:0,
+  },
+  // ── App Actions ───────────────────────────────
+  {
+    id:"rl_daily_ads", category:"app",
+    name:"Daily Ad Views",
+    description:"Max ads a single user can watch per calendar day.",
+    endpoint:null,
+    enabled:true,
+    limit:15, windowSecs:86400,     // 15 per day
+    scope:"user", penalty:"block", blockDurationSecs:0,
+    hits24h:3210, blocked24h:88,
+  },
+  {
+    id:"rl_spin_wheel", category:"app",
+    name:"Spin Wheel",
+    description:"How many times a user can spin the reward wheel per day.",
+    endpoint:null,
+    enabled:true,
+    limit:1, windowSecs:86400,      // 1 per day
+    scope:"user", penalty:"block", blockDurationSecs:0,
+    hits24h:712, blocked24h:34,
+  },
+  {
+    id:"rl_task_complete", category:"app",
+    name:"Task Completions",
+    description:"Maximum task completions recorded per user per day.",
+    endpoint:null,
+    enabled:true,
+    limit:20, windowSecs:86400,     // 20 per day
+    scope:"user", penalty:"log_only", blockDurationSecs:0,
+    hits24h:4109, blocked24h:0,
+  },
+  {
+    id:"rl_withdraw", category:"app",
+    name:"Withdrawal Requests",
+    description:"Limits withdrawal requests to prevent abuse.",
+    endpoint:null,
+    enabled:true,
+    limit:2, windowSecs:86400,      // 2 per day
+    scope:"user", penalty:"block", blockDurationSecs:0,
+    hits24h:83, blocked24h:5,
+  },
+];
+
+/* ═══════════════════════════════════════════════
+   ADMIN PANEL — RBAC
+═══════════════════════════════════════════════ */
+function RoleBadge({role}){
+  const r = ROLES[role] || ROLES.user;
+  return (
+    <span style={{
+      display:"inline-flex", alignItems:"center", gap:4,
+      background:`${r.color}22`, color:r.color,
+      border:`1px solid ${r.color}55`,
+      borderRadius:99, padding:"2px 10px", fontSize:11, fontWeight:700,
+    }}>
+      {r.icon} {r.label}
+    </span>
+  );
+}
+
+function StatCard({icon,label,value,sub,color="#8b5cf6"}){
+  return (
+    <div className="stat-card" style={{flex:"1 1 140px"}}>
+      <div style={{fontSize:28,marginBottom:6}}>{icon}</div>
+      <div style={{fontSize:22,fontWeight:800,color}}>{value}</div>
+      <div style={{fontSize:12,color:"rgba(255,255,255,.5)",marginTop:2}}>{label}</div>
+      {sub&&<div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>{sub}</div>}
+    </div>
+  );
+}
+
+/* ── Dashboard Tab ─────────────────────────────── */
+function AdminDashboard({users, adminUser}){
+  const totalUsers  = users.filter(u=>u.role==="user"||!u.isAdmin).length;
+  const activeUsers = users.filter(u=>(u.role==="user"||!u.isAdmin)&&u.active).length;
+  const totalPts    = users.reduce((s,u)=>s+(u.pts||0),0);
+  const totalUsd    = users.reduce((s,u)=>s+(u.usd||0),0).toFixed(2);
+  const admins      = users.filter(u=>u.role==="super_admin"||u.role==="moderator").length;
+
+  return (
+    <div style={{padding:"0 0 20px"}}>
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:13,color:"rgba(255,255,255,.45)",marginBottom:4}}>Signed in as</div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:40,height:40,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+            {adminUser.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15}}>{adminUser.name}</div>
+            <RoleBadge role={adminUser.role||"super_admin"}/>
+          </div>
+        </div>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>OVERVIEW</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:24}}>
+        <StatCard icon="👥" label="Total Users"   value={totalUsers}  sub={`${activeUsers} active`} color={C.brandLt}/>
+        <StatCard icon="⭐" label="Total Points"  value={totalPts.toLocaleString()} color={C.gold}/>
+        <StatCard icon="💵" label="Total USD"     value={`$${totalUsd}`} color={C.green}/>
+        <StatCard icon="🛡️" label="Admin Staff"  value={admins}      color={C.cyan}/>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>YOUR PERMISSIONS</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {(PERMISSIONS[adminUser.role||"super_admin"]||[]).map(p=>(
+          <span key={p} style={{
+            background:"rgba(139,92,246,.12)", color:C.brandLt,
+            border:`1px solid ${C.border2}`, borderRadius:8,
+            padding:"4px 10px", fontSize:11, fontWeight:600,
+          }}>✓ {p.replace(/_/g," ")}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Users Tab ─────────────────────────────────── */
+function AdminUsers({users, setUsers, adminUser}){
+  const [search,setSearch] = useState("");
+  const [confirm,setConfirm] = useState(null); // {type,userId}
+
+  const regularUsers = users.filter(u=>u.role==="user"||(!u.isAdmin&&!u.role));
+  const filtered = regularUsers.filter(u=>
+    u.name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleActive = (id) => {
+    setUsers(prev=>prev.map(u=>u.id===id?{...u,active:!u.active}:u));
+    setConfirm(null);
+  };
+  const deleteUser = (id) => {
+    setUsers(prev=>prev.filter(u=>u.id!==id));
+    setConfirm(null);
+  };
+
+  const canDelete = can(adminUser,"delete_users");
+  const canToggle = can(adminUser,"toggle_user_active");
+  const canEdit   = can(adminUser,"edit_users");
+
+  return (
+    <div>
+      <div style={{position:"relative",marginBottom:16}}>
+        <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
+        <input
+          className="inp-base"
+          placeholder="Search users by name or email…"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          style={{paddingLeft:38}}
+        />
+      </div>
+
+      <div style={{fontSize:12,color:"rgba(255,255,255,.35)",marginBottom:12}}>
+        {filtered.length} user{filtered.length!==1?"s":""} found
+        {!canDelete&&<span style={{marginLeft:8,color:C.cyan}}>· view &amp; toggle only</span>}
+      </div>
+
+      {filtered.map(u=>(
+        <div key={u.id} className="user-row">
+          <div style={{
+            width:38,height:38,borderRadius:"50%",flexShrink:0,
+            background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:16,fontWeight:700,color:C.white,
+          }}>{u.name.charAt(0).toUpperCase()}</div>
+
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
+              {u.name}
+              {!u.active&&<span style={{fontSize:10,background:"rgba(239,68,68,.15)",color:C.red,border:"1px solid rgba(239,68,68,.3)",borderRadius:99,padding:"1px 7px"}}>Inactive</span>}
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:1}}>
+              {u.country} · {u.pts?.toLocaleString()||0} pts · Joined {u.joined}
+            </div>
+          </div>
+
+          <div style={{display:"flex",gap:8,flexShrink:0}}>
+            {canToggle&&(
+              <button
+                onClick={()=>setConfirm({type:"toggle",userId:u.id,userName:u.name,active:u.active})}
+                title={u.active?"Deactivate":"Activate"}
+                style={{
+                  background:u.active?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",
+                  border:`1px solid ${u.active?"rgba(239,68,68,.3)":"rgba(16,185,129,.3)"}`,
+                  color:u.active?C.red:C.green,
+                  borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
+                }}
+              >{u.active?"🚫 Ban":"✅ Activate"}</button>
+            )}
+            {canDelete&&(
+              <button
+                onClick={()=>setConfirm({type:"delete",userId:u.id,userName:u.name})}
+                title="Delete user"
+                style={{
+                  background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",
+                  color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
+                }}
+              >🗑</button>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* Confirmation dialog */}
+      {confirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>
+              {confirm.type==="delete"?"🗑️":"⚠️"}
+            </div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>
+              {confirm.type==="delete"
+                ? `Delete "${confirm.userName}"?`
+                : `${confirm.active?"Deactivate":"Activate"} "${confirm.userName}"?`}
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>
+              {confirm.type==="delete"
+                ? "This action cannot be undone."
+                : confirm.active
+                  ? "The user will lose access to the app."
+                  : "The user will regain access to the app."}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setConfirm(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button
+                onClick={()=>confirm.type==="delete"?deleteUser(confirm.userId):toggleActive(confirm.userId)}
+                style={{background:confirm.type==="delete"||confirm.active?`linear-gradient(135deg,${C.red},#b91c1c)`:`linear-gradient(135deg,${C.green},#047857)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
+              >{confirm.type==="delete"?"Delete":confirm.active?"Deactivate":"Activate"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Roles Tab (super_admin only) ───────────────── */
+function AdminRoles({users, setUsers, adminUser}){
+  const [confirm,setConfirm] = useState(null);
+  const staffUsers = users.filter(u=>u.isAdmin||u.role==="super_admin"||u.role==="moderator");
+
+  const changeRole = (id, newRole) => {
+    if(id===adminUser.id) return; // can't demote self
+    setUsers(prev=>prev.map(u=>u.id===id
+      ? {...u, role:newRole, isAdmin:newRole!=="user"}
+      : u
+    ));
+    setConfirm(null);
+  };
+
+  const promoteUser = (id) => {
+    setUsers(prev=>prev.map(u=>u.id===id
+      ? {...u, role:"moderator", isAdmin:true}
+      : u
+    ));
+    setConfirm(null);
+  };
+
+  const nonAdminUsers = users.filter(u=>!u.isAdmin&&(!u.role||u.role==="user"));
+
+  return (
+    <div>
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>ADMIN STAFF</div>
+        {staffUsers.map(u=>(
+          <div key={u.id} className="user-row">
+            <div style={{
+              width:38,height:38,borderRadius:"50%",flexShrink:0,
+              background:`linear-gradient(135deg,${C.gold},${C.brand})`,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:16,fontWeight:700,color:C.white,
+            }}>{u.name.charAt(0).toUpperCase()}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:8}}>
+                {u.name}
+                {u.id===adminUser.id&&<span style={{fontSize:10,color:C.muted}}>(you)</span>}
+              </div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1}}>{u.email}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+              <RoleBadge role={u.role||"super_admin"}/>
+              {u.id!==adminUser.id&&u.role!=="super_admin"&&(
+                <button
+                  onClick={()=>setConfirm({type:"demote",userId:u.id,userName:u.name})}
+                  style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}
+                >Remove</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>PROMOTE A USER TO MODERATOR</div>
+        {nonAdminUsers.length===0
+          ? <div style={{color:"rgba(255,255,255,.3)",fontSize:13,textAlign:"center",padding:20}}>No regular users to promote.</div>
+          : nonAdminUsers.map(u=>(
+            <div key={u.id} className="user-row">
+              <div style={{
+                width:38,height:38,borderRadius:"50%",flexShrink:0,
+                background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:16,fontWeight:700,color:C.white,
+              }}>{u.name.charAt(0).toUpperCase()}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,color:C.white,fontSize:14}}>{u.name}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1}}>{u.email}</div>
+              </div>
+              <button
+                onClick={()=>setConfirm({type:"promote",userId:u.id,userName:u.name})}
+                style={{background:"rgba(6,182,212,.12)",border:"1px solid rgba(6,182,212,.3)",color:C.cyan,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",flexShrink:0}}
+              >🛡️ Make Mod</button>
+            </div>
+          ))
+        }
+      </div>
+
+      {confirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>{confirm.type==="promote"?"🛡️":"⬇️"}</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>
+              {confirm.type==="promote"
+                ? `Promote "${confirm.userName}" to Moderator?`
+                : `Remove moderator role from "${confirm.userName}"?`}
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>
+              {confirm.type==="promote"
+                ? "They will gain access to the admin panel with limited permissions."
+                : "They will lose admin panel access and return to a regular user."}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setConfirm(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button
+                onClick={()=>confirm.type==="promote"?promoteUser(confirm.userId):changeRole(confirm.userId,"user")}
+                style={{background:confirm.type==="promote"?`linear-gradient(135deg,${C.cyan},#0284c7)`:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
+              >{confirm.type==="promote"?"Promote":"Remove"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Settings Tab (super_admin only) ────────────── */
+function AdminSettings(){
+  const [saved,setSaved] = useState(false);
+  const [cfg,setCfg] = useState({
+    appName:"Wish",
+    dailyAdLimit:15,
+    sundayAdLimit:20,
+    miningCycleHours:8,
+    referralBonus:300,
+    minWithdrawUsd:10,
+  });
+  const save = ()=>{ setSaved(true); setTimeout(()=>setSaved(false),2000); };
+  const f=(k)=>v=>setCfg(p=>({...p,[k]:v}));
+
+  const Field=({label,k,type="number",min})=>(
+    <div style={{marginBottom:16}}>
+      <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>{label}</div>
+      <input
+        className="inp-base"
+        type={type} min={min}
+        value={cfg[k]}
+        onChange={e=>f(k)(type==="number"?Number(e.target.value):e.target.value)}
+      />
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.25)",borderRadius:12,padding:"10px 14px",marginBottom:20,display:"flex",gap:10,alignItems:"flex-start"}}>
+        <span style={{fontSize:16}}>⚠️</span>
+        <span style={{fontSize:12,color:"rgba(255,255,255,.6)",lineHeight:1.5}}>Settings are stored in-memory only in this demo. Connect to your backend to persist changes.</span>
+      </div>
+      <Field label="App Name"               k="appName"          type="text"/>
+      <Field label="Daily Ad Limit"         k="dailyAdLimit"     min={1}/>
+      <Field label="Sunday Ad Limit"        k="sundayAdLimit"    min={1}/>
+      <Field label="Mining Cycle (hours)"   k="miningCycleHours" min={1}/>
+      <Field label="Referral Bonus (pts)"   k="referralBonus"    min={0}/>
+      <Field label="Min Withdrawal (USD)"   k="minWithdrawUsd"   min={1}/>
+      <button
+        onClick={save}
+        style={{
+          width:"100%",padding:"13px",borderRadius:12,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,
+          background:saved?`linear-gradient(135deg,${C.green},#047857)`:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+          color:"#fff",transition:"background .3s",
+          boxShadow:saved?"none":`0 4px 20px ${C.brand}80`,
+        }}
+      >{saved?"✓ Saved!":"Save Settings"}</button>
+    </div>
+  );
+}
+
+/* ── ScopeCheckboxes helper ────────────────────── */
+function ScopeGrid({items, selected, onChange, color=C.brand}){
+  const groups = [...new Set(items.map(i=>i.group))];
+  return (
+    <div>
+      {groups.map(g=>(
+        <div key={g} style={{marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.35)",letterSpacing:1,marginBottom:6}}>{g.toUpperCase()}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {items.filter(i=>i.group===g).map(item=>{
+              const on = selected.includes(item.id);
+              return (
+                <button key={item.id} onClick={()=>onChange(on?selected.filter(s=>s!==item.id):[...selected,item.id])}
+                  style={{
+                    padding:"5px 11px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+                    background:on?`${color}22`:"rgba(255,255,255,.04)",
+                    border:`1px solid ${on?color:"rgba(255,255,255,.12)"}`,
+                    color:on?color:"rgba(255,255,255,.45)",
+                    transition:"all .15s",
+                  }}
+                >{on?"✓ ":""}{item.label}</button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── API Keys Tab ──────────────────────────────── */
+function AdminApiKeys(){
+  const [keys,setKeys] = useState(INITIAL_API_KEYS);
+  const [modal,setModal] = useState(null);  // null | "create" | "edit" | "revoke" | "created"
+  const [form,setForm] = useState({name:"",scopes:[]});
+  const [editId,setEditId] = useState(null);
+  const [revokeId,setRevokeId] = useState(null);
+  const [newKeyFull,setNewKeyFull] = useState("");
+  const [copied,setCopied] = useState(false);
+  const [showSecret,setShowSecret] = useState({});
+
+  const openCreate = () => { setForm({name:"",scopes:[]}); setModal("create"); };
+  const openEdit   = (k) => { setEditId(k.id); setForm({name:k.name,scopes:[...k.scopes]}); setModal("edit"); };
+  const openRevoke = (k) => { setRevokeId(k.id); setModal("revoke"); };
+
+  const createKey = () => {
+    if(!form.name.trim()||!form.scopes.length) return;
+    const full = makeApiKey();
+    const k = {
+      id:`ak_${Date.now()}`, name:form.name.trim(),
+      prefix:full.slice(0,14), fullKey:full,
+      scopes:form.scopes, status:"active",
+      createdAt:new Date().toISOString(), lastUsed:null,
+    };
+    setKeys(prev=>[k,...prev]);
+    setNewKeyFull(full);
+    setModal("created");
+  };
+
+  const saveEdit = () => {
+    if(!form.name.trim()||!form.scopes.length) return;
+    setKeys(prev=>prev.map(k=>k.id===editId?{...k,name:form.name.trim(),scopes:form.scopes}:k));
+    setModal(null);
+  };
+
+  const revokeKey = () => {
+    setKeys(prev=>prev.map(k=>k.id===revokeId?{...k,status:"revoked",fullKey:null}:k));
+    setModal(null);
+  };
+
+  const copyKey = () => {
+    navigator.clipboard.writeText(newKeyFull).catch(()=>{});
+    setCopied(true);
+    setTimeout(()=>setCopied(false),2000);
+  };
+
+  const activeKeys  = keys.filter(k=>k.status==="active");
+  const revokedKeys = keys.filter(k=>k.status==="revoked");
+
+  const KeyCard = ({k}) => (
+    <div className="user-row" style={{flexDirection:"column",alignItems:"stretch",gap:10}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{
+          width:36,height:36,borderRadius:9,flexShrink:0,
+          background:k.status==="active"?"rgba(16,185,129,.15)":"rgba(239,68,68,.1)",
+          border:`1px solid ${k.status==="active"?"rgba(16,185,129,.3)":"rgba(239,68,68,.2)"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+        }}>🔑</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:C.white,fontSize:14}}>{k.name}</span>
+            <span style={{
+              fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,
+              background:k.status==="active"?"rgba(16,185,129,.15)":"rgba(239,68,68,.1)",
+              color:k.status==="active"?C.green:C.red,
+              border:`1px solid ${k.status==="active"?"rgba(16,185,129,.3)":"rgba(239,68,68,.2)"}`,
+            }}>{k.status==="active"?"● ACTIVE":"✕ REVOKED"}</span>
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:2,fontFamily:"monospace"}}>
+            {k.prefix}{"●".repeat(16)}
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>
+            Created {fmtDate(k.createdAt)}
+            {k.lastUsed&&<span> · Last used {fmtDate(k.lastUsed)}</span>}
+            {!k.lastUsed&&<span style={{color:"rgba(255,255,255,.2)"}}> · Never used</span>}
+          </div>
+        </div>
+        {k.status==="active"&&(
+          <div style={{display:"flex",gap:6,flexShrink:0}}>
+            <button onClick={()=>openEdit(k)} style={{background:"rgba(139,92,246,.12)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Edit</button>
+            <button onClick={()=>openRevoke(k)} style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>Revoke</button>
+          </div>
+        )}
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:46}}>
+        {k.scopes.map(s=>(
+          <span key={s} style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:6,background:"rgba(139,92,246,.1)",color:C.brandLt,border:`1px solid ${C.border}`}}>{s}</span>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <div>
+          <div style={{fontWeight:700,color:C.white,fontSize:15}}>API Keys</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>{activeKeys.length} active · {revokedKeys.length} revoked</div>
+        </div>
+        <button onClick={openCreate} style={{background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",color:"#fff",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${C.brand}60`}}>+ New Key</button>
+      </div>
+
+      <div style={{background:"rgba(245,158,11,.07)",border:"1px solid rgba(245,158,11,.2)",borderRadius:11,padding:"10px 14px",marginBottom:18,display:"flex",gap:9,alignItems:"flex-start"}}>
+        <span style={{fontSize:15,flexShrink:0}}>⚠️</span>
+        <span style={{fontSize:12,color:"rgba(255,255,255,.55)",lineHeight:1.5}}>API keys grant programmatic access to your platform. Keep them secret — never share or commit them to source control. A key's full value is only shown once at creation.</span>
+      </div>
+
+      {activeKeys.length>0&&(
+        <div style={{marginBottom:20}}>
+          {activeKeys.map(k=><KeyCard key={k.id} k={k}/>)}
+        </div>
+      )}
+
+      {revokedKeys.length>0&&(
+        <div>
+          <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,.25)",letterSpacing:1,marginBottom:10}}>REVOKED KEYS</div>
+          {revokedKeys.map(k=><KeyCard key={k.id} k={k}/>)}
+        </div>
+      )}
+
+      {/* Create / Edit modal */}
+      {(modal==="create"||modal==="edit")&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s1,borderRadius:"20px 20px 16px 16px",padding:24,width:"100%",maxWidth:480,border:`1px solid ${C.border}`,maxHeight:"90vh",overflowY:"auto"}}>
+            <div style={{fontWeight:800,fontSize:17,color:C.white,marginBottom:4}}>{modal==="create"?"Create New API Key":"Edit API Key"}</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:20}}>{modal==="create"?"The full key is shown once — copy it immediately.":"You can update the key name and its permission scopes."}</div>
+
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Key Name <span style={{color:C.red}}>*</span></div>
+              <input className="inp-base" placeholder="e.g. Mobile App, CI/CD Pipeline…" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
+            </div>
+
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Permission Scopes <span style={{color:C.red}}>*</span></div>
+              <ScopeGrid items={API_KEY_SCOPES} selected={form.scopes} onChange={s=>setForm(p=>({...p,scopes:s}))} color={C.brand}/>
+              {form.scopes.length===0&&<div style={{fontSize:11,color:C.red,marginTop:6}}>⚠ Select at least one scope</div>}
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:12,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button
+                onClick={modal==="create"?createKey:saveEdit}
+                disabled={!form.name.trim()||!form.scopes.length}
+                style={{background:(!form.name.trim()||!form.scopes.length)?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",borderRadius:12,padding:12,color:(!form.name.trim()||!form.scopes.length)?"rgba(255,255,255,.3)":"#fff",fontWeight:700,cursor:(!form.name.trim()||!form.scopes.length)?"default":"pointer"}}
+              >{modal==="create"?"Generate Key":"Save Changes"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Key created — show full key once */}
+      {modal==="created"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s1,borderRadius:20,padding:24,width:"100%",maxWidth:420,border:`1px solid rgba(16,185,129,.3)`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:8}}>🔑</div>
+            <div style={{fontWeight:800,fontSize:16,color:C.white,textAlign:"center",marginBottom:4}}>API Key Created!</div>
+            <div style={{fontSize:12,color:C.red,textAlign:"center",fontWeight:700,marginBottom:16}}>Copy this key now — it won't be shown again.</div>
+            <div style={{
+              background:"rgba(0,0,0,.4)",border:`1px solid ${C.border2}`,borderRadius:10,padding:"12px 14px",
+              fontFamily:"monospace",fontSize:12,color:C.green,wordBreak:"break-all",marginBottom:14,
+            }}>{newKeyFull}</div>
+            <button onClick={copyKey} style={{
+              width:"100%",padding:12,borderRadius:12,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,
+              background:copied?`linear-gradient(135deg,${C.green},#047857)`:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              color:"#fff",marginBottom:10,transition:"background .3s",
+            }}>{copied?"✓ Copied!":"📋 Copy to Clipboard"}</button>
+            <button onClick={()=>{setModal(null);setNewKeyFull("");}} style={{width:"100%",padding:12,borderRadius:12,border:`1px solid ${C.border}`,background:C.s3,color:C.white,fontWeight:600,cursor:"pointer",fontSize:14}}>I've saved it — Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Revoke confirm */}
+      {modal==="revoke"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid rgba(239,68,68,.25)`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>🚫</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>Revoke "{keys.find(k=>k.id===revokeId)?.name}"?</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>This key will stop working immediately. This cannot be undone.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={revokeKey} style={{background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}>Revoke Key</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Webhooks Tab ──────────────────────────────── */
+function AdminWebhooks(){
+  const [hooks,setHooks] = useState(INITIAL_WEBHOOKS);
+  const [modal,setModal] = useState(null); // null | "create" | "edit" | "delete" | "test"
+  const [form,setForm]   = useState({name:"",url:"",events:[],secret:""});
+  const [editId,setEditId]   = useState(null);
+  const [deleteId,setDeleteId] = useState(null);
+  const [testId,setTestId]   = useState(null);
+  const [testResult,setTestResult] = useState(null);
+  const [showSecret,setShowSecret] = useState({});
+  const [urlErr,setUrlErr] = useState("");
+
+  const validateUrl = v => {
+    try { new URL(v); setUrlErr(""); return true; }
+    catch { setUrlErr("Enter a valid HTTPS URL"); return false; }
+  };
+
+  const openCreate = () => {
+    setForm({name:"",url:"",events:[],secret:makeWebhookSecret()});
+    setUrlErr("");
+    setModal("create");
+  };
+  const openEdit = (h) => {
+    setEditId(h.id);
+    setForm({name:h.name,url:h.url,events:[...h.events],secret:h.secret});
+    setUrlErr("");
+    setModal("edit");
+  };
+  const openDelete = (h) => { setDeleteId(h.id); setModal("delete"); };
+  const openTest   = (h) => { setTestId(h.id); setTestResult(null); setModal("test"); };
+
+  const createHook = () => {
+    if(!form.name.trim()||!validateUrl(form.url)||!form.events.length) return;
+    const h = {
+      id:`wh_${Date.now()}`, name:form.name.trim(),
+      url:form.url.trim(), events:form.events,
+      secret:form.secret||makeWebhookSecret(),
+      status:"active",
+      createdAt:new Date().toISOString(),
+      lastTriggered:null, failCount:0,
+    };
+    setHooks(prev=>[h,...prev]);
+    setModal(null);
+  };
+
+  const saveEdit = () => {
+    if(!form.name.trim()||!validateUrl(form.url)||!form.events.length) return;
+    setHooks(prev=>prev.map(h=>h.id===editId?{...h,name:form.name.trim(),url:form.url.trim(),events:form.events,secret:form.secret}:h));
+    setModal(null);
+  };
+
+  const deleteHook  = () => { setHooks(prev=>prev.filter(h=>h.id!==deleteId)); setModal(null); };
+  const toggleHook  = (id) => setHooks(prev=>prev.map(h=>h.id===id?{...h,status:h.status==="active"?"inactive":"active"}:h));
+  const regenerateSecret = () => setForm(p=>({...p,secret:makeWebhookSecret()}));
+
+  const runTest = () => {
+    setTestResult("loading");
+    setTimeout(()=>{
+      const ok = Math.random()>0.25;
+      setTestResult(ok
+        ? { ok:true,  status:200, body:'{"received":true,"event":"test.ping"}', ms:Math.floor(120+Math.random()*180) }
+        : { ok:false, status:503, body:'Service Unavailable',                   ms:Math.floor(5000+Math.random()*3000) }
+      );
+    }, 1200);
+  };
+
+  const HookCard = ({h}) => (
+    <div className="user-row" style={{flexDirection:"column",alignItems:"stretch",gap:10}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+        <div style={{
+          width:36,height:36,borderRadius:9,flexShrink:0,
+          background:h.status==="active"?"rgba(6,182,212,.12)":"rgba(255,255,255,.05)",
+          border:`1px solid ${h.status==="active"?"rgba(6,182,212,.3)":"rgba(255,255,255,.1)"}`,
+          display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+        }}>🔗</div>
+
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,color:C.white,fontSize:14}}>{h.name}</span>
+            {h.failCount>0&&<span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,background:"rgba(245,158,11,.15)",color:C.gold,border:"1px solid rgba(245,158,11,.3)"}}>{h.failCount} fail{h.failCount!==1?"s":""}</span>}
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h.url}</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>
+            Created {fmtDate(h.createdAt)}
+            {h.lastTriggered?<span> · Last fired {fmtDate(h.lastTriggered)}</span>:<span style={{color:"rgba(255,255,255,.2)"}}> · Never fired</span>}
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
+          <button onClick={()=>toggleHook(h.id)}
+            className={`toggle ${h.status==="active"?"on":"off"}`}
+            title={h.status==="active"?"Disable":"Enable"}
+            style={{width:40,height:22,fontSize:0}}
+          />
+          <button onClick={()=>openTest(h)}   style={{background:"rgba(6,182,212,.1)",border:"1px solid rgba(6,182,212,.25)",color:C.cyan,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}>Test</button>
+          <button onClick={()=>openEdit(h)}   style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}>Edit</button>
+          <button onClick={()=>openDelete(h)} style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}>Delete</button>
+        </div>
+      </div>
+
+      {/* Events */}
+      <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:46}}>
+        {h.events.map(e=>(
+          <span key={e} style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:6,background:"rgba(6,182,212,.08)",color:C.cyan,border:"1px solid rgba(6,182,212,.2)"}}>{e}</span>
+        ))}
+      </div>
+
+      {/* Secret row */}
+      <div style={{paddingLeft:46,display:"flex",alignItems:"center",gap:8}}>
+        <span style={{fontSize:11,color:"rgba(255,255,255,.3)",fontFamily:"monospace"}}>
+          {showSecret[h.id] ? h.secret : h.secret.slice(0,12)+"●".repeat(12)}
+        </span>
+        <button onClick={()=>setShowSecret(p=>({...p,[h.id]:!p[h.id]}))}
+          style={{background:"none",border:"none",cursor:"pointer",fontSize:13,color:C.muted,padding:0,lineHeight:1}}
+        >{showSecret[h.id]?"🙈":"👁"}</button>
+      </div>
+    </div>
+  );
+
+  const FormModal = ({isEdit}) => (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:999,padding:16}}>
+      <div style={{background:C.s1,borderRadius:"20px 20px 16px 16px",padding:24,width:"100%",maxWidth:480,border:`1px solid ${C.border}`,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{fontWeight:800,fontSize:17,color:C.white,marginBottom:20}}>{isEdit?"Edit Webhook":"Add Webhook"}</div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Name <span style={{color:C.red}}>*</span></div>
+          <input className="inp-base" placeholder="e.g. Reward Notifier" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Endpoint URL <span style={{color:C.red}}>*</span></div>
+          <input className="inp-base" placeholder="https://your-server.com/webhooks/wish" value={form.url}
+            onChange={e=>{setForm(p=>({...p,url:e.target.value}));if(urlErr)validateUrl(e.target.value);}}
+            onBlur={e=>validateUrl(e.target.value)}/>
+          {urlErr&&<div style={{fontSize:11,color:C.red,marginTop:4}}>⚠ {urlErr}</div>}
+        </div>
+
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Signing Secret</div>
+          <div style={{display:"flex",gap:8}}>
+            <input className="inp-base" readOnly value={form.secret} style={{fontFamily:"monospace",fontSize:11,flex:1}}/>
+            <button onClick={regenerateSecret} title="Regenerate" style={{background:"rgba(139,92,246,.12)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:10,padding:"0 12px",fontSize:13,cursor:"pointer",flexShrink:0}}>↺</button>
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:4}}>Used to verify payload signatures on your server.</div>
+        </div>
+
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Events to Subscribe <span style={{color:C.red}}>*</span></div>
+          <ScopeGrid items={WEBHOOK_EVENTS} selected={form.events} onChange={e=>setForm(p=>({...p,events:e}))} color={C.cyan}/>
+          {form.events.length===0&&<div style={{fontSize:11,color:C.red,marginTop:6}}>⚠ Select at least one event</div>}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:12,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+          <button
+            onClick={isEdit?saveEdit:createHook}
+            disabled={!form.name.trim()||!form.url.trim()||!form.events.length}
+            style={{
+              background:(!form.name.trim()||!form.url.trim()||!form.events.length)?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.cyan},#0284c7)`,
+              border:"none",borderRadius:12,padding:12,fontWeight:700,cursor:(!form.name.trim()||!form.url.trim()||!form.events.length)?"default":"pointer",
+              color:(!form.name.trim()||!form.url.trim()||!form.events.length)?"rgba(255,255,255,.3)":"#fff",
+            }}
+          >{isEdit?"Save Changes":"Add Webhook"}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+        <div>
+          <div style={{fontWeight:700,color:C.white,fontSize:15}}>Webhooks</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>
+            {hooks.filter(h=>h.status==="active").length} active · {hooks.filter(h=>h.status==="inactive").length} inactive
+          </div>
+        </div>
+        <button onClick={openCreate} style={{background:`linear-gradient(135deg,${C.cyan},#0284c7)`,border:"none",color:"#fff",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${C.cyan}60`}}>+ Add Webhook</button>
+      </div>
+
+      {hooks.map(h=><HookCard key={h.id} h={h}/>)}
+
+      {modal==="create" && <FormModal isEdit={false}/>}
+      {modal==="edit"   && <FormModal isEdit={true}/>}
+
+      {/* Delete confirm */}
+      {modal==="delete"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid rgba(239,68,68,.25)`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>🗑️</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>Delete "{hooks.find(h=>h.id===deleteId)?.name}"?</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>Your endpoint will stop receiving events immediately.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={deleteHook} style={{background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Test modal */}
+      {modal==="test"&&(()=>{
+        const h = hooks.find(x=>x.id===testId);
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+            <div style={{background:C.s1,borderRadius:20,padding:24,maxWidth:400,width:"100%",border:`1px solid ${C.border}`}}>
+              <div style={{fontWeight:800,fontSize:16,color:C.white,marginBottom:4}}>Test Webhook</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:16,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h?.url}</div>
+
+              {!testResult&&(
+                <div style={{textAlign:"center",padding:"20px 0"}}>
+                  <button onClick={runTest} style={{background:`linear-gradient(135deg,${C.cyan},#0284c7)`,border:"none",color:"#fff",borderRadius:12,padding:"12px 28px",fontSize:14,fontWeight:700,cursor:"pointer"}}>🚀 Send Test Ping</button>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:10}}>Sends a <code style={{background:"rgba(255,255,255,.08)",padding:"1px 5px",borderRadius:4}}>test.ping</code> event to your endpoint.</div>
+                </div>
+              )}
+
+              {testResult==="loading"&&(
+                <div style={{textAlign:"center",padding:"24px 0",color:"rgba(255,255,255,.5)",fontSize:13}}>
+                  <div style={{fontSize:28,marginBottom:8,animation:"rotate 1s linear infinite",display:"inline-block"}}>⏳</div>
+                  <div>Sending request…</div>
+                </div>
+              )}
+
+              {testResult&&testResult!=="loading"&&(
+                <div>
+                  <div style={{
+                    background:testResult.ok?"rgba(16,185,129,.08)":"rgba(239,68,68,.08)",
+                    border:`1px solid ${testResult.ok?"rgba(16,185,129,.3)":"rgba(239,68,68,.3)"}`,
+                    borderRadius:12,padding:14,marginBottom:14,
+                  }}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                      <span style={{fontSize:20}}>{testResult.ok?"✅":"❌"}</span>
+                      <span style={{fontWeight:700,color:testResult.ok?C.green:C.red,fontSize:14}}>
+                        {testResult.ok?"Success":"Failed"}
+                      </span>
+                      <span style={{marginLeft:"auto",fontSize:11,color:"rgba(255,255,255,.4)",fontFamily:"monospace"}}>{testResult.ms}ms</span>
+                    </div>
+                    <div style={{display:"flex",gap:8,marginBottom:8}}>
+                      <span style={{
+                        fontSize:12,fontWeight:700,padding:"2px 8px",borderRadius:6,
+                        background:testResult.ok?"rgba(16,185,129,.15)":"rgba(239,68,68,.15)",
+                        color:testResult.ok?C.green:C.red,
+                      }}>HTTP {testResult.status}</span>
+                    </div>
+                    <div style={{fontFamily:"monospace",fontSize:11,color:"rgba(255,255,255,.6)",background:"rgba(0,0,0,.3)",padding:"8px 10px",borderRadius:8,wordBreak:"break-all"}}>{testResult.body}</div>
+                  </div>
+                  <button onClick={runTest} style={{width:"100%",background:"rgba(255,255,255,.05)",border:`1px solid ${C.border}`,borderRadius:10,padding:10,color:C.muted,fontSize:13,fontWeight:600,cursor:"pointer",marginBottom:8}}>Retry Test</button>
+                </div>
+              )}
+
+              <button onClick={()=>setModal(null)} style={{width:"100%",background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer",fontSize:14}}>Close</button>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ── Email Templates Tab ───────────────────────── */
+function AdminEmailTemplates(){
+  const [templates,setTemplates] = useState(INITIAL_EMAIL_TEMPLATES);
+  const [editId,setEditId]       = useState(null); // template id being edited, or null = list view
+  const [previewMode,setPreview] = useState(false);
+  const [saved,setSaved]         = useState(false);
+  const [resetConfirm,setRC]     = useState(false);
+  const iframeRef                = React.useRef(null);
+
+  // Draft state while editing
+  const [draft,setDraft] = useState({subject:"",html:""});
+
+  const openEditor = (tpl) => {
+    setDraft({subject:tpl.subject, html:tpl.html});
+    setEditId(tpl.id);
+    setPreview(false);
+    setSaved(false);
+    setRC(false);
+  };
+
+  const closeEditor = () => { setEditId(null); setPreview(false); };
+
+  const saveDraft = () => {
+    setTemplates(prev=>prev.map(t=>t.id===editId
+      ? {...t, subject:draft.subject, html:draft.html, updatedAt:new Date().toISOString()}
+      : t
+    ));
+    setSaved(true);
+    setTimeout(()=>setSaved(false),2500);
+  };
+
+  const resetToDefault = () => {
+    const orig = INITIAL_EMAIL_TEMPLATES.find(t=>t.id===editId);
+    if(orig){ setDraft({subject:orig.subject, html:orig.html}); }
+    setRC(false);
+  };
+
+  const toggleEnabled = (id) => {
+    setTemplates(prev=>prev.map(t=>t.id===id?{...t,enabled:!t.enabled}:t));
+  };
+
+  // Insert a variable tag at cursor position in the active textarea
+  const insertVar = (tag, field) => {
+    const el = document.getElementById(`email-${field}`);
+    if(!el) return;
+    const s = el.selectionStart, e = el.selectionEnd;
+    const val = draft[field];
+    const next = val.slice(0,s)+tag+val.slice(e);
+    setDraft(p=>({...p,[field]:next}));
+    // restore cursor after React re-render
+    setTimeout(()=>{ el.focus(); el.setSelectionRange(s+tag.length,s+tag.length); },0);
+  };
+
+  // Update iframe preview whenever draft changes
+  React.useEffect(()=>{
+    if(!previewMode||!iframeRef.current) return;
+    const {html,subject} = previewHtml(draft.html, draft.subject);
+    const doc = iframeRef.current.contentDocument||iframeRef.current.contentWindow.document;
+    doc.open(); doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${subject}</title></head><body style="margin:0;">${html}</body></html>`); doc.close();
+  },[previewMode,draft]);
+
+  /* ── List view ── */
+  if(!editId){
+    return (
+      <div>
+        <div style={{fontWeight:700,color:C.white,fontSize:15,marginBottom:4}}>Email Templates</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginBottom:16}}>Edit the emails sent to your users. Changes are saved per-session.</div>
+
+        {templates.map(tpl=>(
+          <div key={tpl.id} className="user-row" style={{cursor:"default"}}>
+            <div style={{
+              width:40,height:40,borderRadius:10,flexShrink:0,
+              background:"rgba(139,92,246,.12)",border:`1px solid ${C.border}`,
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,
+            }}>{tpl.icon}</div>
+
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontWeight:700,color:C.white,fontSize:14}}>{tpl.name}</span>
+                <span style={{
+                  fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:99,
+                  background:tpl.enabled?"rgba(16,185,129,.13)":"rgba(255,255,255,.06)",
+                  color:tpl.enabled?C.green:"rgba(255,255,255,.35)",
+                  border:`1px solid ${tpl.enabled?"rgba(16,185,129,.3)":"rgba(255,255,255,.12)"}`,
+                }}>{tpl.enabled?"Enabled":"Disabled"}</span>
+              </div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tpl.description}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.25)",marginTop:2}}>Last edited {fmtDate(tpl.updatedAt)}</div>
+            </div>
+
+            <div style={{display:"flex",gap:8,flexShrink:0,alignItems:"center"}}>
+              <button
+                onClick={()=>toggleEnabled(tpl.id)}
+                className={`toggle ${tpl.enabled?"on":"off"}`}
+                title={tpl.enabled?"Disable this template":"Enable this template"}
+                style={{fontSize:0}}
+              />
+              <button
+                onClick={()=>openEditor(tpl)}
+                style={{background:`rgba(139,92,246,.12)`,border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}
+              >Edit</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  /* ── Editor view ── */
+  const tpl     = templates.find(t=>t.id===editId);
+  const vars    = EMAIL_TEMPLATE_VARS[editId]||[];
+  const {html:prevHtml,subject:prevSubject} = previewHtml(draft.html,draft.subject);
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:0,minHeight:0}}>
+      {/* Editor header */}
+      <div style={{
+        display:"flex",alignItems:"center",gap:10,
+        padding:"0 0 16px",borderBottom:`1px solid ${C.border}`,marginBottom:16,
+      }}>
+        <button onClick={closeEditor} style={{background:"rgba(255,255,255,.07)",border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}>← Back</button>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:800,color:C.white,fontSize:15,display:"flex",alignItems:"center",gap:8}}>
+            <span>{tpl.icon}</span>{tpl.name}
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:1}}>{tpl.description}</div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button
+            onClick={()=>setPreview(p=>!p)}
+            style={{background:previewMode?`rgba(6,182,212,.15)`:"rgba(255,255,255,.06)",border:`1px solid ${previewMode?"rgba(6,182,212,.4)":C.border}`,color:previewMode?C.cyan:C.muted,borderRadius:8,padding:"7px 13px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+          >{previewMode?"✏️ Edit":"👁 Preview"}</button>
+          <button
+            onClick={()=>setRC(true)}
+            style={{background:"rgba(255,255,255,.05)",border:`1px solid ${C.border}`,color:"rgba(255,255,255,.4)",borderRadius:8,padding:"7px 12px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+            title="Reset to original default"
+          >↺ Reset</button>
+          <button
+            onClick={saveDraft}
+            style={{
+              background:saved?`linear-gradient(135deg,${C.green},#047857)`:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              border:"none",color:"#fff",borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:700,cursor:"pointer",
+              transition:"background .3s",minWidth:70,
+            }}
+          >{saved?"✓ Saved":"Save"}</button>
+        </div>
+      </div>
+
+      {previewMode ? (
+        /* ── Preview pane ── */
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          <div style={{background:"rgba(6,182,212,.07)",border:"1px solid rgba(6,182,212,.2)",borderRadius:10,padding:"10px 14px"}}>
+            <span style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.35)",marginRight:8}}>SUBJECT</span>
+            <span style={{fontSize:13,color:C.white}}>{prevSubject}</span>
+          </div>
+          <div style={{
+            background:"#fff",borderRadius:12,overflow:"hidden",
+            border:`1px solid ${C.border}`,
+          }}>
+            <iframe
+              ref={iframeRef}
+              title="Email Preview"
+              style={{width:"100%",border:"none",minHeight:500,display:"block"}}
+              sandbox="allow-same-origin"
+            />
+          </div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.25)",textAlign:"center"}}>Preview uses sample values for merge tags</div>
+        </div>
+      ) : (
+        /* ── Edit pane ── */
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {/* Subject */}
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Subject Line
+              <span style={{fontWeight:400,color:"rgba(255,255,255,.25)",marginLeft:6,fontSize:11}}>merge tags supported</span>
+            </div>
+            <input
+              id="email-subject"
+              className="inp-base"
+              value={draft.subject}
+              onChange={e=>setDraft(p=>({...p,subject:e.target.value}))}
+              placeholder="Email subject…"
+            />
+          </div>
+
+          {/* Variable reference chips — click to insert into subject */}
+          <div>
+            <div style={{fontSize:11,fontWeight:700,color:"rgba(255,255,255,.3)",letterSpacing:1,marginBottom:6}}>AVAILABLE MERGE TAGS — click to insert into subject or body</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {vars.map(([tag,desc])=>(
+                <div key={tag} style={{display:"flex",gap:0,borderRadius:8,overflow:"hidden",border:`1px solid ${C.border2}`}}>
+                  <button
+                    onClick={()=>insertVar(tag,"subject")}
+                    title={`Insert ${tag} into subject`}
+                    style={{background:"rgba(139,92,246,.12)",border:"none",color:C.brandLt,padding:"4px 9px",fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"monospace"}}
+                  >{tag}</button>
+                  <button
+                    onClick={()=>insertVar(tag,"html")}
+                    title={`Insert ${tag} into body`}
+                    style={{background:"rgba(139,92,246,.06)",border:"none",borderLeft:`1px solid ${C.border}`,color:"rgba(255,255,255,.35)",padding:"4px 8px",fontSize:10,cursor:"pointer"}}
+                  >body</button>
+                  <span style={{padding:"4px 9px",fontSize:11,color:"rgba(255,255,255,.3)",background:"transparent",display:"flex",alignItems:"center"}}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* HTML body */}
+          <div style={{flex:1}}>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              HTML Body
+              <span style={{fontWeight:400,color:"rgba(255,255,255,.25)",marginLeft:6,fontSize:11}}>{draft.html.length.toLocaleString()} chars</span>
+            </div>
+            <textarea
+              id="email-html"
+              value={draft.html}
+              onChange={e=>setDraft(p=>({...p,html:e.target.value}))}
+              spellCheck={false}
+              style={{
+                width:"100%",minHeight:340,
+                background:"rgba(0,0,0,.35)",
+                border:`1.5px solid ${C.border2}`,
+                color:"#e2e8f0",
+                borderRadius:12,padding:"14px 16px",
+                fontSize:12,fontFamily:"'DM Mono','Courier New',monospace",
+                lineHeight:1.7,
+                outline:"none",resize:"vertical",
+                transition:"border .2s",
+                boxSizing:"border-box",
+              }}
+              onFocus={e=>e.target.style.borderColor="rgba(139,92,246,.5)"}
+              onBlur={e=>e.target.style.borderColor="rgba(139,92,246,.25)"}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Reset confirm */}
+      {resetConfirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.82)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:30,textAlign:"center",marginBottom:10}}>↺</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>Reset to Default?</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>Your unsaved changes will be lost and the template will be restored to its original content.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setRC(false)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={resetToDefault} style={{background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}>Reset</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Rate Limits Tab ───────────────────────────── */
+function AdminRateLimits(){
+  const [rules, setRules]   = useState(INITIAL_RATE_LIMITS);
+  const [editId, setEditId] = useState(null);    // rule being edited
+  const [addModal, setAdd]  = useState(false);   // create new rule
+  const [globalOn, setGO]   = useState(true);    // master kill-switch
+  const [saved, setSaved]   = useState(false);
+  const [filterCat, setFC]  = useState("all");
+
+  // Draft used for both edit and create
+  const blankDraft = ()=>({
+    name:"", description:"", category:"api", endpoint:"",
+    enabled:true, limit:60, windowSecs:60,
+    scope:"user", penalty:"block", blockDurationSecs:60,
+  });
+  const [draft, setDraft] = useState(blankDraft());
+  const df = (k) => (v) => setDraft(p=>({...p,[k]:v}));
+
+  const openEdit = (r) => {
+    setDraft({...r});
+    setEditId(r.id);
+    setAdd(false);
+    setSaved(false);
+  };
+  const openAdd = () => {
+    setDraft(blankDraft());
+    setAdd(true);
+    setEditId(null);
+    setSaved(false);
+  };
+  const closeModal = () => { setEditId(null); setAdd(false); };
+
+  const saveEdit = () => {
+    if(!draft.name.trim()) return;
+    setRules(prev=>prev.map(r=>r.id===editId?{...r,...draft}:r));
+    setSaved(true);
+    setTimeout(()=>{setSaved(false); closeModal();}, 900);
+  };
+
+  const createRule = () => {
+    if(!draft.name.trim()) return;
+    setRules(prev=>[...prev,{
+      ...draft,
+      id:`rl_custom_${Date.now()}`,
+      hits24h:0, blocked24h:0,
+    }]);
+    closeModal();
+  };
+
+  const toggleRule = (id) => setRules(prev=>prev.map(r=>r.id===id?{...r,enabled:!r.enabled}:r));
+  const deleteRule = (id) => setRules(prev=>prev.filter(r=>r.id!==id));
+
+  const displayed = filterCat==="all" ? rules : rules.filter(r=>r.category===filterCat);
+  const totalBlocked = rules.reduce((s,r)=>s+r.blocked24h,0);
+  const totalHits    = rules.reduce((s,r)=>s+r.hits24h,0);
+  const activeRules  = rules.filter(r=>r.enabled).length;
+
+  /* ── window/scope/penalty selector row ── */
+  const WindowSelector = ({value, onChange}) => {
+    const presets = [
+      {label:"10 s", v:10},{label:"30 s",v:30},{label:"1 m",v:60},
+      {label:"5 m",v:300},{label:"15 m",v:900},{label:"1 h",v:3600},
+      {label:"6 h",v:21600},{label:"24 h",v:86400},
+    ];
+    return (
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {presets.map(p=>(
+          <button key={p.v} onClick={()=>onChange(p.v)}
+            style={{
+              padding:"5px 11px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+              background:value===p.v?`rgba(139,92,246,.25)`:"rgba(255,255,255,.05)",
+              border:`1px solid ${value===p.v?C.brand:"rgba(255,255,255,.1)"}`,
+              color:value===p.v?C.brandLt:"rgba(255,255,255,.5)",
+              transition:"all .15s",
+            }}
+          >{p.label}</button>
+        ))}
+        <input type="number" min={1} value={value}
+          onChange={e=>onChange(Math.max(1,parseInt(e.target.value)||1))}
+          title="Custom value in seconds"
+          style={{width:72,background:"rgba(255,255,255,.06)",border:`1px solid ${C.border}`,color:C.white,borderRadius:8,padding:"5px 8px",fontSize:12,outline:"none"}}
+        />
+      </div>
+    );
+  };
+
+  const ChipSelector = ({options, value, onChange}) => (
+    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+      {options.map(o=>(
+        <button key={o.id} onClick={()=>onChange(o.id)}
+          style={{
+            padding:"7px 14px",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"left",
+            background:value===o.id?`rgba(139,92,246,.2)`:"rgba(255,255,255,.04)",
+            border:`1px solid ${value===o.id?C.brand:"rgba(255,255,255,.1)"}`,
+            color:value===o.id?C.white:"rgba(255,255,255,.5)",
+            transition:"all .15s",
+          }}
+        >
+          <div style={{color:value===o.id?C.brandLt:"inherit"}}>{o.label}</div>
+          <div style={{fontSize:10,opacity:.7,marginTop:1,fontWeight:400}}>{o.desc}</div>
+        </button>
+      ))}
+    </div>
+  );
+
+  const RuleCard = ({r}) => {
+    const cat = RL_CATEGORIES[r.category];
+    const pct = r.hits24h>0 ? Math.min(100,Math.round((r.blocked24h/r.hits24h)*100)) : 0;
+    return (
+      <div className="user-row" style={{flexDirection:"column",alignItems:"stretch",gap:10,opacity:r.enabled?1:.55}}>
+        {/* Top row */}
+        <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+          <div style={{
+            width:38,height:38,borderRadius:9,flexShrink:0,
+            background:`${cat.color}18`,border:`1px solid ${cat.color}40`,
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,
+          }}>{cat.icon}</div>
+
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,color:C.white,fontSize:14}}>{r.name}</span>
+              <span style={{
+                fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,
+                background:r.enabled?"rgba(16,185,129,.12)":"rgba(255,255,255,.06)",
+                color:r.enabled?C.green:"rgba(255,255,255,.3)",
+                border:`1px solid ${r.enabled?"rgba(16,185,129,.25)":"rgba(255,255,255,.1)"}`,
+              }}>{r.enabled?"ON":"OFF"}</span>
+              <span style={{
+                fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:99,
+                background:`${cat.color}18`,color:cat.color,border:`1px solid ${cat.color}30`,
+              }}>{cat.label}</span>
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:2}}>{r.description}</div>
+            {r.endpoint&&<div style={{fontSize:10,fontFamily:"monospace",color:"rgba(255,255,255,.25)",marginTop:2}}>{r.endpoint}</div>}
+          </div>
+
+          <div style={{display:"flex",gap:7,flexShrink:0,alignItems:"center"}}>
+            <button onClick={()=>toggleRule(r.id)}
+              className={`toggle ${r.enabled?"on":"off"}`}
+              style={{fontSize:0,width:40,height:22}}
+            />
+            <button onClick={()=>openEdit(r)}
+              style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"6px 11px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+            >Edit</button>
+            {r.id.startsWith("rl_custom_")&&(
+              <button onClick={()=>deleteRule(r.id)}
+                style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"6px 8px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+                title="Delete custom rule"
+              >🗑</button>
+            )}
+          </div>
+        </div>
+
+        {/* Stats + config row */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingLeft:48}}>
+          {/* Rate badge */}
+          <div style={{
+            background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,
+            borderRadius:8,padding:"5px 11px",display:"flex",alignItems:"center",gap:6,
+          }}>
+            <span style={{fontSize:15}}>⚡</span>
+            <span style={{fontSize:12,fontWeight:700,color:C.brandLt}}>{fmtRate(r.limit,r.windowSecs)}</span>
+          </div>
+          {/* Scope badge */}
+          <div style={{
+            background:"rgba(6,182,212,.08)",border:"1px solid rgba(6,182,212,.2)",
+            borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:600,color:C.cyan,
+          }}>{RL_SCOPES.find(s=>s.id===r.scope)?.label}</div>
+          {/* Penalty badge */}
+          <div style={{
+            background:r.penalty==="block"?"rgba(239,68,68,.08)":r.penalty==="delay"?"rgba(245,158,11,.08)":"rgba(255,255,255,.05)",
+            border:`1px solid ${r.penalty==="block"?"rgba(239,68,68,.2)":r.penalty==="delay"?"rgba(245,158,11,.2)":"rgba(255,255,255,.1)"}`,
+            borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:600,
+            color:r.penalty==="block"?C.red:r.penalty==="delay"?C.gold:"rgba(255,255,255,.4)",
+          }}>{RL_PENALTIES.find(p=>p.id===r.penalty)?.label}</div>
+          {/* 24h stats */}
+          <div style={{marginLeft:"auto",display:"flex",gap:12,alignItems:"center"}}>
+            <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>
+              <span style={{color:"rgba(255,255,255,.55)",fontWeight:600}}>{r.hits24h.toLocaleString()}</span> hits/24h
+            </span>
+            {r.blocked24h>0&&(
+              <span style={{fontSize:11,fontWeight:700,color:C.red}}>
+                {r.blocked24h} blocked
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Mini bar showing block rate */}
+        {r.hits24h>0&&(
+          <div style={{paddingLeft:48,paddingRight:4}}>
+            <div style={{height:3,background:"rgba(255,255,255,.07)",borderRadius:99,overflow:"hidden"}}>
+              <div style={{
+                height:"100%",borderRadius:99,width:`${pct}%`,
+                background:pct>10?`linear-gradient(90deg,${C.gold},${C.red})`:`linear-gradient(90deg,${C.green},${C.brandLt})`,
+                transition:"width .4s ease",
+              }}/>
+            </div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.2)",marginTop:2}}>{pct}% block rate</div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ── Edit / Create modal ── */
+  const RuleModal = ({isCreate}) => (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:999,padding:16}}>
+      <div style={{background:C.s1,borderRadius:"20px 20px 14px 14px",padding:24,width:"100%",maxWidth:520,border:`1px solid ${C.border}`,maxHeight:"88vh",overflowY:"auto"}}>
+        <div style={{fontWeight:800,fontSize:17,color:C.white,marginBottom:20}}>
+          {isCreate?"New Rate Limit Rule":"Edit Rule"}
+        </div>
+
+        {/* Name */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Rule Name <span style={{color:C.red}}>*</span></div>
+          <input className="inp-base" placeholder="e.g. Custom Auth Limit" value={draft.name} onChange={e=>df("name")(e.target.value)}/>
+        </div>
+
+        {/* Description */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Description</div>
+          <input className="inp-base" placeholder="What does this rule protect?" value={draft.description} onChange={e=>df("description")(e.target.value)}/>
+        </div>
+
+        {/* Category */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Category</div>
+          <div style={{display:"flex",gap:8}}>
+            {Object.entries(RL_CATEGORIES).map(([id,cat])=>(
+              <button key={id} onClick={()=>df("category")(id)}
+                style={{
+                  flex:1,padding:"8px 6px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
+                  background:draft.category===id?`${cat.color}20`:"rgba(255,255,255,.04)",
+                  border:`1px solid ${draft.category===id?cat.color:"rgba(255,255,255,.1)"}`,
+                  color:draft.category===id?cat.color:"rgba(255,255,255,.4)",
+                }}
+              >{cat.icon} {cat.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Endpoint */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Endpoint / Action <span style={{fontWeight:400,color:"rgba(255,255,255,.25)"}}>(optional)</span></div>
+          <input className="inp-base" placeholder="e.g. POST /api/send-otp or leave blank for app actions" value={draft.endpoint||""} onChange={e=>df("endpoint")(e.target.value||null)} style={{fontFamily:"monospace",fontSize:12}}/>
+        </div>
+
+        {/* Limit + window */}
+        <div style={{marginBottom:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Request Limit <span style={{color:C.red}}>*</span>
+            </div>
+            <input type="number" min={1} className="inp-base"
+              value={draft.limit}
+              onChange={e=>df("limit")(Math.max(1,parseInt(e.target.value)||1))}
+            />
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Enabled
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:10}}>
+              <button onClick={()=>df("enabled")(!draft.enabled)}
+                className={`toggle ${draft.enabled?"on":"off"}`}
+                style={{fontSize:0,width:46,height:26}}
+              />
+              <span style={{fontSize:13,color:draft.enabled?C.green:"rgba(255,255,255,.35)",fontWeight:600}}>
+                {draft.enabled?"Active":"Disabled"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Time window */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+            Time Window
+            <span style={{fontWeight:400,color:C.brandLt,marginLeft:6}}>= {fmtWindow(draft.windowSecs)}</span>
+          </div>
+          <WindowSelector value={draft.windowSecs} onChange={df("windowSecs")}/>
+        </div>
+
+        {/* Scope */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Scope</div>
+          <ChipSelector options={RL_SCOPES} value={draft.scope} onChange={df("scope")}/>
+        </div>
+
+        {/* Penalty */}
+        <div style={{marginBottom:draft.penalty==="block"?14:20}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Penalty</div>
+          <ChipSelector options={RL_PENALTIES} value={draft.penalty} onChange={df("penalty")}/>
+        </div>
+
+        {/* Block duration — only when penalty is block */}
+        {draft.penalty==="block"&&draft.windowSecs<86400&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Block Duration
+              <span style={{fontWeight:400,color:C.red,marginLeft:6}}>= {fmtWindow(draft.blockDurationSecs)}</span>
+            </div>
+            <WindowSelector value={draft.blockDurationSecs} onChange={df("blockDurationSecs")}/>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:4}}>How long to block the client after hitting the limit.</div>
+          </div>
+        )}
+
+        {/* Preview summary */}
+        <div style={{
+          background:"rgba(139,92,246,.07)",border:`1px solid ${C.border}`,
+          borderRadius:10,padding:"10px 14px",marginBottom:20,
+          fontSize:12,color:"rgba(255,255,255,.55)",lineHeight:1.7,
+        }}>
+          <strong style={{color:C.brandLt}}>Summary:</strong> Allow{" "}
+          <strong style={{color:C.white}}>{draft.limit} requests</strong> per{" "}
+          <strong style={{color:C.white}}>{fmtWindow(draft.windowSecs)}</strong>{" "}
+          {draft.scope==="ip"?"per IP address":draft.scope==="user"?"per user account":"globally"}.{" "}
+          {draft.penalty==="block"&&<>Violators are <strong style={{color:C.red}}>blocked for {fmtWindow(draft.blockDurationSecs)}</strong>.</>}
+          {draft.penalty==="delay"&&<>Excess requests are <strong style={{color:C.gold}}>throttled / queued</strong>.</>}
+          {draft.penalty==="log_only"&&<>Violations are <strong style={{color:C.muted}}>logged only</strong> — no enforcement.</>}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <button onClick={closeModal} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:12,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+          <button
+            onClick={isCreate?createRule:saveEdit}
+            disabled={!draft.name.trim()}
+            style={{
+              background:saved?`linear-gradient(135deg,${C.green},#047857)`:!draft.name.trim()?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              border:"none",borderRadius:12,padding:12,
+              color:!draft.name.trim()?"rgba(255,255,255,.3)":"#fff",
+              fontWeight:700,cursor:!draft.name.trim()?"default":"pointer",
+              transition:"background .3s",
+            }}
+          >{saved?"✓ Saved":isCreate?"Create Rule":"Save Changes"}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        <div>
+          <div style={{fontWeight:700,color:C.white,fontSize:15}}>Rate Limit Rules</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>
+            {activeRules} active · {rules.length-activeRules} disabled
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          {/* Master switch */}
+          <div style={{
+            display:"flex",alignItems:"center",gap:8,
+            background:globalOn?"rgba(16,185,129,.08)":"rgba(239,68,68,.08)",
+            border:`1px solid ${globalOn?"rgba(16,185,129,.25)":"rgba(239,68,68,.25)"}`,
+            borderRadius:10,padding:"7px 12px",
+          }}>
+            <button onClick={()=>setGO(g=>!g)}
+              className={`toggle ${globalOn?"on":"off"}`}
+              style={{fontSize:0,width:40,height:22,flexShrink:0}}
+            />
+            <span style={{fontSize:12,fontWeight:700,color:globalOn?C.green:C.red,whiteSpace:"nowrap"}}>
+              {globalOn?"Enforcing":"Disabled globally"}
+            </span>
+          </div>
+          <button onClick={openAdd} style={{background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",color:"#fff",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${C.brand}60`,whiteSpace:"nowrap"}}>+ Add Rule</button>
+        </div>
+      </div>
+
+      {/* Global off banner */}
+      {!globalOn&&(
+        <div style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.3)",borderRadius:11,padding:"10px 14px",marginBottom:16,display:"flex",gap:9,alignItems:"center"}}>
+          <span style={{fontSize:18}}>⚠️</span>
+          <span style={{fontSize:13,color:C.red,fontWeight:600}}>Rate limiting is globally disabled. All rules are suspended — enable to enforce them.</span>
+        </div>
+      )}
+
+      {/* 24h summary cards */}
+      <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
+        {Object.entries(RL_CATEGORIES).map(([id,cat])=>{
+          const catRules = rules.filter(r=>r.category===id);
+          const blocked  = catRules.reduce((s,r)=>s+r.blocked24h,0);
+          const hits     = catRules.reduce((s,r)=>s+r.hits24h,0);
+          return (
+            <div key={id} className="stat-card" style={{flex:"1 1 120px",cursor:"pointer",border:filterCat===id?`1px solid ${cat.color}`:undefined}}
+              onClick={()=>setFC(f=>f===id?"all":id)}>
+              <div style={{fontSize:22,marginBottom:4}}>{cat.icon}</div>
+              <div style={{fontSize:16,fontWeight:800,color:cat.color}}>{blocked}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>blocked / 24h</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.25)",marginTop:2}}>{hits.toLocaleString()} total hits</div>
+            </div>
+          );
+        })}
+        <div className="stat-card" style={{flex:"1 1 120px"}}>
+          <div style={{fontSize:22,marginBottom:4}}>🛡️</div>
+          <div style={{fontSize:16,fontWeight:800,color:C.brandLt}}>{totalBlocked}</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>total blocked</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.25)",marginTop:2}}>{totalHits.toLocaleString()} total hits</div>
+        </div>
+      </div>
+
+      {filterCat!=="all"&&(
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+          <span style={{fontSize:12,color:"rgba(255,255,255,.4)"}}>Filtered: <strong style={{color:RL_CATEGORIES[filterCat].color}}>{RL_CATEGORIES[filterCat].label}</strong></span>
+          <button onClick={()=>setFC("all")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Clear</button>
+        </div>
+      )}
+
+      {/* Rule cards */}
+      {displayed.map(r=><RuleCard key={r.id} r={r}/>)}
+
+      {(editId||addModal) && <RuleModal isCreate={addModal}/>}
+    </div>
+  );
+}
+
+/* ── Backup & Restore Tab ──────────────────────── */
+function AdminBackup({users, setUsers, adminUser}){
+  // History of backups created this session
+  const [history, setHistory]       = useState([]);
+  // Create-backup state
+  const [creating, setCreating]     = useState(false);
+  const [createErr, setCreateErr]   = useState("");
+  // Restore state
+  const [restoreFile, setRF]        = useState(null);   // parsed backup object
+  const [restoreRaw, setRRaw]       = useState("");     // filename
+  const [parseErr, setParseErr]     = useState("");
+  const [strategy, setStrategy]     = useState("upsert");
+  const [restoring, setRestoring]   = useState(false);
+  const [restoreResult, setRR]      = useState(null);   // {success, results, error}
+  const [confirmRestore, setCR]     = useState(false);
+  const [adminKey, setAdminKey]     = useState("");
+  const fileInputRef                = React.useRef(null);
+
+  // ── helpers ──────────────────────────────────────
+  function buildBackupPayload(rows){
+    return {
+      version:"1.0", app:"wish-app",
+      exportedAt:new Date().toISOString(),
+      exportedBy:adminUser.email,
+      tables:{ users:{ count:rows.length, rows } },
+    };
+  }
+
+  function downloadJson(obj, filename){
+    const blob = new Blob([JSON.stringify(obj,null,2)],{type:"application/json"});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href=url; a.download=filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function formatBytes(bytes){
+    if(bytes<1024) return `${bytes} B`;
+    if(bytes<1024*1024) return `${(bytes/1024).toFixed(1)} KB`;
+    return `${(bytes/1024/1024).toFixed(2)} MB`;
+  }
+
+  function backupSize(backup){
+    return formatBytes(new Blob([JSON.stringify(backup)]).size);
+  }
+
+  // ── create backup ─────────────────────────────────
+  const createBackup = async () => {
+    setCreating(true); setCreateErr("");
+    try {
+      const headers = {"Content-Type":"application/json"};
+      if(adminKey) headers["x-admin-key"] = adminKey;
+
+      const res = await fetch("/api/backup",{headers});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if(!json.success) throw new Error(json.error||"Unknown error");
+
+      const backup = json.backup;
+      const entry  = { id:Date.now(), backup, createdAt:new Date().toISOString(), source:"live" };
+      setHistory(h=>[entry,...h]);
+      downloadJson(backup, `wish-backup-${new Date().toISOString().slice(0,10)}.json`);
+    } catch(err){
+      // API unavailable — fall back to in-memory snapshot (demo mode)
+      if(err.message.startsWith("HTTP 4")||err.message.includes("fetch")||err.message.includes("Failed")){
+        const backup = buildBackupPayload(users);
+        const entry  = { id:Date.now(), backup, createdAt:new Date().toISOString(), source:"demo" };
+        setHistory(h=>[entry,...h]);
+        downloadJson(backup, `wish-backup-${new Date().toISOString().slice(0,10)}.json`);
+      } else {
+        setCreateErr(err.message);
+      }
+    } finally { setCreating(false); }
+  };
+
+  // ── file upload ───────────────────────────────────
+  const onFileChange = (e) => {
+    const file = e.target.files[0];
+    if(!file){ setRF(null); setRRaw(""); return; }
+    setRRaw(file.name); setParseErr(""); setRF(null); setRR(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        if(!parsed.version||!parsed.tables||parsed.app!=="wish-app")
+          throw new Error("File is not a valid wish-app backup.");
+        setRF(parsed);
+      } catch(ex){ setParseErr(ex.message); }
+    };
+    reader.readAsText(file);
+    // reset input so re-uploading same file fires onchange
+    e.target.value="";
+  };
+
+  // ── restore ───────────────────────────────────────
+  const runRestore = async () => {
+    setCR(false); setRestoring(true); setRR(null);
+    try {
+      const headers = {"Content-Type":"application/json"};
+      if(adminKey) headers["x-admin-key"] = adminKey;
+
+      const res = await fetch("/api/restore",{
+        method:"POST",
+        headers,
+        body: JSON.stringify({backup:restoreFile, strategy}),
+      });
+      const json = await res.json();
+      if(!res.ok||!json.success) throw new Error(json.error||`HTTP ${res.status}`);
+      setRR({success:true, results:json.results, source:"live"});
+    } catch(err){
+      // Demo fallback — apply to in-memory state
+      if(err.message.includes("fetch")||err.message.includes("Failed")||err.message.startsWith("HTTP 4")||err.message.startsWith("HTTP 5")){
+        const incoming = restoreFile.tables?.users?.rows||[];
+        if(strategy==="upsert"){
+          const map = {};
+          users.forEach(u=>{ map[u.id]=u; });
+          incoming.forEach(u=>{ map[u.id]={...map[u.id],...u}; });
+          setUsers(Object.values(map));
+          setRR({success:true, results:{users:{restored:incoming.length}}, source:"demo"});
+        } else {
+          const existingIds = new Set(users.map(u=>u.id));
+          const toAdd = incoming.filter(u=>!existingIds.has(u.id));
+          setUsers(prev=>[...prev,...toAdd]);
+          setRR({success:true, results:{users:{restored:toAdd.length, skipped:incoming.length-toAdd.length}}, source:"demo"});
+        }
+      } else {
+        setRR({success:false, error:err.message, source:"live"});
+      }
+    } finally { setRestoring(false); }
+  };
+
+  // ── table row counts from a backup ────────────────
+  const tableStats = (backup) =>
+    Object.entries(backup.tables||{}).map(([t,d])=>({ table:t, count:d.count||d.rows?.length||0 }));
+
+  // ── render ────────────────────────────────────────
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+
+      {/* Admin key field */}
+      <div style={{background:"rgba(139,92,246,.07)",border:`1px solid ${C.border}`,borderRadius:12,padding:"12px 16px"}}>
+        <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,.4)",marginBottom:6}}>
+          ADMIN KEY <span style={{fontWeight:400,color:"rgba(255,255,255,.25)"}}>(optional — required if ADMIN_BACKUP_KEY is set in env)</span>
+        </div>
+        <input
+          className="inp-base"
+          type="password"
+          placeholder="Leave blank if not configured"
+          value={adminKey}
+          onChange={e=>setAdminKey(e.target.value)}
+          style={{fontFamily:"monospace",fontSize:12}}
+        />
+      </div>
+
+      {/* ── Create Backup ── */}
+      <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden"}}>
+        <div style={{padding:"16px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+          <div>
+            <div style={{fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>💾</span> Create Backup
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>
+              Exports a full snapshot of the database to a JSON file.
+            </div>
+          </div>
+          <button
+            onClick={createBackup}
+            disabled={creating}
+            style={{
+              background:creating?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              border:"none",color:creating?"rgba(255,255,255,.3)":"#fff",borderRadius:10,
+              padding:"10px 18px",fontSize:13,fontWeight:700,
+              cursor:creating?"default":"pointer",
+              boxShadow:creating?"none":`0 4px 16px ${C.brand}60`,
+              whiteSpace:"nowrap",flexShrink:0,
+            }}
+          >{creating?"⏳ Exporting…":"⬇ Download Backup"}</button>
+        </div>
+
+        {/* What gets backed up */}
+        <div style={{padding:"12px 18px",display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[["👥","Users table","All user profiles, points, balances"],
+            ["⚙️","Config (soon)","App settings & ad network config"],
+          ].map(([icon,label,desc])=>(
+            <div key={label} style={{flex:"1 1 160px",background:"rgba(255,255,255,.03)",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px"}}>
+              <div style={{fontSize:15,marginBottom:4}}>{icon}</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.white}}>{label}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:2}}>{desc}</div>
+            </div>
+          ))}
+        </div>
+
+        {createErr&&(
+          <div style={{margin:"0 18px 14px",background:"rgba(239,68,68,.08)",border:"1px solid rgba(239,68,68,.25)",borderRadius:10,padding:"10px 12px",fontSize:12,color:C.red}}>
+            ⚠ {createErr}
+          </div>
+        )}
+      </div>
+
+      {/* ── Backup History ── */}
+      {history.length>0&&(
+        <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden"}}>
+          <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.border}`,fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:8}}>
+            <span style={{fontSize:16}}>🗂</span> This Session ({history.length})
+          </div>
+          {history.map((entry,i)=>{
+            const stats = tableStats(entry.backup);
+            return (
+              <div key={entry.id} style={{
+                padding:"12px 18px",
+                borderBottom:i<history.length-1?`1px solid ${C.border}`:undefined,
+                display:"flex",alignItems:"center",gap:12,
+              }}>
+                <div style={{
+                  width:36,height:36,borderRadius:9,flexShrink:0,
+                  background:"rgba(16,185,129,.12)",border:"1px solid rgba(16,185,129,.25)",
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,
+                }}>✓</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,color:C.white,fontSize:13}}>
+                    wish-backup-{entry.createdAt.slice(0,10)}.json
+                    {entry.source==="demo"&&<span style={{marginLeft:6,fontSize:10,color:C.gold,fontWeight:600}}>demo snapshot</span>}
+                  </div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:2}}>
+                    {fmtDate(entry.createdAt)} · {backupSize(entry.backup)} · {stats.map(s=>`${s.count} ${s.table}`).join(" · ")}
+                  </div>
+                </div>
+                <button
+                  onClick={()=>downloadJson(entry.backup,`wish-backup-${entry.createdAt.slice(0,10)}-${entry.id}.json`)}
+                  style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",flexShrink:0}}
+                >⬇ Re-download</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Restore ── */}
+      <div style={{background:C.s2,border:`1px solid rgba(245,158,11,.2)`,borderRadius:16,overflow:"hidden"}}>
+        <div style={{padding:"16px 18px",borderBottom:`1px solid rgba(245,158,11,.15)`,display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:20}}>⚠️</span>
+          <div>
+            <div style={{fontWeight:700,color:C.gold,fontSize:14}}>Restore from Backup</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:1}}>
+              Overwrites live data. Only use a backup from this app. Cannot be undone.
+            </div>
+          </div>
+        </div>
+
+        <div style={{padding:"16px 18px",display:"flex",flexDirection:"column",gap:14}}>
+          {/* File picker */}
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:8}}>Select Backup File</div>
+            <div
+              onClick={()=>fileInputRef.current?.click()}
+              style={{
+                border:`2px dashed ${restoreFile?"rgba(16,185,129,.5)":C.border2}`,
+                borderRadius:12,padding:"20px",textAlign:"center",cursor:"pointer",
+                background:restoreFile?"rgba(16,185,129,.05)":"rgba(255,255,255,.02)",
+                transition:"all .2s",
+              }}
+            >
+              <div style={{fontSize:28,marginBottom:6}}>{restoreFile?"✅":"📂"}</div>
+              <div style={{fontSize:13,color:restoreFile?C.green:C.muted,fontWeight:600}}>
+                {restoreFile ? restoreRaw : "Click to choose a .json backup file"}
+              </div>
+              {restoreFile&&(
+                <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:4}}>
+                  {backupSize(restoreFile)} · exported {fmtDate(restoreFile.exportedAt)}
+                  {restoreFile.exportedBy&&<span> by {restoreFile.exportedBy}</span>}
+                </div>
+              )}
+            </div>
+            <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={onFileChange} style={{display:"none"}}/>
+            {parseErr&&<div style={{fontSize:12,color:C.red,marginTop:6}}>⚠ {parseErr}</div>}
+          </div>
+
+          {/* Backup preview */}
+          {restoreFile&&(
+            <div style={{background:"rgba(255,255,255,.03)",border:`1px solid ${C.border}`,borderRadius:10,padding:"12px 14px"}}>
+              <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,.35)",letterSpacing:1,marginBottom:10}}>BACKUP CONTENTS</div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+                {tableStats(restoreFile).map(s=>(
+                  <div key={s.table} style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 12px"}}>
+                    <div style={{fontSize:16,fontWeight:800,color:C.brandLt}}>{s.count}</div>
+                    <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>{s.table}</div>
+                  </div>
+                ))}
+                <div style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 12px"}}>
+                  <div style={{fontSize:16,fontWeight:800,color:C.brandLt}}>{backupSize(restoreFile)}</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>file size</div>
+                </div>
+              </div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>
+                Version {restoreFile.version} · App: {restoreFile.app}
+              </div>
+            </div>
+          )}
+
+          {/* Conflict strategy */}
+          {restoreFile&&(
+            <div>
+              <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:8}}>Conflict Strategy</div>
+              <div style={{display:"flex",gap:8}}>
+                {[
+                  {id:"upsert", icon:"🔄", label:"Upsert",      desc:"Overwrite existing records with backup values"},
+                  {id:"skip",   icon:"⏭",  label:"Skip Existing",desc:"Only insert records not already in the database"},
+                ].map(s=>(
+                  <button key={s.id} onClick={()=>setStrategy(s.id)}
+                    style={{
+                      flex:1,padding:"10px 12px",borderRadius:10,cursor:"pointer",textAlign:"left",
+                      background:strategy===s.id?"rgba(139,92,246,.18)":"rgba(255,255,255,.03)",
+                      border:`1px solid ${strategy===s.id?C.brand:"rgba(255,255,255,.1)"}`,
+                      color:strategy===s.id?C.white:"rgba(255,255,255,.45)",
+                    }}
+                  >
+                    <div style={{fontSize:14,marginBottom:3}}>{s.icon} <span style={{fontWeight:700,fontSize:12}}>{s.label}</span></div>
+                    <div style={{fontSize:11,opacity:.7}}>{s.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Restore button */}
+          {restoreFile&&!restoreResult&&(
+            <button
+              onClick={()=>setCR(true)}
+              disabled={restoring}
+              style={{
+                width:"100%",padding:13,borderRadius:12,border:"none",cursor:restoring?"default":"pointer",
+                background:restoring?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.gold},#b45309)`,
+                color:restoring?"rgba(255,255,255,.3)":"#fff",fontWeight:700,fontSize:14,
+              }}
+            >{restoring?"⏳ Restoring…":"⚡ Restore Database"}</button>
+          )}
+
+          {/* Result */}
+          {restoreResult&&(
+            <div style={{
+              background:restoreResult.success?"rgba(16,185,129,.08)":"rgba(239,68,68,.08)",
+              border:`1px solid ${restoreResult.success?"rgba(16,185,129,.3)":"rgba(239,68,68,.3)"}`,
+              borderRadius:12,padding:"14px 16px",
+            }}>
+              <div style={{fontWeight:700,color:restoreResult.success?C.green:C.red,fontSize:14,marginBottom:8}}>
+                {restoreResult.success?"✅ Restore Complete":"❌ Restore Failed"}
+                {restoreResult.source==="demo"&&<span style={{marginLeft:8,fontSize:11,color:C.gold}}>(demo mode)</span>}
+              </div>
+              {restoreResult.success&&Object.entries(restoreResult.results||{}).map(([table,r])=>(
+                <div key={table} style={{fontSize:12,color:"rgba(255,255,255,.6)",marginBottom:4}}>
+                  <strong style={{color:C.white}}>{table}:</strong>{" "}
+                  {r.restored} record{r.restored!==1?"s":""} restored
+                  {r.skipped>0&&<span style={{color:C.muted}}> · {r.skipped} skipped</span>}
+                  {r.skipped===true&&<span style={{color:C.muted}}> (not in backup)</span>}
+                </div>
+              ))}
+              {restoreResult.error&&<div style={{fontSize:12,color:C.red}}>{restoreResult.error}</div>}
+              <button
+                onClick={()=>{setRF(null);setRRaw("");setRR(null);setParseErr("");}}
+                style={{marginTop:10,background:"rgba(255,255,255,.07)",border:`1px solid ${C.border}`,borderRadius:8,padding:"6px 14px",color:C.muted,fontSize:12,fontWeight:600,cursor:"pointer"}}
+              >Start over</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Confirm restore dialog */}
+      {confirmRestore&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s1,borderRadius:20,padding:24,maxWidth:340,width:"100%",border:"1px solid rgba(245,158,11,.35)"}}>
+            <div style={{fontSize:34,textAlign:"center",marginBottom:8}}>⚠️</div>
+            <div style={{fontWeight:800,color:C.white,fontSize:16,textAlign:"center",marginBottom:6}}>Restore Database?</div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.5)",textAlign:"center",lineHeight:1.6,marginBottom:8}}>
+              This will <strong style={{color:strategy==="upsert"?C.red:C.gold}}>{strategy==="upsert"?"overwrite existing records":"insert new records"}</strong> using the backup from{" "}
+              <strong style={{color:C.white}}>{fmtDate(restoreFile?.exportedAt)}</strong>.
+              This cannot be undone.
+            </div>
+            <div style={{background:"rgba(255,255,255,.04)",borderRadius:10,padding:"10px 12px",marginBottom:18,fontSize:12}}>
+              {tableStats(restoreFile).map(s=>(
+                <div key={s.table} style={{color:"rgba(255,255,255,.5)",marginBottom:2}}>
+                  <strong style={{color:C.white}}>{s.count}</strong> {s.table} rows · strategy: <strong style={{color:strategy==="upsert"?C.gold:C.cyan}}>{strategy}</strong>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setCR(false)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:12,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button onClick={runRestore} style={{background:`linear-gradient(135deg,${C.gold},#b45309)`,border:"none",borderRadius:12,padding:12,color:"#fff",fontWeight:700,cursor:"pointer"}}>Restore Now</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Broadcast Messaging Tab ───────────────────── */
+const BROADCAST_TYPES = [
+  { id:"announcement", label:"Announcement", icon:"📢", color:"#06b6d4" },
+  { id:"promotion",    label:"Promotion",    icon:"🎁", color:"#10b981" },
+  { id:"info",         label:"Info",         icon:"ℹ️", color:"#8b5cf6" },
+  { id:"warning",      label:"Warning",      icon:"⚠️", color:"#f59e0b" },
+];
+
+const BROADCAST_CHANNELS = [
+  { id:"email",   label:"Email",            icon:"✉️",  desc:"Send via Resend to each user's email address" },
+  { id:"in_app",  label:"In-App",           icon:"🔔",  desc:"Deliver as a notification inside the app" },
+  { id:"push",    label:"Push Notification",icon:"📲",  desc:"Native device push (coming soon)", disabled:true },
+];
+
+// Derive unique countries from a user list
+const uniqueCountries = (users) => [...new Set(users.map(u=>u.country).filter(Boolean))];
+
+// Audience preview — returns users matching current filters
+function filterAudience(users, audience) {
+  let out = users.filter(u => !u.isAdmin && u.role !== "super_admin" && u.role !== "moderator");
+  if (audience.filter === "active")   out = out.filter(u => u.active);
+  if (audience.filter === "inactive") out = out.filter(u => !u.active);
+  if (audience.countries.length)      out = out.filter(u => audience.countries.includes(u.country));
+  if (audience.minPts !== "")         out = out.filter(u => (u.pts||0) >= Number(audience.minPts));
+  if (audience.maxPts !== "")         out = out.filter(u => (u.pts||0) <= Number(audience.maxPts));
+  return out;
+}
+
+function AdminBroadcast({ users, adminUser }) {
+  // Compose
+  const [type,    setType]    = useState("announcement");
+  const [channel, setChannel] = useState("email");
+  const [subject, setSubject] = useState("");
+  const [body,    setBody]    = useState("");
+
+  // Audience
+  const [audience, setAudience] = useState({
+    filter: "active", countries: [], minPts: "", maxPts: "",
+  });
+  const aud = (k) => (v) => setAudience(p => ({ ...p, [k]: v }));
+  const toggleCountry = (c) => setAudience(p => ({
+    ...p,
+    countries: p.countries.includes(c) ? p.countries.filter(x => x !== c) : [...p.countries, c],
+  }));
+
+  // Schedule
+  const [sendMode,      setSendMode]  = useState("now");   // "now" | "scheduled"
+  const [scheduledFor,  setSF]        = useState("");
+
+  // Send state
+  const [confirm,    setConfirm]  = useState(false);
+  const [sending,    setSending]  = useState(false);
+  const [sendResult, setSR]       = useState(null);
+
+  // History
+  const [history, setHistory] = useState([
+    {
+      id:"bcast_demo1", type:"announcement", channel:"email",
+      subject:"Welcome to the new Wish platform!",
+      body:"We've rolled out major new features…",
+      audience:{ filter:"all", countries:[], minPts:"", maxPts:"" },
+      recipientCount:4, status:"sent",
+      sentAt:"2025-03-01T10:00:00Z", sentBy:"admin@wish.com",
+      sent:4, failed:0,
+    },
+    {
+      id:"bcast_demo2", type:"promotion", channel:"email",
+      subject:"🎁 Double points weekend — starts now!",
+      body:"This weekend only, every ad you watch earns 2× points…",
+      audience:{ filter:"active", countries:[], minPts:"", maxPts:"" },
+      recipientCount:3, status:"sent",
+      sentAt:"2025-03-15T08:30:00Z", sentBy:"admin@wish.com",
+      sent:3, failed:0,
+    },
+    {
+      id:"bcast_demo3", type:"warning", channel:"in_app",
+      subject:"Scheduled maintenance — Saturday 2 AM UTC",
+      body:"The platform will be down for ~30 minutes…",
+      audience:{ filter:"all", countries:[], minPts:"", maxPts:"" },
+      recipientCount:4, status:"scheduled",
+      sentAt:null, scheduledFor:"2025-04-05T02:00:00Z", sentBy:"admin@wish.com",
+      sent:0, failed:0,
+    },
+  ]);
+
+  const preview = filterAudience(users, audience);
+  const countries = uniqueCountries(users);
+  const typeInfo    = BROADCAST_TYPES.find(t => t.id === type);
+  const channelInfo = BROADCAST_CHANNELS.find(c => c.id === channel);
+  const bodyLimit   = channel === "in_app" ? 280 : 5000;
+  const canSend     = subject.trim() && body.trim() && preview.length > 0
+                      && (sendMode === "now" || scheduledFor);
+
+  const doSend = async () => {
+    setConfirm(false);
+    setSending(true);
+    setSR(null);
+
+    const payload = {
+      subject: subject.trim(),
+      body: body.trim(),
+      type, channel,
+      audience,
+      scheduledFor: sendMode === "scheduled" ? scheduledFor : null,
+      sentBy: adminUser.email,
+    };
+
+    try {
+      const res = await fetch("/api/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      // Guard against non-JSON responses (e.g. Vercel HTML error pages)
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server returned HTTP ${res.status} (non-JSON response)`);
+      }
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || `Server error (HTTP ${res.status})`);
+
+      const entry = {
+        id: `bcast_${Date.now()}`, type, channel, subject: subject.trim(), body: body.trim(),
+        audience: { ...audience },
+        recipientCount: preview.length,
+        status: sendMode === "scheduled" ? "scheduled" : "sent",
+        sentAt: sendMode === "now" ? new Date().toISOString() : null,
+        scheduledFor: sendMode === "scheduled" ? scheduledFor : null,
+        sentBy: adminUser.email,
+        sent: json.sent ?? 0, failed: json.failed ?? 0,
+        note: json.note,
+      };
+      setHistory(h => [entry, ...h]);
+      setSR({ ok: true, sent: json.sent, failed: json.failed, note: json.note, source: "live" });
+      setSubject(""); setBody("");
+    } catch (err) {
+      // Demo fallback ONLY when the endpoint doesn't exist yet (local dev without API routes).
+      // A TypeError means the fetch itself failed (network down / endpoint absent).
+      // A real deployed API returning 4xx/5xx is a genuine error — show it, don't fake success.
+      const isNoEndpoint = (err instanceof TypeError) || err.message.includes("HTTP 404");
+      if (isNoEndpoint) {
+        await new Promise(r => setTimeout(r, 1400));
+        const failed = Math.floor(preview.length * 0.05);
+        const sent   = preview.length - failed;
+        const entry  = {
+          id: `bcast_${Date.now()}`, type, channel, subject: subject.trim(), body: body.trim(),
+          audience: { ...audience },
+          recipientCount: preview.length,
+          status: sendMode === "scheduled" ? "scheduled" : "sent",
+          sentAt: sendMode === "now" ? new Date().toISOString() : null,
+          scheduledFor: sendMode === "scheduled" ? scheduledFor : null,
+          sentBy: adminUser.email,
+          sent, failed, source: "demo",
+        };
+        setHistory(h => [entry, ...h]);
+        setSR({ ok: true, sent, failed, source: "demo" });
+        setSubject(""); setBody("");
+      } else {
+        setSR({ ok: false, error: err.message });
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ── audience description for history / confirm dialog ──
+  const audienceLabel = (a) => {
+    const parts = [];
+    parts.push(a.filter === "active" ? "Active users" : a.filter === "inactive" ? "Inactive users" : "All users");
+    if (a.countries?.length) parts.push(a.countries.join(" "));
+    if (a.minPts !== "" && a.minPts != null) parts.push(`≥ ${Number(a.minPts).toLocaleString()} pts`);
+    if (a.maxPts !== "" && a.maxPts != null) parts.push(`≤ ${Number(a.maxPts).toLocaleString()} pts`);
+    return parts.join(" · ");
+  };
+
+  const statusStyle = (status) => ({
+    sent:      { bg:"rgba(16,185,129,.12)",  color:C.green, border:"rgba(16,185,129,.3)",  label:"Sent" },
+    scheduled: { bg:"rgba(6,182,212,.1)",    color:C.cyan,  border:"rgba(6,182,212,.3)",   label:"Scheduled" },
+    failed:    { bg:"rgba(239,68,68,.1)",    color:C.red,   border:"rgba(239,68,68,.3)",   label:"Failed" },
+    draft:     { bg:"rgba(255,255,255,.05)", color:C.muted, border:"rgba(255,255,255,.1)", label:"Draft" },
+  }[status] || { bg:"rgba(255,255,255,.05)", color:C.muted, border:"rgba(255,255,255,.1)", label:status });
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+
+      {/* ── Compose card ── */}
+      <div style={{ background:C.s2, border:`1px solid ${C.border}`, borderRadius:16, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, fontWeight:700, color:C.white, fontSize:14, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:16 }}>✍️</span> New Broadcast
+        </div>
+
+        <div style={{ padding:"16px 18px", display:"flex", flexDirection:"column", gap:16 }}>
+
+          {/* Message type */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:8 }}>Message Type</div>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {BROADCAST_TYPES.map(t => (
+                <button key={t.id} onClick={() => setType(t.id)} style={{
+                  padding:"7px 14px", borderRadius:9, fontSize:12, fontWeight:600, cursor:"pointer",
+                  background: type===t.id ? `${t.color}22` : "rgba(255,255,255,.04)",
+                  border:`1px solid ${type===t.id ? t.color : "rgba(255,255,255,.1)"}`,
+                  color: type===t.id ? t.color : "rgba(255,255,255,.4)",
+                  transition:"all .15s",
+                }}>{t.icon} {t.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Channel */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:8 }}>Channel</div>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {BROADCAST_CHANNELS.map(ch => (
+                <button key={ch.id} onClick={() => !ch.disabled && setChannel(ch.id)}
+                  disabled={ch.disabled}
+                  style={{
+                    flex:"1 1 120px", padding:"9px 12px", borderRadius:10, cursor:ch.disabled?"default":"pointer", textAlign:"left",
+                    background: channel===ch.id ? "rgba(139,92,246,.18)" : ch.disabled ? "rgba(255,255,255,.02)" : "rgba(255,255,255,.04)",
+                    border:`1px solid ${channel===ch.id ? C.brand : "rgba(255,255,255,.1)"}`,
+                    color: ch.disabled ? "rgba(255,255,255,.2)" : channel===ch.id ? C.white : "rgba(255,255,255,.45)",
+                    opacity: ch.disabled ? .45 : 1,
+                    transition:"all .15s",
+                  }}>
+                  <div style={{ fontSize:15, marginBottom:2 }}>{ch.icon} <span style={{ fontSize:12, fontWeight:700 }}>{ch.label}{ch.disabled&&" (soon)"}</span></div>
+                  <div style={{ fontSize:10, opacity:.7 }}>{ch.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Subject */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:6 }}>
+              Subject {channel==="in_app" && <span style={{ fontWeight:400, color:"rgba(255,255,255,.25)" }}>· shown as notification title</span>}
+            </div>
+            <input
+              className="inp-base"
+              placeholder={channel==="in_app" ? "Short notification title…" : "Email subject line…"}
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+            />
+          </div>
+
+          {/* Body */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:6, display:"flex", justifyContent:"space-between" }}>
+              <span>
+                Message Body
+                {channel==="email" && <span style={{ fontWeight:400, color:"rgba(255,255,255,.25)", marginLeft:4 }}>· HTML supported</span>}
+              </span>
+              <span style={{ fontWeight:400, color: body.length > bodyLimit*0.9 ? C.red : "rgba(255,255,255,.25)" }}>
+                {body.length}{channel==="in_app" && `/${bodyLimit}`}
+              </span>
+            </div>
+            <textarea
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              maxLength={channel==="in_app" ? bodyLimit : undefined}
+              placeholder={
+                channel==="email"
+                  ? "<p>Hi {{name}},</p>\n<p>We have exciting news for you…</p>"
+                  : "Your message to users (plain text, max 280 chars)…"
+              }
+              style={{
+                width:"100%", minHeight: channel==="email" ? 180 : 100,
+                background:"rgba(0,0,0,.3)", border:`1.5px solid ${C.border2}`,
+                color:"#e2e8f0", borderRadius:12, padding:"12px 14px",
+                fontSize:13, fontFamily: channel==="email" ? "'DM Mono','Courier New',monospace" : "inherit",
+                lineHeight:1.7, outline:"none", resize:"vertical", boxSizing:"border-box",
+                transition:"border .2s",
+              }}
+              onFocus={e => e.target.style.borderColor="rgba(139,92,246,.5)"}
+              onBlur={e  => e.target.style.borderColor="rgba(139,92,246,.25)"}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Audience card ── */}
+      <div style={{ background:C.s2, border:`1px solid ${C.border}`, borderRadius:16, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ fontWeight:700, color:C.white, fontSize:14, display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontSize:16 }}>🎯</span> Audience
+          </div>
+          <div style={{
+            background: preview.length > 0 ? "rgba(16,185,129,.12)" : "rgba(255,255,255,.05)",
+            border:`1px solid ${preview.length > 0 ? "rgba(16,185,129,.3)" : "rgba(255,255,255,.1)"}`,
+            borderRadius:99, padding:"4px 12px", fontSize:12, fontWeight:700,
+            color: preview.length > 0 ? C.green : "rgba(255,255,255,.35)",
+          }}>
+            {preview.length} recipient{preview.length !== 1 ? "s" : ""}
+          </div>
+        </div>
+
+        <div style={{ padding:"16px 18px", display:"flex", flexDirection:"column", gap:14 }}>
+          {/* Filter */}
+          <div>
+            <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:8 }}>User Status</div>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {[
+                { id:"all",      label:"All Users",      icon:"👥" },
+                { id:"active",   label:"Active Only",    icon:"✅" },
+                { id:"inactive", label:"Inactive Only",  icon:"🚫" },
+              ].map(f => (
+                <button key={f.id} onClick={() => aud("filter")(f.id)} style={{
+                  padding:"7px 14px", borderRadius:9, fontSize:12, fontWeight:600, cursor:"pointer",
+                  background: audience.filter===f.id ? "rgba(139,92,246,.2)" : "rgba(255,255,255,.04)",
+                  border:`1px solid ${audience.filter===f.id ? C.brand : "rgba(255,255,255,.1)"}`,
+                  color: audience.filter===f.id ? C.white : "rgba(255,255,255,.4)",
+                }}>{f.icon} {f.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Country */}
+          {countries.length > 0 && (
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:8 }}>
+                Country <span style={{ fontWeight:400, color:"rgba(255,255,255,.25)" }}>· leave blank for all</span>
+              </div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {countries.map(c => {
+                  const on = audience.countries.includes(c);
+                  return (
+                    <button key={c} onClick={() => toggleCountry(c)} style={{
+                      padding:"5px 11px", borderRadius:8, fontSize:13, cursor:"pointer",
+                      background: on ? "rgba(139,92,246,.2)" : "rgba(255,255,255,.04)",
+                      border:`1px solid ${on ? C.brand : "rgba(255,255,255,.1)"}`,
+                      color: on ? C.white : "rgba(255,255,255,.5)",
+                    }}>{c}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Points range */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:6 }}>Min Points</div>
+              <input className="inp-base" type="number" min={0} placeholder="e.g. 10000"
+                value={audience.minPts} onChange={e => aud("minPts")(e.target.value)} />
+            </div>
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:6 }}>Max Points</div>
+              <input className="inp-base" type="number" min={0} placeholder="e.g. 50000"
+                value={audience.maxPts} onChange={e => aud("maxPts")(e.target.value)} />
+            </div>
+          </div>
+
+          {/* Recipient preview */}
+          {preview.length > 0 && (
+            <div style={{ background:"rgba(255,255,255,.03)", border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 12px" }}>
+              <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,.3)", marginBottom:8, letterSpacing:1 }}>PREVIEW</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {preview.slice(0,6).map(u => (
+                  <div key={u.id} style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(139,92,246,.1)", border:`1px solid ${C.border}`, borderRadius:8, padding:"4px 9px" }}>
+                    <span style={{ fontSize:11 }}>{u.country}</span>
+                    <span style={{ fontSize:12, color:C.white, fontWeight:600 }}>{u.name}</span>
+                    <span style={{ fontSize:10, color:"rgba(255,255,255,.35)" }}>{u.pts.toLocaleString()} pts</span>
+                  </div>
+                ))}
+                {preview.length > 6 && (
+                  <div style={{ padding:"4px 9px", fontSize:12, color:"rgba(255,255,255,.35)" }}>+{preview.length - 6} more</div>
+                )}
+              </div>
+            </div>
+          )}
+          {preview.length === 0 && (
+            <div style={{ fontSize:12, color:C.red, textAlign:"center", padding:"8px 0" }}>⚠ No users match the current filters.</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Schedule card ── */}
+      <div style={{ background:C.s2, border:`1px solid ${C.border}`, borderRadius:16, overflow:"hidden" }}>
+        <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, fontWeight:700, color:C.white, fontSize:14, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{ fontSize:16 }}>🗓</span> Delivery
+        </div>
+        <div style={{ padding:"16px 18px", display:"flex", flexDirection:"column", gap:14 }}>
+          <div style={{ display:"flex", gap:8 }}>
+            {[
+              { id:"now",       label:"Send Now",  icon:"⚡" },
+              { id:"scheduled", label:"Schedule",  icon:"🕐" },
+            ].map(m => (
+              <button key={m.id} onClick={() => setSendMode(m.id)} style={{
+                flex:1, padding:"10px", borderRadius:10, cursor:"pointer",
+                background: sendMode===m.id ? "rgba(139,92,246,.2)" : "rgba(255,255,255,.04)",
+                border:`1px solid ${sendMode===m.id ? C.brand : "rgba(255,255,255,.1)"}`,
+                color: sendMode===m.id ? C.white : "rgba(255,255,255,.4)",
+                fontWeight:600, fontSize:13,
+              }}>{m.icon} {m.label}</button>
+            ))}
+          </div>
+          {sendMode === "scheduled" && (
+            <div>
+              <div style={{ fontSize:12, fontWeight:600, color:"rgba(255,255,255,.45)", marginBottom:6 }}>Send At</div>
+              <input
+                type="datetime-local"
+                className="inp-base"
+                value={scheduledFor}
+                onChange={e => setSF(e.target.value)}
+                min={new Date(Date.now()+60000).toISOString().slice(0,16)}
+                style={{ colorScheme:"dark" }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Send button ── */}
+      <button
+        onClick={() => setConfirm(true)}
+        disabled={!canSend || sending}
+        style={{
+          width:"100%", padding:15, borderRadius:13, border:"none",
+          background: (!canSend||sending) ? "rgba(255,255,255,.07)" : `linear-gradient(135deg,${typeInfo.color},${typeInfo.color}cc)`,
+          color: (!canSend||sending) ? "rgba(255,255,255,.3)" : "#fff",
+          fontWeight:800, fontSize:15, cursor:(!canSend||sending)?"default":"pointer",
+          boxShadow:(!canSend||sending)?"none":`0 6px 24px ${typeInfo.color}60`,
+          transition:"all .2s",
+        }}
+      >
+          {sending ? "⏳ Sending…" : sendMode==="scheduled" ? `🗓 Schedule ${typeInfo.icon} ${typeInfo.label}` : `${typeInfo.icon} Send ${typeInfo.label} to ${preview.length} user${preview.length!==1?"s":""}`}
+      </button>
+
+      {/* Validation hints — shown only when button is disabled and user hasn't started sending */}
+      {!canSend && !sending && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:6, justifyContent:"center" }}>
+          {!subject.trim() && (
+            <span style={{ fontSize:11, color:"rgba(255,255,255,.35)", background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.1)", borderRadius:99, padding:"3px 10px" }}>
+              ✏️ Subject required
+            </span>
+          )}
+          {!body.trim() && (
+            <span style={{ fontSize:11, color:"rgba(255,255,255,.35)", background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.1)", borderRadius:99, padding:"3px 10px" }}>
+              ✏️ Message body required
+            </span>
+          )}
+          {preview.length === 0 && (
+            <span style={{ fontSize:11, color:"rgba(239,68,68,.6)", background:"rgba(239,68,68,.08)", border:"1px solid rgba(239,68,68,.2)", borderRadius:99, padding:"3px 10px" }}>
+              ⚠️ No recipients match filters
+            </span>
+          )}
+          {sendMode === "scheduled" && !scheduledFor && (
+            <span style={{ fontSize:11, color:"rgba(255,255,255,.35)", background:"rgba(255,255,255,.05)", border:"1px solid rgba(255,255,255,.1)", borderRadius:99, padding:"3px 10px" }}>
+              🕐 Schedule time required
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Send result */}
+      {sendResult && (
+        <div style={{
+          background: sendResult.ok ? "rgba(16,185,129,.08)" : "rgba(239,68,68,.08)",
+          border:`1px solid ${sendResult.ok ? "rgba(16,185,129,.3)" : "rgba(239,68,68,.3)"}`,
+          borderRadius:12, padding:"14px 16px",
+        }}>
+          <div style={{ fontWeight:700, fontSize:14, color: sendResult.ok ? C.green : C.red, marginBottom:6 }}>
+            {sendResult.ok ? (sendResult.source==="demo" ? "✅ Sent (demo mode)" : "✅ Sent!") : "❌ Failed"}
+          </div>
+          {sendResult.ok && (
+            <div style={{ fontSize:13, color:"rgba(255,255,255,.6)" }}>
+              <strong style={{ color:C.white }}>{sendResult.sent}</strong> delivered
+              {sendResult.failed > 0 && <span style={{ color:C.red }}> · {sendResult.failed} failed</span>}
+              {sendResult.note  && <div style={{ fontSize:11, color:"rgba(255,255,255,.35)", marginTop:4 }}>ℹ {sendResult.note}</div>}
+            </div>
+          )}
+          {!sendResult.ok && <div style={{ fontSize:12, color:C.red }}>{sendResult.error}</div>}
+          <button onClick={() => setSR(null)} style={{ marginTop:10, background:"none", border:"none", color:C.muted, fontSize:12, cursor:"pointer", textDecoration:"underline" }}>Dismiss</button>
+        </div>
+      )}
+
+      {/* ── History ── */}
+      {history.length > 0 && (
+        <div style={{ background:C.s2, border:`1px solid ${C.border}`, borderRadius:16, overflow:"hidden" }}>
+          <div style={{ padding:"14px 18px", borderBottom:`1px solid ${C.border}`, fontWeight:700, color:C.white, fontSize:14, display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontSize:16 }}>📋</span> Broadcast History
+          </div>
+          {history.map((b, i) => {
+            const ti  = BROADCAST_TYPES.find(t => t.id === b.type) || BROADCAST_TYPES[0];
+            const ci  = BROADCAST_CHANNELS.find(c => c.id === b.channel) || BROADCAST_CHANNELS[0];
+            const ss  = statusStyle(b.status);
+            return (
+              <div key={b.id} style={{
+                padding:"14px 18px",
+                borderBottom: i < history.length-1 ? `1px solid ${C.border}` : undefined,
+              }}>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+                  <div style={{
+                    width:38, height:38, borderRadius:9, flexShrink:0,
+                    background:`${ti.color}18`, border:`1px solid ${ti.color}40`,
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:18,
+                  }}>{ti.icon}</div>
+
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap" }}>
+                      <span style={{ fontWeight:700, color:C.white, fontSize:13 }}>{b.subject}</span>
+                      <span style={{
+                        fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:99,
+                        background:ss.bg, color:ss.color, border:`1px solid ${ss.border}`,
+                      }}>{ss.label}</span>
+                      {b.source==="demo" && <span style={{ fontSize:10, color:C.gold, fontWeight:600 }}>demo</span>}
+                    </div>
+                    <div style={{ fontSize:11, color:"rgba(255,255,255,.35)", marginTop:3, display:"flex", gap:10, flexWrap:"wrap" }}>
+                      <span>{ci.icon} {ci.label}</span>
+                      <span>🎯 {audienceLabel(b.audience)}</span>
+                      <span>👥 {b.recipientCount} recipient{b.recipientCount!==1?"s":""}</span>
+                      {b.sent > 0 && <span style={{ color:C.green }}>✓ {b.sent} sent</span>}
+                      {b.failed > 0 && <span style={{ color:C.red }}>✕ {b.failed} failed</span>}
+                    </div>
+                    <div style={{ fontSize:10, color:"rgba(255,255,255,.25)", marginTop:2 }}>
+                      {b.status==="scheduled"
+                        ? `Scheduled for ${fmtDate(b.scheduledFor)}`
+                        : `Sent ${fmtDate(b.sentAt)}`
+                      } · by {b.sentBy}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Confirm dialog ── */}
+      {confirm && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.88)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:999, padding:16 }}>
+          <div style={{ background:C.s1, borderRadius:20, padding:24, maxWidth:360, width:"100%", border:`1px solid ${typeInfo.color}55` }}>
+            <div style={{ fontSize:32, textAlign:"center", marginBottom:8 }}>{typeInfo.icon}</div>
+            <div style={{ fontWeight:800, color:C.white, fontSize:16, textAlign:"center", marginBottom:4 }}>
+              {sendMode==="scheduled" ? "Schedule broadcast?" : "Send broadcast now?"}
+            </div>
+
+            <div style={{ background:"rgba(255,255,255,.04)", border:`1px solid ${C.border}`, borderRadius:10, padding:"12px 14px", margin:"16px 0", fontSize:12 }}>
+              {[
+                ["Type",     `${typeInfo.icon} ${typeInfo.label}`],
+                ["Channel",  `${channelInfo.icon} ${channelInfo.label}`],
+                ["Subject",  subject],
+                ["Audience", audienceLabel(audience)],
+                ["Recipients", `${preview.length} user${preview.length!==1?"s":""}`],
+                sendMode==="scheduled" ? ["Scheduled for", scheduledFor ? fmtDate(scheduledFor) : "—"] : ["Delivery","Immediately"],
+              ].map(([k,v]) => (
+                <div key={k} style={{ display:"flex", gap:8, marginBottom:4 }}>
+                  <span style={{ color:"rgba(255,255,255,.4)", minWidth:80, flexShrink:0 }}>{k}</span>
+                  <span style={{ color:C.white, wordBreak:"break-word" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+              <button onClick={() => setConfirm(false)} style={{ background:C.s3, border:`1px solid ${C.border}`, borderRadius:12, padding:12, color:C.white, fontWeight:600, cursor:"pointer" }}>Cancel</button>
+              <button onClick={doSend} style={{
+                background:`linear-gradient(135deg,${typeInfo.color},${typeInfo.color}aa)`,
+                border:"none", borderRadius:12, padding:12, color:"#fff", fontWeight:700, cursor:"pointer",
+              }}>{sendMode==="scheduled" ? "Schedule" : "Send Now"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Main AdminPanel ───────────────────────────── */
+function AdminPanel({user, onExit, lang}){
+  const role = user.role || (user.isAdmin ? "super_admin" : "user");
+  const [tab,setTab] = useState("dashboard");
+  const [users,setUsers] = useState(INITIAL_USERS);
+
+  const tabs = [
+    { id:"dashboard", label:"Dashboard", icon:"📊", perm:"view_dashboard" },
+    { id:"users",     label:"Users",     icon:"👥", perm:"view_users" },
+    { id:"roles",     label:"Roles",     icon:"🛡️", perm:"manage_roles" },
+    { id:"apikeys",   label:"API Keys",  icon:"🔑", perm:"manage_api_keys" },
+    { id:"webhooks",  label:"Webhooks",  icon:"🔗", perm:"manage_webhooks" },
+    { id:"emails",     label:"Emails",      icon:"✉️", perm:"manage_email_templates" },
+    { id:"ratelimits", label:"Rate Limits", icon:"🛡️", perm:"manage_rate_limits" },
+    { id:"backup",     label:"Backup",      icon:"💾", perm:"manage_backups" },
+    { id:"broadcast",  label:"Broadcast",   icon:"📢", perm:"send_broadcasts" },
+    { id:"settings",   label:"Settings",   icon:"⚙️", perm:"view_settings" },
+  ].filter(t=>can(user,t.perm));
+
+  // Ensure current tab is accessible; fall back to first allowed tab
+  const activeTab = tabs.find(t=>t.id===tab) ? tab : (tabs[0]?.id||"dashboard");
+
+  const roleInfo = ROLES[role] || ROLES.super_admin;
+
+  return (
+    <div style={{height:"100%",display:"flex",flexDirection:"column",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",color:C.white}}>
+      {/* Header */}
+      <div style={{
+        background:`linear-gradient(135deg,${C.s1},${C.s2})`,
+        borderBottom:`1px solid ${C.border}`,
+        padding:"16px 20px 0",
+        flexShrink:0,
+      }}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{
+              width:36,height:36,borderRadius:10,
+              background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,
+            }}>✨</div>
+            <div>
+              <div style={{fontSize:16,fontWeight:800,color:C.white}}>Wish Admin</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>
+                <span style={{color:roleInfo.color}}>{roleInfo.icon} {roleInfo.label}</span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onExit}
+            style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}
+          >Exit</button>
+        </div>
+
+        {/* Nav tabs */}
+        <div className="admin-nav">
+          {tabs.map(t=>(
+            <button key={t.id} className={`admin-tab${activeTab===t.id?" active":""}`} onClick={()=>setTab(t.id)}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,overflowY:"auto",padding:20}}>
+        {activeTab==="dashboard" && <AdminDashboard users={users} adminUser={user}/>}
+        {activeTab==="users"     && <AdminUsers users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="roles"     && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="apikeys"   && <AdminApiKeys/>}
+        {activeTab==="webhooks"  && <AdminWebhooks/>}
+        {activeTab==="emails"      && <AdminEmailTemplates/>}
+        {activeTab==="ratelimits" && <AdminRateLimits/>}
+        {activeTab==="backup"     && <AdminBackup users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="broadcast"  && <AdminBroadcast users={users} adminUser={user}/>}
+        {activeTab==="settings"   && <AdminSettings/>}
+      </div>
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════
@@ -1492,8 +4481,9 @@ function WishApp(){
   const handleLogin=(u)=>{ setLU(u); };
   const handleLogout=()=>{ setLU(null); };
 
+  const isAdminUser = loggedUser && (loggedUser.role==="super_admin"||loggedUser.role==="moderator"||loggedUser.isAdmin);
   if(!loggedUser) return <AuthScreen onLogin={handleLogin} lang={lang}/>;
-  if(loggedUser.isAdmin) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
+  if(isAdminUser) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
   return <MainApp user={loggedUser} onLogout={handleLogout} lang={lang} setLang={setLang}/>;
 }
 
