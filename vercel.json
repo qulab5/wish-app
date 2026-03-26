@@ -30,6 +30,22 @@
       "dest": "/api/announcements.js"
     },
     {
+      "src": "/api/wallet",
+      "dest": "/api/wallet.js"
+    },
+    {
+      "src": "/api/walletBalance",
+      "dest": "/api/walletBalance.js"
+    },
+    {
+      "src": "/api/walletSend",
+      "dest": "/api/walletSend.js"
+    },
+    {
+      "src": "/api/walletTx",
+      "dest": "/api/walletTx.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
