@@ -7313,12 +7313,23 @@ function SecuritySettingsView({ user }) {
 function WishApp(){
   const [loggedUser,setLU] = useState(()=>Security.load('last_user',null));
   const [lang,setLang]     = useState(()=>Security.load('lang','en'));
+  // unlocked=true when user just logged in (fresh), or has already passed the lock screen this session
+  const [unlocked,setUnlocked] = useState(false);
 
-  const handleLogin  = (u) => { Security.save('last_user',u); setLU(u); };
-  const handleLogout = ()  => { Security.remove('last_user'); setLU(null); };
+  const handleLogin  = (u) => { Security.save('last_user',u); setLU(u); setUnlocked(true); };
+  const handleLogout = ()  => { Security.remove('last_user'); setLU(null); setUnlocked(false); };
 
-  const isAdminUser = loggedUser && (loggedUser.role==="super_admin"||loggedUser.role==="moderator"||loggedUser.isAdmin);
   if(!loggedUser) return <AuthScreen onLogin={handleLogin} lang={lang}/>;
+
+  // If user has PIN or biometric configured, require unlock on every fresh page load
+  const uid    = loggedUser.id;
+  const hasPin = uid && !!Security.loadUser(uid,'pin_hash',null);
+  const hasBio = uid &&  Security.loadUser(uid,'has_bio',false);
+  if(!unlocked && (hasPin||hasBio)){
+    return <UnlockScreen user={loggedUser} onUnlock={()=>setUnlocked(true)}/>;
+  }
+
+  const isAdminUser = loggedUser.role==="super_admin"||loggedUser.role==="moderator"||loggedUser.isAdmin;
   if(isAdminUser) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
   return <MainApp user={loggedUser} onLogout={handleLogout} lang={lang} setLang={setLang}/>;
 }
