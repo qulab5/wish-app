@@ -190,12 +190,50 @@ const MINING_S   = isSunday ? SUN_CYCLE : MINING_CYCLE;
    DEMO USERS DATABASE  (in-memory)
 ═══════════════════════════════════════════════ */
 const INITIAL_USERS = [
-  { id:"u1", name:"Ahmad Ali",   email:"ahmad@wish.com",   phone:"+92-300-1234567", pass:"ahmad123",  pts:48200, usd:48.20, joined:"Jan 2025", country:"🇵🇰", isAdmin:false, active:true },
-  { id:"u2", name:"Sara Khan",   email:"sara@wish.com",    phone:"+91-900-7654321", pass:"sara123",   pts:41500, usd:41.50, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, active:true },
-  { id:"u3", name:"Rahul Dev",   email:"rahul@wish.com",   phone:"+91-800-1111111", pass:"rahul123",  pts:35400, usd:35.40, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, active:true },
-  { id:"u4", name:"Zain Ahmed",  email:"zain@wish.com",    phone:"+92-333-9999999", pass:"zain123",   pts:29800, usd:29.80, joined:"Mar 2025", country:"🇵🇰", isAdmin:false, active:false },
-  { id:"admin", name:"Admin",    email:"admin@wish.com",   phone:"+1-000-0000000",  pass:"admin@123", pts:0,     usd:0,     joined:"Jan 2025", country:"🌍", isAdmin:true,  active:true },
+  { id:"u1", name:"Ahmad Ali",   email:"ahmad@wish.com",   phone:"+92-300-1234567", pass:"ahmad123",  pts:48200, usd:48.20, joined:"Jan 2025", country:"🇵🇰", isAdmin:false, role:"user",        active:true },
+  { id:"u2", name:"Sara Khan",   email:"sara@wish.com",    phone:"+91-900-7654321", pass:"sara123",   pts:41500, usd:41.50, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, role:"user",        active:true },
+  { id:"u3", name:"Rahul Dev",   email:"rahul@wish.com",   phone:"+91-800-1111111", pass:"rahul123",  pts:35400, usd:35.40, joined:"Feb 2025", country:"🇮🇳", isAdmin:false, role:"user",        active:true },
+  { id:"u4", name:"Zain Ahmed",  email:"zain@wish.com",    phone:"+92-333-9999999", pass:"zain123",   pts:29800, usd:29.80, joined:"Mar 2025", country:"🇵🇰", isAdmin:false, role:"user",        active:false },
+  { id:"mod1", name:"Moderator", email:"mod@wish.com",     phone:"+1-111-1111111",  pass:"mod@123",   pts:0,     usd:0,     joined:"Jan 2025", country:"🌍", isAdmin:true,  role:"moderator",   active:true },
+  { id:"admin", name:"Admin",    email:"admin@wish.com",   phone:"+1-000-0000000",  pass:"admin@123", pts:0,     usd:0,     joined:"Jan 2025", country:"🌍", isAdmin:true,  role:"super_admin", active:true },
 ];
+
+/* ═══════════════════════════════════════════════
+   RBAC — ROLES & PERMISSIONS
+═══════════════════════════════════════════════ */
+const ROLES = {
+  super_admin: { label:"Super Admin", color:"#f59e0b", icon:"👑" },
+  moderator:   { label:"Moderator",   color:"#06b6d4", icon:"🛡️" },
+  user:        { label:"User",        color:"#8b5cf6", icon:"👤" },
+};
+
+// Permission flags — each key is a capability string
+const PERMISSIONS = {
+  super_admin: [
+    "view_dashboard",
+    "view_users",
+    "edit_users",
+    "delete_users",
+    "toggle_user_active",
+    "view_analytics",
+    "manage_roles",
+    "assign_moderator",
+    "view_settings",
+    "edit_settings",
+  ],
+  moderator: [
+    "view_dashboard",
+    "view_users",
+    "toggle_user_active",
+    "view_analytics",
+  ],
+  user: [],
+};
+
+function can(user, permission){
+  const role = user.role || (user.isAdmin ? "super_admin" : "user");
+  return (PERMISSIONS[role] || []).includes(permission);
+}
 
 /* ═══════════════════════════════════════════════
    AD NETWORKS CONFIG  (default)
@@ -1031,13 +1069,426 @@ function AuthScreen({onLogin,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   ADMIN PANEL (simplified - replace with your full version)
+   ADMIN PANEL — RBAC
 ═══════════════════════════════════════════════ */
-function AdminPanel({user,onExit,lang}){
-  return <div style={{padding:20,color:"white"}}>
-    <h1>Admin Panel</h1>
-    <button onClick={onExit}>Exit</button>
-  </div>;
+function RoleBadge({role}){
+  const r = ROLES[role] || ROLES.user;
+  return (
+    <span style={{
+      display:"inline-flex", alignItems:"center", gap:4,
+      background:`${r.color}22`, color:r.color,
+      border:`1px solid ${r.color}55`,
+      borderRadius:99, padding:"2px 10px", fontSize:11, fontWeight:700,
+    }}>
+      {r.icon} {r.label}
+    </span>
+  );
+}
+
+function StatCard({icon,label,value,sub,color="#8b5cf6"}){
+  return (
+    <div className="stat-card" style={{flex:"1 1 140px"}}>
+      <div style={{fontSize:28,marginBottom:6}}>{icon}</div>
+      <div style={{fontSize:22,fontWeight:800,color}}>{value}</div>
+      <div style={{fontSize:12,color:"rgba(255,255,255,.5)",marginTop:2}}>{label}</div>
+      {sub&&<div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:2}}>{sub}</div>}
+    </div>
+  );
+}
+
+/* ── Dashboard Tab ─────────────────────────────── */
+function AdminDashboard({users, adminUser}){
+  const totalUsers  = users.filter(u=>u.role==="user"||!u.isAdmin).length;
+  const activeUsers = users.filter(u=>(u.role==="user"||!u.isAdmin)&&u.active).length;
+  const totalPts    = users.reduce((s,u)=>s+(u.pts||0),0);
+  const totalUsd    = users.reduce((s,u)=>s+(u.usd||0),0).toFixed(2);
+  const admins      = users.filter(u=>u.role==="super_admin"||u.role==="moderator").length;
+
+  return (
+    <div style={{padding:"0 0 20px"}}>
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:13,color:"rgba(255,255,255,.45)",marginBottom:4}}>Signed in as</div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:40,height:40,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>
+            {adminUser.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15}}>{adminUser.name}</div>
+            <RoleBadge role={adminUser.role||"super_admin"}/>
+          </div>
+        </div>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>OVERVIEW</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:24}}>
+        <StatCard icon="👥" label="Total Users"   value={totalUsers}  sub={`${activeUsers} active`} color={C.brandLt}/>
+        <StatCard icon="⭐" label="Total Points"  value={totalPts.toLocaleString()} color={C.gold}/>
+        <StatCard icon="💵" label="Total USD"     value={`$${totalUsd}`} color={C.green}/>
+        <StatCard icon="🛡️" label="Admin Staff"  value={admins}      color={C.cyan}/>
+      </div>
+
+      <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>YOUR PERMISSIONS</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {(PERMISSIONS[adminUser.role||"super_admin"]||[]).map(p=>(
+          <span key={p} style={{
+            background:"rgba(139,92,246,.12)", color:C.brandLt,
+            border:`1px solid ${C.border2}`, borderRadius:8,
+            padding:"4px 10px", fontSize:11, fontWeight:600,
+          }}>✓ {p.replace(/_/g," ")}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Users Tab ─────────────────────────────────── */
+function AdminUsers({users, setUsers, adminUser}){
+  const [search,setSearch] = useState("");
+  const [confirm,setConfirm] = useState(null); // {type,userId}
+
+  const regularUsers = users.filter(u=>u.role==="user"||(!u.isAdmin&&!u.role));
+  const filtered = regularUsers.filter(u=>
+    u.name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleActive = (id) => {
+    setUsers(prev=>prev.map(u=>u.id===id?{...u,active:!u.active}:u));
+    setConfirm(null);
+  };
+  const deleteUser = (id) => {
+    setUsers(prev=>prev.filter(u=>u.id!==id));
+    setConfirm(null);
+  };
+
+  const canDelete = can(adminUser,"delete_users");
+  const canToggle = can(adminUser,"toggle_user_active");
+  const canEdit   = can(adminUser,"edit_users");
+
+  return (
+    <div>
+      <div style={{position:"relative",marginBottom:16}}>
+        <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
+        <input
+          className="inp-base"
+          placeholder="Search users by name or email…"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          style={{paddingLeft:38}}
+        />
+      </div>
+
+      <div style={{fontSize:12,color:"rgba(255,255,255,.35)",marginBottom:12}}>
+        {filtered.length} user{filtered.length!==1?"s":""} found
+        {!canDelete&&<span style={{marginLeft:8,color:C.cyan}}>· view &amp; toggle only</span>}
+      </div>
+
+      {filtered.map(u=>(
+        <div key={u.id} className="user-row">
+          <div style={{
+            width:38,height:38,borderRadius:"50%",flexShrink:0,
+            background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:16,fontWeight:700,color:C.white,
+          }}>{u.name.charAt(0).toUpperCase()}</div>
+
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
+              {u.name}
+              {!u.active&&<span style={{fontSize:10,background:"rgba(239,68,68,.15)",color:C.red,border:"1px solid rgba(239,68,68,.3)",borderRadius:99,padding:"1px 7px"}}>Inactive</span>}
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:1}}>
+              {u.country} · {u.pts?.toLocaleString()||0} pts · Joined {u.joined}
+            </div>
+          </div>
+
+          <div style={{display:"flex",gap:8,flexShrink:0}}>
+            {canToggle&&(
+              <button
+                onClick={()=>setConfirm({type:"toggle",userId:u.id,userName:u.name,active:u.active})}
+                title={u.active?"Deactivate":"Activate"}
+                style={{
+                  background:u.active?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",
+                  border:`1px solid ${u.active?"rgba(239,68,68,.3)":"rgba(16,185,129,.3)"}`,
+                  color:u.active?C.red:C.green,
+                  borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
+                }}
+              >{u.active?"🚫 Ban":"✅ Activate"}</button>
+            )}
+            {canDelete&&(
+              <button
+                onClick={()=>setConfirm({type:"delete",userId:u.id,userName:u.name})}
+                title="Delete user"
+                style={{
+                  background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",
+                  color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
+                }}
+              >🗑</button>
+            )}
+          </div>
+        </div>
+      ))}
+
+      {/* Confirmation dialog */}
+      {confirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>
+              {confirm.type==="delete"?"🗑️":"⚠️"}
+            </div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>
+              {confirm.type==="delete"
+                ? `Delete "${confirm.userName}"?`
+                : `${confirm.active?"Deactivate":"Activate"} "${confirm.userName}"?`}
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>
+              {confirm.type==="delete"
+                ? "This action cannot be undone."
+                : confirm.active
+                  ? "The user will lose access to the app."
+                  : "The user will regain access to the app."}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setConfirm(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button
+                onClick={()=>confirm.type==="delete"?deleteUser(confirm.userId):toggleActive(confirm.userId)}
+                style={{background:confirm.type==="delete"||confirm.active?`linear-gradient(135deg,${C.red},#b91c1c)`:`linear-gradient(135deg,${C.green},#047857)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
+              >{confirm.type==="delete"?"Delete":confirm.active?"Deactivate":"Activate"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Roles Tab (super_admin only) ───────────────── */
+function AdminRoles({users, setUsers, adminUser}){
+  const [confirm,setConfirm] = useState(null);
+  const staffUsers = users.filter(u=>u.isAdmin||u.role==="super_admin"||u.role==="moderator");
+
+  const changeRole = (id, newRole) => {
+    if(id===adminUser.id) return; // can't demote self
+    setUsers(prev=>prev.map(u=>u.id===id
+      ? {...u, role:newRole, isAdmin:newRole!=="user"}
+      : u
+    ));
+    setConfirm(null);
+  };
+
+  const promoteUser = (id) => {
+    setUsers(prev=>prev.map(u=>u.id===id
+      ? {...u, role:"moderator", isAdmin:true}
+      : u
+    ));
+    setConfirm(null);
+  };
+
+  const nonAdminUsers = users.filter(u=>!u.isAdmin&&(!u.role||u.role==="user"));
+
+  return (
+    <div>
+      <div style={{marginBottom:20}}>
+        <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>ADMIN STAFF</div>
+        {staffUsers.map(u=>(
+          <div key={u.id} className="user-row">
+            <div style={{
+              width:38,height:38,borderRadius:"50%",flexShrink:0,
+              background:`linear-gradient(135deg,${C.gold},${C.brand})`,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:16,fontWeight:700,color:C.white,
+            }}>{u.name.charAt(0).toUpperCase()}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:8}}>
+                {u.name}
+                {u.id===adminUser.id&&<span style={{fontSize:10,color:C.muted}}>(you)</span>}
+              </div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1}}>{u.email}</div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+              <RoleBadge role={u.role||"super_admin"}/>
+              {u.id!==adminUser.id&&u.role!=="super_admin"&&(
+                <button
+                  onClick={()=>setConfirm({type:"demote",userId:u.id,userName:u.name})}
+                  style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"5px 9px",fontSize:11,fontWeight:600,cursor:"pointer"}}
+                >Remove</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>PROMOTE A USER TO MODERATOR</div>
+        {nonAdminUsers.length===0
+          ? <div style={{color:"rgba(255,255,255,.3)",fontSize:13,textAlign:"center",padding:20}}>No regular users to promote.</div>
+          : nonAdminUsers.map(u=>(
+            <div key={u.id} className="user-row">
+              <div style={{
+                width:38,height:38,borderRadius:"50%",flexShrink:0,
+                background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:16,fontWeight:700,color:C.white,
+              }}>{u.name.charAt(0).toUpperCase()}</div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:700,color:C.white,fontSize:14}}>{u.name}</div>
+                <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1}}>{u.email}</div>
+              </div>
+              <button
+                onClick={()=>setConfirm({type:"promote",userId:u.id,userName:u.name})}
+                style={{background:"rgba(6,182,212,.12)",border:"1px solid rgba(6,182,212,.3)",color:C.cyan,borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:600,cursor:"pointer",flexShrink:0}}
+              >🛡️ Make Mod</button>
+            </div>
+          ))
+        }
+      </div>
+
+      {confirm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>{confirm.type==="promote"?"🛡️":"⬇️"}</div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>
+              {confirm.type==="promote"
+                ? `Promote "${confirm.userName}" to Moderator?`
+                : `Remove moderator role from "${confirm.userName}"?`}
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>
+              {confirm.type==="promote"
+                ? "They will gain access to the admin panel with limited permissions."
+                : "They will lose admin panel access and return to a regular user."}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setConfirm(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+              <button
+                onClick={()=>confirm.type==="promote"?promoteUser(confirm.userId):changeRole(confirm.userId,"user")}
+                style={{background:confirm.type==="promote"?`linear-gradient(135deg,${C.cyan},#0284c7)`:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
+              >{confirm.type==="promote"?"Promote":"Remove"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Settings Tab (super_admin only) ────────────── */
+function AdminSettings(){
+  const [saved,setSaved] = useState(false);
+  const [cfg,setCfg] = useState({
+    appName:"Wish",
+    dailyAdLimit:15,
+    sundayAdLimit:20,
+    miningCycleHours:8,
+    referralBonus:300,
+    minWithdrawUsd:10,
+  });
+  const save = ()=>{ setSaved(true); setTimeout(()=>setSaved(false),2000); };
+  const f=(k)=>v=>setCfg(p=>({...p,[k]:v}));
+
+  const Field=({label,k,type="number",min})=>(
+    <div style={{marginBottom:16}}>
+      <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>{label}</div>
+      <input
+        className="inp-base"
+        type={type} min={min}
+        value={cfg[k]}
+        onChange={e=>f(k)(type==="number"?Number(e.target.value):e.target.value)}
+      />
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{background:"rgba(245,158,11,.08)",border:"1px solid rgba(245,158,11,.25)",borderRadius:12,padding:"10px 14px",marginBottom:20,display:"flex",gap:10,alignItems:"flex-start"}}>
+        <span style={{fontSize:16}}>⚠️</span>
+        <span style={{fontSize:12,color:"rgba(255,255,255,.6)",lineHeight:1.5}}>Settings are stored in-memory only in this demo. Connect to your backend to persist changes.</span>
+      </div>
+      <Field label="App Name"               k="appName"          type="text"/>
+      <Field label="Daily Ad Limit"         k="dailyAdLimit"     min={1}/>
+      <Field label="Sunday Ad Limit"        k="sundayAdLimit"    min={1}/>
+      <Field label="Mining Cycle (hours)"   k="miningCycleHours" min={1}/>
+      <Field label="Referral Bonus (pts)"   k="referralBonus"    min={0}/>
+      <Field label="Min Withdrawal (USD)"   k="minWithdrawUsd"   min={1}/>
+      <button
+        onClick={save}
+        style={{
+          width:"100%",padding:"13px",borderRadius:12,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,
+          background:saved?`linear-gradient(135deg,${C.green},#047857)`:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+          color:"#fff",transition:"background .3s",
+          boxShadow:saved?"none":`0 4px 20px ${C.brand}80`,
+        }}
+      >{saved?"✓ Saved!":"Save Settings"}</button>
+    </div>
+  );
+}
+
+/* ── Main AdminPanel ───────────────────────────── */
+function AdminPanel({user, onExit, lang}){
+  const role = user.role || (user.isAdmin ? "super_admin" : "user");
+  const [tab,setTab] = useState("dashboard");
+  const [users,setUsers] = useState(INITIAL_USERS);
+
+  const tabs = [
+    { id:"dashboard", label:"Dashboard", icon:"📊", perm:"view_dashboard" },
+    { id:"users",     label:"Users",     icon:"👥", perm:"view_users" },
+    { id:"roles",     label:"Roles",     icon:"🛡️", perm:"manage_roles" },
+    { id:"settings",  label:"Settings",  icon:"⚙️", perm:"view_settings" },
+  ].filter(t=>can(user,t.perm));
+
+  // Ensure current tab is accessible; fall back to first allowed tab
+  const activeTab = tabs.find(t=>t.id===tab) ? tab : (tabs[0]?.id||"dashboard");
+
+  const roleInfo = ROLES[role] || ROLES.super_admin;
+
+  return (
+    <div style={{height:"100%",display:"flex",flexDirection:"column",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",color:C.white}}>
+      {/* Header */}
+      <div style={{
+        background:`linear-gradient(135deg,${C.s1},${C.s2})`,
+        borderBottom:`1px solid ${C.border}`,
+        padding:"16px 20px 0",
+        flexShrink:0,
+      }}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{
+              width:36,height:36,borderRadius:10,
+              background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,
+            }}>✨</div>
+            <div>
+              <div style={{fontSize:16,fontWeight:800,color:C.white}}>Wish Admin</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>
+                <span style={{color:roleInfo.color}}>{roleInfo.icon} {roleInfo.label}</span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onExit}
+            style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:10,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer"}}
+          >Exit</button>
+        </div>
+
+        {/* Nav tabs */}
+        <div className="admin-nav">
+          {tabs.map(t=>(
+            <button key={t.id} className={`admin-tab${activeTab===t.id?" active":""}`} onClick={()=>setTab(t.id)}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{flex:1,overflowY:"auto",padding:20}}>
+        {activeTab==="dashboard" && <AdminDashboard users={users} adminUser={user}/>}
+        {activeTab==="users"     && <AdminUsers users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="roles"     && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="settings"  && <AdminSettings/>}
+      </div>
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════
@@ -1492,8 +1943,9 @@ function WishApp(){
   const handleLogin=(u)=>{ setLU(u); };
   const handleLogout=()=>{ setLU(null); };
 
+  const isAdminUser = loggedUser && (loggedUser.role==="super_admin"||loggedUser.role==="moderator"||loggedUser.isAdmin);
   if(!loggedUser) return <AuthScreen onLogin={handleLogin} lang={lang}/>;
-  if(loggedUser.isAdmin) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
+  if(isAdminUser) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
   return <MainApp user={loggedUser} onLogout={handleLogout} lang={lang} setLang={setLang}/>;
 }
 
