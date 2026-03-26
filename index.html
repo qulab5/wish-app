@@ -1,5 +1,3 @@
-<!DOCTYPE html>
-<!-- wish-app v2.0.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -44,6 +42,35 @@
   @keyframes orbit {
     from { transform: rotate(0deg) translateX(56px) rotate(0deg); }
     to   { transform: rotate(360deg) translateX(56px) rotate(-360deg); }
+  }
+  @keyframes swing {
+    0%   { transform: rotate(-18deg); }
+    30%  { transform: rotate(13deg);  }
+    55%  { transform: rotate(-7deg);  }
+    72%  { transform: rotate(4deg);   }
+    86%  { transform: rotate(-2deg);  }
+    95%  { transform: rotate(1deg);   }
+    100% { transform: rotate(0deg);   }
+  }
+  @keyframes dotPulse {
+    0%,100% { transform: scale(0.75); opacity: 0.35; }
+    50%     { transform: scale(1.25); opacity: 1;    }
+  }
+  @keyframes splashFade {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0);    }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0);   }
+    20%     { transform: translateX(-9px);}
+    40%     { transform: translateX(9px); }
+    60%     { transform: translateX(-5px);}
+    80%     { transform: translateX(5px); }
+  }
+  @keyframes pinSuccess {
+    0%   { transform: scale(0.6); opacity: 0; }
+    70%  { transform: scale(1.15); }
+    100% { transform: scale(1);   opacity: 1; }
   }
   .glass-effect {
     backdrop-filter: blur(10px);
@@ -170,9 +197,15 @@ const C = {
 const APP_NAME       = "Wish";
 const APP_TAGLINE    = "Earn & Reward Platform";
 const USD_PER_POINT  = 0.001;
-const REFERRAL_BONUS = 300;
+const PTS_PER_TOKEN  = 1000;   // 1000 pts = 1 Wish Token
+const REF_SIGNUP_BONUS = 2000;   // pts given to referrer on new sign-up
+const REF_MINE_PCT    = 0.10;   // referrer earns 10% of referred user's every mining claim
 const MINING_CYCLE   = 8 * 60 * 60;
 const SUN_CYCLE      = 4 * 60 * 60;
+const MINE_SESSION_S = 4 * 60 * 60;   // 4-hour mining session
+const MINE_PTS_HOUR  = 2000;           // 2000 pts per hour → 8000 for full session
+const MINE_BOOST_PTS = 500;            // pts added per boost ad
+const MINE_MAX_BOOST = 5;              // max boosts per session
 const AD_COOLDOWN_S  = 5 * 60 * 60;
 
 const DAILY_PTS_MAP = {
@@ -288,10 +321,14 @@ const TR = {
        noAcc:"Don't have an account?", haveAcc:"Already have an account?",
        signUp:"Create Account", signIn:"Sign In", continue:"Continue",
        welcomeBack:"Welcome Back!", joinWish:"Join Wish Today",
-       home:"Home", earn:"Earn", tasks:"Tasks", leaders:"Leaders", mining:"Mining", wallet:"Wallet",
+       home:"Home", earn:"Earn", tasks:"Tasks", leaders:"Leaders", mining:"Mining", wallet:"Wallet", convert:"Convert",
+       convertTitle:"Convert Points", convertSub:"Turn points into Wish Tokens",
+       convRate:"Conversion Rate", convBalance:"Your Points Balance", convTokens:"Wish Tokens",
+       convBtn:"Convert Now", convSuccess:"Converted!", convNone:"Not enough points",
+       convHistory:"Total Tokens Earned",
        logout:"Logout", logoutQ:"Are you sure you want to logout?", yes:"Yes, Logout", cancel:"Cancel",
        profile:"My Profile", exchange:"Exchange", soon:"SOON", language:"Language",
-       totalPts:"Total Points", usdBal:"USD Balance", adsLeft:"Ads Left",
+       totalPts:"Total Points", usdBal:"Tokens", adsLeft:"Ads Left",
        spins:"Spins", season:"Season", watchAd:"Watch Ad & Earn",
        spinNow:"Spin Now", spinning:"Spinning…",
        miningTitle:"Mining Season", miningNext:"Next reward in",
@@ -310,10 +347,14 @@ const TR = {
        noAcc:"اکاؤنٹ نہیں ہے؟", haveAcc:"پہلے سے اکاؤنٹ ہے؟",
        signUp:"اکاؤنٹ بنائیں", signIn:"لاگ ان کریں", continue:"جاری رکھیں",
        welcomeBack:"خوش آمدید!", joinWish:"Wish میں شامل ہوں",
-       home:"ہوم", earn:"کمائیں", tasks:"کام", leaders:"رہنما", mining:"مائننگ", wallet:"والٹ",
+       home:"ہوم", earn:"کمائیں", tasks:"کام", leaders:"رہنما", mining:"مائننگ", wallet:"والٹ", convert:"کنورٹ",
+       convertTitle:"پوائنٹس کنورٹ", convertSub:"پوائنٹس کو وِش ٹوکن میں بدلیں",
+       convRate:"تبادلہ شرح", convBalance:"آپ کے پوائنٹس", convTokens:"وِش ٹوکن",
+       convBtn:"ابھی کنورٹ کریں", convSuccess:"کنورٹ ہو گیا!", convNone:"کافی پوائنٹس نہیں",
+       convHistory:"کل ٹوکن",
        logout:"لاگ آؤٹ", logoutQ:"کیا آپ لاگ آؤٹ کرنا چاہتے ہیں؟", yes:"ہاں", cancel:"منسوخ",
        profile:"میری پروفائل", exchange:"ایکسچینج", soon:"جلد", language:"زبان",
-       totalPts:"کل پوائنٹس", usdBal:"USD بیلنس", adsLeft:"باقی اشتہار",
+       totalPts:"کل پوائنٹس", usdBal:"ٹوکن", adsLeft:"باقی اشتہار",
        spins:"اسپن", season:"سیزن", watchAd:"اشتہار دیکھیں",
        spinNow:"اسپن کریں", spinning:"گھوم رہا ہے…",
        miningTitle:"مائننگ سیزن", miningNext:"اگلا انعام",
@@ -636,6 +677,16 @@ body{background:#0d0b1e;}
 @keyframes popIn{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
 @keyframes float{0%{transform:translateY(0px)}50%{transform:translateY(-8px)}100%{transform:translateY(0px)}}
 @keyframes pulse-glow{0%{box-shadow:0 0 0 0 rgba(139,92,246,0.7)}70%{box-shadow:0 0 0 15px rgba(139,92,246,0)}100%{box-shadow:0 0 0 0 rgba(139,92,246,0)}}
+@keyframes gold-pulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.55)}70%{box-shadow:0 0 0 14px rgba(245,158,11,0)}}
+@keyframes conv-btn-shine{0%{background-position:200% center}100%{background-position:-200% center}}
+@keyframes coin-drop{0%{transform:translateY(-18px) scale(.7);opacity:0}60%{transform:translateY(4px) scale(1.1);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
+@keyframes nav-pop{0%{transform:scale(1) translateY(0)}45%{transform:scale(1.32) translateY(-5px)}100%{transform:scale(1.18) translateY(-3px)}}
+@keyframes nav-glow{0%,100%{filter:drop-shadow(0 0 0px currentColor)}50%{filter:drop-shadow(0 0 6px currentColor)}}
+@keyframes nav-spin-once{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes nav-pill-in{0%{transform:scaleX(0);opacity:0}100%{transform:scaleX(1);opacity:1}}
+.nav-ico-active{animation:nav-pop .38s cubic-bezier(.34,1.56,.64,1) forwards,nav-glow 2s ease infinite .38s}
+.nav-ico-convert-active{animation:nav-pop .38s cubic-bezier(.34,1.56,.64,1) forwards,nav-spin-once .6s ease .1s}
+.nav-pill{display:block;width:20px;height:3px;border-radius:2px;margin:3px auto 0;animation:nav-pill-in .3s cubic-bezier(.34,1.56,.64,1) forwards}
 .sec{animation:up .28s ease both;}
 .ptr{height:6px;background:rgba(139,92,246,.1);border-radius:99px;overflow:hidden;}
 .ptrf{height:100%;border-radius:99px;transition:width .6s ease;}
@@ -674,7 +725,7 @@ body{background:#0d0b1e;}
 function AuthScreen({onLogin,lang}){
   const [mode,setMode]      = useState("welcome");
   const [method,setMethod]  = useState("email");
-  const [form,setForm]      = useState({name:"", email:"", phone:"", countryCode:"+1", pass:"", conf:""});
+  const [form,setForm]      = useState({name:"", email:"", phone:"", countryCode:"+1", pass:"", conf:"", refCode:""});
   const [errs,setErrs]      = useState({});
   const [loading,setLoading]= useState(false);
   const [users,setUsers]    = useState(INITIAL_USERS);
@@ -848,12 +899,35 @@ function AuthScreen({onLogin,lang}){
       const data=await res.json();
       if(data.success){
         setUsers(p=>[...p,pendingUser]);
-        // Persist new user to MongoDB
+        // Persist new user to Supabase
         try{
           const saveRes=await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString()})});
-          if(!saveRes.ok){const e=await saveRes.json();console.error('Failed to save user:',e);}
-        }catch(e){console.error('Failed to save user:',e);}
+            body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString(),refCode:pendingUser.refCode||null,refBy:pendingUser.refBy||null,refPts:0,refs:[]})});
+          if(!saveRes.ok){
+            const e=await saveRes.json();
+            console.error('Failed to save user:',e);
+            setOtpErr('Account created but failed to save: '+(e.error||'DB error. Check Vercel env vars.'));
+            return;
+          }
+        }catch(e){
+          console.error('Failed to save user:',e);
+          setOtpErr('Account created but DB save failed. Check Vercel env vars (SUPABASE_URL, SUPABASE_SERVICE_KEY).');
+          return;
+        }
+        // ── Award 2,000 pts signup bonus to the referrer ─────────────────
+        if(pendingUser.refBy){
+          try{
+            const rr=await fetch(`/api/user?refCode=${encodeURIComponent(pendingUser.refBy)}`);
+            const rd=await rr.json();
+            if(rd.user){
+              const ref=rd.user;
+              const joinedLabel=new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
+              const newRefs=[...(ref.refs||[]),{name:pendingUser.name,joined:joinedLabel,pts:0}];
+              await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({id:ref.id,email:ref.email,pts:(ref.pts||0)+REF_SIGNUP_BONUS,refPts:(ref.refPts||0)+REF_SIGNUP_BONUS,refs:newRefs})});
+            }
+          }catch(_){}
+        }
         onLogin(pendingUser);
       } else {
         setOtpErr(typeof data.error==='string'?data.error:'Invalid code');
@@ -884,14 +958,24 @@ function AuthScreen({onLogin,lang}){
     setLoading(true);
     if(mode==="login"){
       let foundUser=null;
-      // Check demo/admin users first (in-memory)
+      // Check demo/admin users first (in-memory) for credentials
       if(method==="email"){
         foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
       } else {
         const fp=form.countryCode+form.phone;
         foundUser=users.find(u=>u.phone===fp&&u.pass===form.pass)||null;
       }
-      // Fall back to MongoDB for real registered users
+      // Always fetch the DB record so we get the latest pts/usd/state.
+      // For in-memory/demo users this merges their saved progress on top of the
+      // hardcoded seed values; for real registered users it IS the source of truth.
+      if(foundUser&&!foundUser.isAdmin&&method==="email"){
+        try{
+          const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
+          const d=await r.json();
+          if(d.user) foundUser={...foundUser,...d.user};
+        }catch(e){}
+      }
+      // Fall back to DB-only lookup for real registered users (no in-memory entry)
       if(!foundUser&&method==="email"){
         try{
           const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
@@ -911,7 +995,10 @@ function AuthScreen({onLogin,lang}){
         if(d.user){setLoading(false);setErrs({email:"Account already exists"});return;}
       }catch(e){}
       const fullPhone=form.countryCode+form.phone;
-      const nu={id:"u"+Date.now(),name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true};
+      const _uid="u"+Date.now();
+      const _rc=form.name.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+_uid.slice(-4);
+      const nu={id:_uid,name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true,
+        refCode:_rc,refBy:form.refCode.trim().toLowerCase()||null,refPts:0,refs:[]};
       setLoading(false);
       sendOtp(nu);
     }
@@ -1068,6 +1155,7 @@ function AuthScreen({onLogin,lang}){
         
         <Inp label={L("password")} type="password" val={form.pass} onChange={f("pass")} err={errs.pass} placeholder="••••••••" icon="🔒"/>
         {mode==="register"&&<Inp label="Confirm Password" type="password" val={form.conf} onChange={f("conf")} err={errs.conf} placeholder="••••••••" icon="🔑"/>}
+        {mode==="register"&&<Inp label="Referral Code (optional)" val={form.refCode} onChange={f("refCode")} placeholder="Enter a friend's referral code" icon="🔗"/>}
       </div>
 
       <Btn label={loading?"⏳ Please wait…":(mode==="login"?`🔓 ${L("signIn")}`:`🚀 ${L("signUp")}`)} onClick={submit} full variant="brand" disabled={loading} style={{marginTop:8,padding:16,fontSize:15,borderRadius:15}}/>
@@ -1076,28 +1164,8 @@ function AuthScreen({onLogin,lang}){
 }
 
 /* ═══════════════════════════════════════════════
-   API KEY & WEBHOOK CONSTANTS
+   ADMIN PANEL
 ═══════════════════════════════════════════════ */
-const API_KEY_SCOPES = [
-  { id:"read:users",    label:"Read Users",       group:"Users"   },
-  { id:"write:users",   label:"Write Users",      group:"Users"   },
-  { id:"read:stats",    label:"Read Stats",        group:"Analytics"},
-  { id:"read:rewards",  label:"Read Rewards",      group:"Rewards" },
-  { id:"write:rewards", label:"Write Rewards",     group:"Rewards" },
-  { id:"read:tasks",    label:"Read Tasks",        group:"Tasks"   },
-  { id:"write:tasks",   label:"Write Tasks",       group:"Tasks"   },
-];
-
-const WEBHOOK_EVENTS = [
-  { id:"user.registered",   label:"User Registered",    group:"Users"   },
-  { id:"user.activated",    label:"User Activated",     group:"Users"   },
-  { id:"user.deactivated",  label:"User Deactivated",   group:"Users"   },
-  { id:"reward.earned",     label:"Reward Earned",      group:"Rewards" },
-  { id:"reward.redeemed",   label:"Reward Redeemed",    group:"Rewards" },
-  { id:"task.completed",    label:"Task Completed",     group:"Tasks"   },
-  { id:"withdrawal.requested", label:"Withdrawal Requested", group:"Finance"},
-];
-
 // Generates a random hex string of given length
 function randHex(len){
   const arr = new Uint8Array(len/2);
@@ -4033,6 +4101,324 @@ function AdminPanel({user, onExit, lang}){
 /* ═══════════════════════════════════════════════
    MAIN APP
 ═══════════════════════════════════════════════ */
+
+function WalletTab({ u, C, setU }) {
+  const [wallet,    setWallet]    = useState(u.walletAddress || '');
+  const [wishBal,   setWBal]      = useState(u.tokens ?? 0);
+  const [solBal,    setSBal]      = useState(null);
+  const [mintCfg,   setMintCfg]   = useState(false);
+  const [screen,    setScreen]    = useState('main');
+  const [sendTo,    setSendTo]    = useState('');
+  const [sendAmt,   setSendAmt]   = useState('');
+  const [msg,       setMsg]       = useState('');
+  const [busy,      setBusy]      = useState(false);
+  const [copied,    setCopied]    = useState(false);
+  const [creating,  setCreating]  = useState(false);
+  const [balLoading,setBalLoad]   = useState(false);
+  const [txHistory,  setTxHistory] = useState([]);
+
+  // ── Auto-create or restore wallet on mount ─────────────────────────────────
+  useEffect(() => {
+    loadTx();
+    if (u.walletAddress) { loadBalances(u.walletAddress); return; }
+    setCreating(true);
+    fetch(`/api/wallet?userId=${encodeURIComponent(u.id)}`)
+      .then(r => r.json())
+      .then(d => { if (d.address) { setWallet(d.address); loadBalances(d.address); }
+                   else setMsg(d.error || 'Could not create wallet'); })
+      .catch(e => setMsg('Network error: ' + e.message))
+      .finally(() => setCreating(false));
+  }, []);
+
+  useEffect(() => {
+    if (u.walletAddress && !wallet) { setWallet(u.walletAddress); loadBalances(u.walletAddress); }
+  }, [u.walletAddress]);
+
+  // Keep WISH balance in sync with in-app tokens when mint not on-chain yet
+  useEffect(() => {
+    if (!mintCfg) setWBal(u.tokens ?? 0);
+  }, [u.tokens, mintCfg]);
+
+  // ── Balance fetch (server-side — avoids CORS on public Solana RPC) ─────────
+  const loadBalances = async (addr) => {
+    setBalLoad(true);
+    try {
+      const r = await fetch(`/api/walletBalance?address=${encodeURIComponent(addr)}`);
+      const d = await r.json();
+      if (!d.error) {
+        setSBal(d.sol);
+        setMintCfg(!!d.mintConfigured);
+        if (d.mintConfigured) {
+          setWBal(d.wish);
+        } else {
+          // Fetch fresh token balance from DB so the refresh button shows
+          // the real value even when the in-memory state is stale.
+          try {
+            const ur = await fetch(`/api/user?email=${encodeURIComponent(u.email)}`);
+            const ud = await ur.json();
+            const fresh = ud.user?.tokens ?? u.tokens ?? 0;
+            setWBal(fresh);
+            setU(p => ({ ...p, tokens: fresh }));
+          } catch { setWBal(u.tokens ?? 0); }
+        }
+      }
+    } catch(e) { console.warn('[balances]', e.message); }
+    finally { setBalLoad(false); }
+  };
+
+  // ── Send WISH coins (server-side signing) ──────────────────────────────────
+  const send = async () => {
+    if (busy || !wallet || !sendTo.trim() || !sendAmt) return;
+    setBusy(true); setMsg('');
+    try {
+      const r = await fetch('/api/walletSend', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id, toAddress: sendTo.trim(), amount: Number(sendAmt) }),
+      });
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      // Update local balance immediately without waiting for a reload
+      setWBal(d.newBalance);
+      setU(p => ({ ...p, tokens: d.newBalance }));
+      setMsg('✅ Sent successfully!');
+      setSendTo(''); setSendAmt('');
+      loadTx();
+      setTimeout(() => { setMsg(''); setScreen('main'); }, 1800);
+    } catch(e) { setMsg('❌ ' + (e.message || 'Send failed')); }
+    finally    { setBusy(false); }
+  };
+
+  const loadTx = () => {
+    fetch(`/api/walletTx?userId=${encodeURIComponent(u.id)}`)
+      .then(r => r.json())
+      .then(d => { if (d.txs) setTxHistory(d.txs); })
+      .catch(() => {});
+  };
+
+  const copyAddr = async () => {
+    try { await navigator.clipboard.writeText(wallet); } catch { /* ignore */ }
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+
+  const back = () => { setScreen('main'); setMsg(''); };
+  const fmt  = n => (n === null) ? null : Number(n).toLocaleString(undefined, {maximumFractionDigits:4});
+
+  // ── Loading placeholder ────────────────────────────────────────────────────
+  if (!wallet) return (
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'70px 24px',minHeight:320}}>
+      <div style={{fontSize:54,marginBottom:20,animation:'float 2.5s ease-in-out infinite'}}>🪙</div>
+      {creating
+        ? <>
+            <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:12}}>Setting up your wallet…</div>
+            <div style={{display:'flex',gap:7}}>
+              {[0,1,2].map(i => <div key={i} style={{width:9,height:9,borderRadius:'50%',background:'#8b5cf6',animation:'dotPulse 1.2s ease infinite',animationDelay:`${i*0.22}s`}}/>)}
+            </div>
+          </>
+        : <div style={{fontSize:13,color:'#f87171',textAlign:'center',lineHeight:1.6}}>{msg || 'Could not load wallet. Refresh to try again.'}</div>}
+    </div>
+  );
+
+  // ── Send screen ────────────────────────────────────────────────────────────
+  if (screen === 'send') return (
+    <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24}}>
+        <button onClick={back} style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,.07)',border:'none',color:C.white,fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
+        <div style={{fontSize:17,fontWeight:800,color:C.white}}>Send Wish Coins</div>
+      </div>
+      <div style={{background:'linear-gradient(135deg,rgba(245,158,11,.12),rgba(249,115,22,.08))',border:'1px solid rgba(245,158,11,.25)',borderRadius:14,padding:'12px 16px',marginBottom:20,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontSize:12,color:'rgba(255,255,255,.45)'}}>Available balance</span>
+        <span style={{fontWeight:800,color:'#f59e0b',fontSize:18}}>{wishBal??'…'} <span style={{fontSize:12,opacity:.6}}>WISH</span></span>
+      </div>
+      <input style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,padding:'14px 16px',color:C.white,fontSize:14,width:'100%',outline:'none',marginBottom:12,boxSizing:'border-box'}}
+        placeholder="Recipient wallet address" value={sendTo} onChange={e=>setSendTo(e.target.value)}/>
+      <input style={{background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.1)',borderRadius:12,padding:'14px 16px',color:C.white,fontSize:22,fontWeight:700,width:'100%',outline:'none',marginBottom:20,boxSizing:'border-box'}}
+        type="number" min="0" placeholder="0" value={sendAmt} onChange={e=>setSendAmt(e.target.value)}/>
+      <button onClick={send} disabled={busy||!sendTo||!sendAmt||Number(sendAmt)<=0}
+        style={{width:'100%',padding:'16px 0',background:(!sendTo||!sendAmt||Number(sendAmt)<=0)?'rgba(255,255,255,.06)':'linear-gradient(135deg,#f59e0b,#f97316)',border:'none',borderRadius:14,color:(!sendTo||!sendAmt||Number(sendAmt)<=0)?'rgba(255,255,255,.25)':'#fff',fontWeight:800,fontSize:16,cursor:(!sendTo||!sendAmt||Number(sendAmt)<=0)?'not-allowed':'pointer',opacity:busy?.7:1}}>
+        {busy?'⏳ Sending…':'📤 Confirm Send'}
+      </button>
+      {msg && <div style={{marginTop:14,background:msg.startsWith('✅')?'rgba(52,211,153,.08)':'rgba(248,113,113,.08)',border:`1px solid ${msg.startsWith('✅')?'rgba(52,211,153,.25)':'rgba(248,113,113,.25)'}`,borderRadius:12,padding:'10px 14px',color:msg.startsWith('✅')?'#34d399':'#f87171',fontSize:12,fontFamily:'monospace'}}>{msg}</div>}
+    </div>
+  );
+
+  // ── Receive screen ─────────────────────────────────────────────────────────
+  if (screen === 'receive') return (
+    <div style={{padding:'0 16px 32px',animation:'up .3s ease'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:24}}>
+        <button onClick={back} style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,.07)',border:'none',color:C.white,fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>←</button>
+        <div style={{fontSize:17,fontWeight:800,color:C.white}}>Receive</div>
+      </div>
+      <div style={{background:'linear-gradient(145deg,#1a0833,#120f2e)',border:'1px solid rgba(139,92,246,.2)',borderRadius:22,padding:'24px 20px',textAlign:'center'}}>
+        <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:1.5,textTransform:'uppercase',marginBottom:18}}>Send SOL or WISH to this address</div>
+        <div style={{display:'inline-block',padding:10,background:'#fff',borderRadius:18,marginBottom:20,boxShadow:'0 0 50px rgba(139,92,246,.35)'}}>
+          <img src={`https://api.qrserver.com/v1/create-qr-code/?data=${wallet}&size=180x180&bgcolor=ffffff&color=1a0833&margin=8`}
+            alt="QR" style={{display:'block',borderRadius:10,width:180,height:180}}/>
+        </div>
+        <div style={{fontSize:11,color:'#a78bfa',fontFamily:'monospace',wordBreak:'break-all',lineHeight:1.8,background:'rgba(139,92,246,.08)',borderRadius:12,padding:'10px 14px',marginBottom:20}}>
+          {wallet}
+        </div>
+        <button onClick={copyAddr}
+          style={{width:'100%',padding:'15px 0',background:copied?'linear-gradient(135deg,#34d399,#10b981)':'linear-gradient(135deg,#8b5cf6,#7c3aed)',border:'none',borderRadius:14,color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',transition:'all .25s',boxShadow:copied?'0 4px 20px rgba(52,211,153,.3)':'0 4px 20px rgba(139,92,246,.3)'}}>
+          {copied ? '✓ Copied!' : '📋 Copy Address'}
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Main screen ────────────────────────────────────────────────────────────
+  return (
+    <div style={{paddingBottom:32,animation:'up .3s ease'}}>
+
+      {/* Hero balance card */}
+      <div style={{background:'linear-gradient(145deg,#1a0833 0%,#2d1060 50%,#0d1840 100%)',borderBottom:'1px solid rgba(139,92,246,.18)',padding:'28px 20px 22px',position:'relative',overflow:'hidden'}}>
+        {/* Ambient glow blobs */}
+        <div style={{position:'absolute',top:-50,right:-30,width:180,height:180,borderRadius:'50%',background:'radial-gradient(circle,rgba(245,158,11,.18),transparent 70%)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:-40,left:-20,width:140,height:140,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.22),transparent 70%)',pointerEvents:'none'}}/>
+
+        {/* Header row */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+          <div style={{fontSize:30,animation:'float 3s ease-in-out infinite',lineHeight:1}}>🪙</div>
+          <div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:1.8,textTransform:'uppercase'}}>Wish Wallet</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,.2)',letterSpacing:.3}}>Solana Network</div>
+          </div>
+          {/* Refresh button */}
+          <button onClick={()=>loadBalances(wallet)} title="Refresh balances"
+            style={{marginLeft:'auto',width:32,height:32,borderRadius:8,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',color:'rgba(255,255,255,.4)',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:balLoading?'spin 1s linear infinite':'none'}}>
+            ↻
+          </button>
+        </div>
+
+        {/* WISH balance — big hero number */}
+        <div style={{marginBottom:10}}>
+          <div style={{
+            fontSize:50,fontWeight:900,letterSpacing:-2,lineHeight:1,
+            background:'linear-gradient(135deg,#fde68a 0%,#f59e0b 40%,#f97316 100%)',
+            WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+            filter:'drop-shadow(0 2px 16px rgba(245,158,11,.5))',
+          }}>
+            {balLoading && wishBal === null
+              ? <span style={{display:'inline-block',width:120,height:48,background:'rgba(255,255,255,.08)',borderRadius:10,animation:'shimmer 1.4s infinite',verticalAlign:'middle',backgroundSize:'600px 100%',backgroundImage:'linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.04) 75%)'}}/>
+              : (fmt(wishBal) ?? '—')}
+          </div>
+          <div style={{fontSize:12,color:'rgba(255,255,255,.3)',marginTop:3,letterSpacing:1.2,textTransform:'uppercase'}}>Wish Coins</div>
+        </div>
+
+        {/* SOL pill */}
+        <div style={{display:'inline-flex',alignItems:'center',gap:6,background:'rgba(255,255,255,.07)',borderRadius:20,padding:'5px 13px',marginBottom:24,border:'1px solid rgba(255,255,255,.06)'}}>
+          <span style={{fontSize:13,color:'rgba(255,255,255,.35)'}}>◎</span>
+          <span style={{fontSize:13,fontWeight:600,color:'rgba(255,255,255,.55)'}}>
+            {balLoading && solBal === null ? '…' : (solBal ?? '—')} SOL
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <button onClick={()=>{setScreen('send');setMsg('');}}
+            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(245,158,11,.22),rgba(249,115,22,.18))',border:'1px solid rgba(245,158,11,.35)',borderRadius:14,color:'#fbbf24',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
+            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+            📤 Send
+          </button>
+          <button onClick={()=>setScreen('receive')}
+            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(124,58,237,.18))',border:'1px solid rgba(139,92,246,.35)',borderRadius:14,color:'#c4b5fd',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
+            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+            📥 Receive
+          </button>
+        </div>
+      </div>
+
+      {/* Token row */}
+      <div style={{margin:'14px 16px 0',background:'rgba(245,158,11,.04)',border:'1px solid rgba(245,158,11,.1)',borderRadius:18,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,boxShadow:'0 4px 14px rgba(245,158,11,.35)'}}>🪙</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>Wish Coin</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>WISH · Solana</div>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:18,fontWeight:800,color:'#f59e0b'}}>
+              {balLoading && wishBal === null ? <span style={{opacity:.4}}>…</span> : (fmt(wishBal) ?? '—')}
+            </div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>WISH</div>
+          </div>
+        </div>
+      </div>
+
+      {/* SOL row */}
+      <div style={{margin:'10px 16px 0',background:'rgba(99,102,241,.04)',border:'1px solid rgba(99,102,241,.1)',borderRadius:18,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#9945FF,#14F195)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 4px 14px rgba(153,69,255,.25)'}}>◎</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>Solana</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>SOL · Native</div>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:18,fontWeight:800,color:'#a78bfa'}}>
+              {balLoading && solBal === null ? <span style={{opacity:.4}}>…</span> : (solBal ?? '—')}
+            </div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>SOL</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Wallet address row */}
+      <div style={{margin:'10px 16px 0',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.07)',borderRadius:16,padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:5}}>Wallet Address</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,.6)',fontFamily:'monospace',letterSpacing:.4}}>
+            {wallet.slice(0,6)}…{wallet.slice(-6)}
+          </div>
+        </div>
+        <button onClick={copyAddr}
+          style={{padding:'8px 14px',background:copied?'rgba(52,211,153,.12)':'rgba(255,255,255,.06)',border:`1px solid ${copied?'rgba(52,211,153,.35)':'rgba(255,255,255,.1)'}`,borderRadius:10,color:copied?'#34d399':'rgba(255,255,255,.45)',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .2s'}}>
+          {copied ? '✓ Copied' : '📋 Copy'}
+        </button>
+      </div>
+
+      {/* Transaction history */}
+      <div style={{margin:'18px 16px 0'}}>
+        <div style={{fontSize:12,color:'rgba(255,255,255,.3)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:10}}>Transaction History</div>
+        {txHistory.length === 0
+          ? <div style={{textAlign:'center',padding:'24px 0',color:'rgba(255,255,255,.2)',fontSize:13}}>No transactions yet</div>
+          : txHistory.map(tx => {
+              const isSent = tx.type === 'sent';
+              const addr   = tx.address || '';
+              const short  = addr.length > 10 ? addr.slice(0,5)+'…'+addr.slice(-5) : addr || '—';
+              const date   = new Date(tx.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+              return (
+                <div key={tx.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',borderRadius:14,marginBottom:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:'50%',background:isSent?'rgba(248,113,113,.15)':'rgba(52,211,153,.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>
+                      {isSent ? '📤' : '📥'}
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:C.white}}>{isSent ? 'Sent' : 'Received'}</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{isSent ? 'To: ' : 'From: '}{short}</div>
+                      <div style={{fontSize:10,color:'rgba(255,255,255,.2)',marginTop:1}}>{date}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:15,fontWeight:800,color:isSent?'#f87171':'#34d399'}}>
+                      {isSent ? '−' : '+'}{tx.amount}
+                    </div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,.25)',marginTop:2}}>WISH</div>
+                  </div>
+                </div>
+              );
+            })
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   MAIN APP
+═══════════════════════════════════════════════ */
 function MainApp({user,onLogout,lang,setLang}){
   const [tab,setTab]       = useState("home");
   const [u,setU]           = useState({...user});
@@ -4042,13 +4428,19 @@ function MainApp({user,onLogout,lang,setLang}){
   const [adLeft,setAL]     = useState(5);
   const [adShowing,setAS]  = useState(false);
   const [adData,setAD]     = useState(null);
-  const [spinning,setSpin] = useState(false);
-  const [spinResult,setSR] = useState(null);
-  const [spinAngle,setSA] = useState(0);
-  const [mineT,setMineT]      = useState(MINING_CYCLE);
-  const [mineReady,setMR]     = useState(false);
-  const [mineStarted,setMS]   = useState(false);
-  const [mineAdShow,setMAd]   = useState(false);
+  const [spinning,setSpin]   = useState(false);
+  const [spinResult,setSR]   = useState(null);
+  const [spinAngle,setSA]    = useState(0);
+  const [spinNextFree,setSNF]= useState(()=>Security.load('snf_'+user.id,0)||0); // epoch ms when next free spin is available
+  const [extraSpins,setES]   = useState(0);   // additional spins earned by watching ads
+  const [spinAdPopup,setSAP] = useState(false);
+  const [mineStartedAt,setMSAt]= useState(0);        // epoch ms when session began (0 = no session)
+  const [mineT,setMineT]       = useState(MINE_SESSION_S);
+  const [mineReady,setMR]      = useState(false);
+  const [mineStarted,setMS]    = useState(false);
+  const [mineAdShow,setMAd]    = useState(false);
+  const [mineBoosts,setMineBoosts] = useState(0);
+  const [convSuccess,setConvS] = useState(false);  // flash "Converted!" feedback
   const [langMenu,setLM]      = useState(false);
   const [avatarPick,setAP]    = useState(false);
   const fileInputRef          = React.useRef(null);
@@ -4057,75 +4449,312 @@ function MainApp({user,onLogout,lang,setLang}){
   const [editEmail,setEE]     = useState(user.email);
   const [editPass,setEP]      = useState("");
   const [profileMsg,setPMsg]  = useState("");
+  const [sidebarOpen, setSO]  = useState(false);
+  const [sidebarView, setSV]  = useState(null);
+  const [refCopied,  setRefCopied] = useState("");
+  const [editingField, setEF] = useState(null);
+  // Guard: auto-save must not fire until the initial DB load has finished.
+  // Without this, the stale localStorage user (saved at login time) would be
+  // written back to the DB 2 seconds after every page refresh, overwriting any
+  // points/state that were saved to the DB since that last login.
+  const dbLoaded = React.useRef(false);
+  // Always-current mirror of u — lets setTimeout callbacks (e.g. doSpin's
+  // 4.2s timer) read the latest pts/usd without stale-closure issues.
+  const uRef = React.useRef(u);
+  useEffect(()=>{ uRef.current = u; });
   const L = k => t$(lang,k);
   const dir = (LANGS[lang]||LANGS.en).dir;
 
   useEffect(()=>{
-    if(!mineStarted)return;
+    if(!mineStarted||mineReady)return;
     const iv=setInterval(()=>setMineT(t=>{if(t<=1){setMR(true);return 0;}return t-1;}),1000);
     return()=>clearInterval(iv);
-  },[mineStarted]);
+  },[mineStarted,mineReady]);
 
   // Load saved progress from MongoDB on first mount
   useEffect(()=>{
     fetch(`/api/user?email=${encodeURIComponent(user.email)}`)
       .then(r=>r.json())
       .then(d=>{
+        // Always unlock auto-save, even when the user isn't in the DB yet
+        // (demo/in-memory users). Without this the flag stays false and saves
+        // are permanently blocked for those accounts.
+        dbLoaded.current = true;
         if(!d.user) return;
-        const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa}=d.user;
+        const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
+               spinNextFree:snf,extraSpins:es,lang:dbLang,tokens:dbTokens,
+               refCode:dbRefCode,refBy:dbRefBy,refPts:dbRefPts,refs:dbRefs,
+               walletAddress:dbWa}=d.user;
+        // Restore language preference from DB (cross-device)
+        if(dbLang){ setLang(dbLang); Security.save('lang',dbLang); }
         setU(p=>({...p,
-          pts:pts??p.pts,
-          usd:usd??p.usd,
+          // Prefer the DB value, but never let a DB 0 overwrite a locally-earned
+          // value that was already synced to localStorage.  Saves bring the DB
+          // value UP; a DB value lower than localStorage means a save failed.
+          pts: Math.max(pts ?? 0, p.pts),
+          usd: Math.max(usd ?? 0, p.usd),
+          tokens: dbTokens ?? p.tokens ?? 0,
           avatar:avatar||p.avatar,
-          name:name||p.name
+          name:name||p.name,
+          refCode:       dbRefCode||p.refCode||null,
+          refBy:         dbRefBy  ||p.refBy  ||null,
+          refPts:        Math.max(dbRefPts??0, p.refPts??0),
+          refs:          dbRefs   ||p.refs   ||[],
+          walletAddress: dbWa     ||p.walletAddress||null,
         }));
-        if(td) setTD(td);
         const today=new Date().toDateString();
         if(al!=null) setAL(adDate===today?al:5);
         if(sa!=null) setSA(sa);
+        // Take max(DB, local) — prevents a stale DB 0 from overwriting a valid local cooldown.
+        setSNF(p=>Math.max(snf??0, p));
+        if(es!=null)  setES(es);
+        // ── Restore task state + mining session ──────────────────────────────
+        // Mining session start time is stored as tasksDone.__mine_startedAt
+        // (a reserved JSONB key) so it persists without any schema migration.
+        if(td){
+          setTD(td);
+          const msa = td.__mine_startedAt;
+          const mb  = td.__mine_boosts || 0;
+          if(msa){
+            const elapsedS = Math.floor((Date.now() - msa) / 1000);
+            setMSAt(msa);
+            setMineBoosts(mb);
+            if(elapsedS >= MINE_SESSION_S){
+              // Session finished while user was away — ready to claim
+              setMineT(0); setMS(true); setMR(true);
+            } else {
+              // Session still running — resume from correct position
+              setMineT(MINE_SESSION_S - elapsedS); setMS(true); setMR(false);
+            }
+          }
+        }
       })
-      .catch(()=>{});
+      .catch(()=>{ dbLoaded.current = true; });  // unlock even on network error
   },[]);
 
-  // Auto-save progress to MongoDB (debounced 2s after last change)
+  // Keep last_user in localStorage in sync with the live pts/usd so that a
+  // page refresh renders the correct value immediately (no 0-flash while the
+  // DB load is still in-flight).  Only runs after dbLoaded so the stale
+  // login-snapshot is never promoted back on top of a DB load.
   useEffect(()=>{
+    if(!dbLoaded.current) return;
+    Security.save('last_user',{...u});
+  },[u.pts,u.usd]);
+
+  // Persist spinNextFree to localStorage immediately on change so it survives
+  // a page refresh even if the DB save hasn't completed yet.
+  useEffect(()=>{
+    if(spinNextFree>0) Security.save('snf_'+u.id, spinNextFree);
+  },[spinNextFree]);
+
+  // Auto-save progress (debounced 2s after last change).
+  // avatar is intentionally excluded — it is saved explicitly after upload
+  // to avoid sending a huge base64 data-URL that exceeds Supabase's body limit.
+  useEffect(()=>{
+    // Skip until the initial DB load has applied fresh server state.
+    // Without this guard the stale localStorage snapshot (saved at login time)
+    // would overwrite the DB 2 seconds after every page refresh.
+    if(!dbLoaded.current) return;
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,avatar:u.avatar,
-          tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle})
-      }).catch(()=>{});
+        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
+          tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins,
+          refCode:u.refCode||null,refPts:u.refPts??0,refs:u.refs??[]})
+      }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[auto-save]',d);}).catch(e=>console.error('[auto-save]',e));
     },2000);
     return()=>clearTimeout(t);
-  },[u.pts,u.usd,u.avatar,u.name,tasksDone,adLeft,spinAngle]);
+  },[u.pts,u.usd,u.name,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
+
+  // Pts accumulated in the current mining session (updates every second as mineT ticks).
+  // elapsed-time pts + boost pts — transferred to balance only on Claim.
+  const mineElapsed = MINE_SESSION_S - mineT;
+  const mineAccum = mineStarted
+    ? Math.floor(mineElapsed * MINE_PTS_HOUR / 3600) + mineBoosts * MINE_BOOST_PTS
+    : 0;
+
   const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
-  const claimAd=()=>{addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);};
+  const claimAd=()=>{
+    const newPts=u.pts+adData.pts;
+    const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
+    const newAL=adLeft-1;
+    addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:newAL,adDate:new Date().toDateString()})
+    }).catch(()=>{});
+  };
   const doSpin=()=>{
-    if(spinning)return;
+    if(spinning) return;
+    const now=Date.now();
+    const hasFree=now>=spinNextFree;
+    const totalSpins=(hasFree?1:0)+extraSpins;
+    if(totalSpins<=0){setSAP(true);return;}
     setSpin(true);setSR(null);
+    // Pre-compute post-spin values now, while state is fresh.
+    // The setTimeout closure below is stale w.r.t. setState calls, so we
+    // must capture these values here and pass them through the closure.
+    const newSnf=hasFree?now+24*60*60*1000:spinNextFree;
+    const newEs=hasFree?extraSpins:extraSpins-1;
+    if(hasFree) setSNF(newSnf);
+    else        setES(newEs);
+    // Save spin consumption immediately so a refresh before the 4.2s animation
+    // completes doesn't restore the free spin from the DB.
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:u.id,email:u.email,spinNextFree:newSnf,extraSpins:newEs})
+    }).catch(()=>{});
     const i=Math.floor(Math.random()*SPIN_PTS.length);
     const targetOffset=(337.5-i*45+720)%360;
     const currentMod=spinAngle%360;
     const diff=(targetOffset-currentMod+360)%360;
     const newAngle=spinAngle+5*360+diff;
     setSA(newAngle);
-    setTimeout(()=>{addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});setSpin(false);},4200);
+    setTimeout(()=>{
+      // Read from uRef so we get the latest pts/usd even if state has
+      // changed (e.g. mining claim) during the 4.2s animation.
+      const cu=uRef.current;
+      const newPts=cu.pts+SPIN_PTS[i];
+      const newUsd=+(cu.usd+SPIN_USD[i]*0.01).toFixed(2);
+      addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);
+      setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});
+      setSpin(false);
+      // Persist immediately — don't rely on the 2s auto-save debounce which
+      // can be cancelled by a page refresh before it fires.
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:cu.id,email:cu.email,pts:newPts,usd:newUsd,
+          spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs})
+      })
+      .then(r=>r.json())
+      .then(d=>{ if(!d.success) console.error('[spin save]',d); })
+      .catch(e=>console.error('[spin save network]',e));
+      if(newEs<=0) setSAP(true);
+    },4200);
+  };
+  const doConvert=()=>{
+    const tokensToMint=Math.floor(uRef.current.pts/PTS_PER_TOKEN);
+    if(tokensToMint<=0) return;
+    const ptsUsed=tokensToMint*PTS_PER_TOKEN;
+    const newPts=uRef.current.pts-ptsUsed;
+    const newTokens=(uRef.current.tokens??0)+tokensToMint;
+    setU(p=>({...p, pts:newPts, tokens:newTokens}));
+    setConvS(true);
+    setTimeout(()=>setConvS(false),2500);
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:uRef.current.id,email:uRef.current.email,
+        pts:newPts,tokens:newTokens})
+    }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[convert save]',d);})
+      .catch(e=>console.error('[convert save]',e));
+  };
+  const watchSpinAd=()=>{
+    showRewardedAd(()=>{
+      const newEs=extraSpins+1;
+      setES(newEs);setSAP(false);
+      // Persist the new spin count immediately
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,extraSpins:newEs})
+      }).catch(()=>{});
+    });
   };
   const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
-  const claimMining=()=>{if(!mineReady)return;addPts(500);setMineT(MINING_CYCLE);setMR(false);setMS(false);};
+  const claimMining=()=>{
+    if(!mineReady)return;
+    const earned = mineAccum;
+    // Compute new totals now (u.pts/u.usd are still the pre-claim values here).
+    const newPts = u.pts + earned;
+    const newUsd = +(u.usd + earned * USD_PER_POINT).toFixed(2);
+    addPts(earned, earned * USD_PER_POINT);
+    setMSAt(0); setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
+    // eslint-disable-next-line no-unused-vars
+    const {__mine_startedAt:_a, __mine_boosts:_b, ...cleanTD} = tasksDone;
+    setTD(cleanTD);
+    // Save pts + usd + session reset immediately — do NOT rely on the 2s
+    // auto-save debounce.  If the user refreshes or signs out right after
+    // claiming, the DB must already have the new balance.
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,tasksDone:cleanTD})
+    }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[mine claim save]',d);})
+      .catch(e=>console.error('[mine claim save]',e));
+    // ── Give referrer 10% of this mining claim ────────────────────────────
+    if(u.refBy){
+      const bonus=Math.floor(earned*REF_MINE_PCT);
+      if(bonus>0){
+        fetch(`/api/user?refCode=${encodeURIComponent(u.refBy)}`)
+          .then(r=>r.json())
+          .then(rd=>{
+            if(!rd.user)return;
+            const ref=rd.user;
+            const newRefPts=(ref.refPts||0)+bonus;
+            const newRefs=(ref.refs||[]).map(r=>r.name===u.name?{...r,pts:(r.pts||0)+bonus}:r);
+            fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({id:ref.id,email:ref.email,pts:(ref.pts||0)+bonus,refPts:newRefPts,refs:newRefs})
+            }).catch(()=>{});
+          }).catch(()=>{});
+      }
+    }
+  };
   const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
+
+  // ═══ AD INTEGRATION PLACEHOLDERS ═══════════════════════════════════════
+  // TODO: Replace showRewardedAd() with your actual ad network SDK call.
+  // e.g. AdMob: admob.showRewardedAd(adUnitId).then(onRewarded)
+  //      IronSource: ironSource.showRewardedVideo().then(onRewarded)
+  // onRewarded is called only after the user successfully watches the ad.
+  const showRewardedAd = (onRewarded) => {
+    // PLACEHOLDER — remove the line below and wire in your real ad SDK
+    console.log("[AD] showRewardedAd called — integrate your ad SDK here");
+    onRewarded(); // <-- remove this when real ad SDK is integrated
+  };
+
+  // Start a 4-hour mining session (requires watching a rewarded ad).
+  // Session start time is stored in tasksDone.__mine_startedAt (existing JSONB column)
+  // so it survives sign-out and app close with no schema migration required.
+  const startMiningWithAd = () => {
+    if (mineStarted) return;
+    showRewardedAd(() => {
+      const now = Date.now();
+      setMSAt(now);
+      setMS(true); setMineT(MINE_SESSION_S); setMineBoosts(0); setMR(false);
+      const newTD = {...tasksDone, __mine_startedAt: now, __mine_boosts: 0};
+      setTD(newTD);
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
+      }).catch(()=>{});
+    });
+  };
+
+  // Boost current session by 500 pts (requires watching a rewarded ad)
+  // TODO: each of the 5 boost slots calls this with its own ad unit if needed
+  const boostMining = () => {
+    if (!mineStarted || mineReady || mineBoosts >= MINE_MAX_BOOST) return;
+    // Boost pts fold into mineAccum and transfer at claim.
+    // Boost count is persisted immediately into tasksDone so it survives sign-out.
+    showRewardedAd(() => {
+      const nb = mineBoosts + 1;
+      setMineBoosts(nb);
+      const newTD = {...tasksDone, __mine_boosts: nb};
+      setTD(newTD);
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
+      }).catch(()=>{});
+    });
+  };
   const PE={YouTube:"▶️",Facebook:"📘",Twitter:"🐦",Instagram:"📸",TikTok:"🎵",LinkedIn:"💼",Telegram:"✈️",WhatsApp:"💬"};
 
   const TAB={
     home:(
       <div style={{padding:"0 16px 16px"}}>
+        {/* User Card */}
         <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:"20px",marginBottom:16,position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:-20,right:-20,fontSize:80,opacity:.1}}>⭐</div>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:52,height:52,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:800,border:"2px solid rgba(255,255,255,.4)"}}>{u.name[0].toUpperCase()}</div>
+            <div style={{width:52,height:52,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:800,border:"2px solid rgba(255,255,255,.4)",overflow:"hidden",flexShrink:0}}>
+                {u.avatar
+                  ? <img src={u.avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="avatar"/>
+                  : u.name[0].toUpperCase()
+                }
+              </div>
             <div>
               <div style={{fontSize:18,fontWeight:700,color:"#fff"}}>{u.name}</div>
               <div style={{fontSize:13,color:"rgba(255,255,255,.7)"}}>{u.country} · {u.joined}</div>
@@ -4133,8 +4762,9 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{marginLeft:"auto",background:"rgba(255,255,255,.15)",borderRadius:10,padding:"4px 10px",fontSize:12,color:"#fff"}}>✓ {L("verified")}</div>
           </div>
         </div>
+        {/* Stats Grid */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:`$${u.usd.toFixed(2)}`,icon:"💵"},{label:L("adsLeft"),val:adLeft,icon:"📺"}].map(s=>(
+          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:"🪙"},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡"}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
               <div style={{fontSize:22}}>{s.icon}</div>
               <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
@@ -4142,34 +4772,116 @@ function MainApp({user,onLogout,lang,setLang}){
             </div>
           ))}
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
-          <button onClick={()=>setTab("earn")} style={{background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>📺 {L("watchAd")}</button>
-          <button onClick={()=>setTab("tasks")} style={{background:`linear-gradient(135deg,${C.cyan},${C.brand})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}}>✅ {L("tasks")}</button>
-        </div>
-        <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:14,fontWeight:700,color:C.brandLt,marginBottom:10}}>🏆 {L("leaders")}</div>
-          {FAKE_LEADERS.slice(0,3).map((l,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:i<2?`1px solid ${C.border}`:"none"}}>
-              <div style={{fontSize:18}}>{"🥇🥈🥉"[i]}</div>
-              <div style={{flex:1,fontSize:14,color:C.white}}>{l.country} {l.name}</div>
-              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+        {/* ═══ START MINING CARD ═══ */}
+        <div style={{background:"linear-gradient(145deg,rgba(19,16,42,.95),rgba(13,11,30,.98))",borderRadius:24,border:"1px solid rgba(139,92,246,.3)",padding:20,marginBottom:16,position:"relative",overflow:"hidden"}}>
+          {/* Ambient glow */}
+          <div style={{position:"absolute",top:-70,right:-70,width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.18),transparent 70%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:-50,left:-50,width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(245,158,11,.1),transparent 70%)",pointerEvents:"none"}}/>
+          {/* Card header */}
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+            <div style={{width:46,height:46,borderRadius:14,background:"linear-gradient(135deg,rgba(245,158,11,.25),rgba(139,92,246,.2))",border:"1px solid rgba(245,158,11,.35)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0,animation:mineStarted&&!mineReady?"mine-pulse 1.8s ease-in-out infinite":"pulse-glow 3s infinite"}}>⛏️</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:16,fontWeight:800,color:"#fff"}}>Start Mining</div>
+              <div style={{fontSize:12,color:C.muted}}>{MINE_PTS_HOUR.toLocaleString()} pts/hr · 4 hr session</div>
             </div>
-          ))}
+            {mineStarted&&!mineReady&&(
+              <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.3)",borderRadius:8,padding:"4px 10px",flexShrink:0}}>
+                <div className="dot" style={{background:C.green}}/>
+                <span style={{fontSize:11,fontWeight:700,color:C.green}}>ACTIVE</span>
+              </div>
+            )}
+          </div>
+          {/* Reward info row */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
+            <div style={{background:"rgba(139,92,246,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(139,92,246,.18)"}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>{mineStarted?"Earned So Far":"Session Reward"}</div>
+              <div style={{fontSize:20,fontWeight:800,color:C.brandLt,fontVariantNumeric:"tabular-nums"}}>{mineStarted?mineAccum.toLocaleString():"8,000"} pts</div>
+              <div style={{fontSize:10,color:C.muted}}>{mineStarted?`≈${(MINE_PTS_HOUR/3600).toFixed(2)} pts/sec`:"base earnings"}</div>
+            </div>
+            <div style={{background:"rgba(245,158,11,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(245,158,11,.18)"}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Boost Bonus</div>
+              <div style={{fontSize:20,fontWeight:800,color:C.gold}}>{(mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts</div>
+              <div style={{fontSize:10,color:C.muted}}>{mineBoosts}/{MINE_MAX_BOOST} boosts used</div>
+            </div>
+          </div>
+          {/* Timer (active, not ready) */}
+          {mineStarted&&!mineReady&&(
+            <div style={{textAlign:"center",marginBottom:16,background:"rgba(0,0,0,.25)",borderRadius:14,padding:"14px 12px",border:"1px solid rgba(255,255,255,.05)"}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:4,textTransform:"uppercase",letterSpacing:.08}}>Time Remaining</div>
+              <div style={{fontSize:34,fontWeight:800,color:C.gold,fontFamily:"monospace",letterSpacing:2}}>{fmtTime(mineT)}</div>
+              <div style={{marginTop:10}}>
+                <div className="ptr">
+                  <div className="ptrf" style={{width:`${(mineElapsed/MINE_SESSION_S)*100}%`,background:`linear-gradient(90deg,${C.gold},${C.brand})`}}/>
+                </div>
+              </div>
+              <div style={{marginTop:10,fontSize:12,color:C.brandLt,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>
+                +{mineAccum.toLocaleString()} pts accumulated
+              </div>
+            </div>
+          )}
+          {/* Ready to claim banner */}
+          {mineReady&&(
+            <div style={{textAlign:"center",marginBottom:16,background:"rgba(16,185,129,.1)",borderRadius:14,padding:"14px",border:"1px solid rgba(16,185,129,.25)"}}>
+              <div style={{fontSize:22,marginBottom:4}}>🎉</div>
+              <div style={{fontSize:14,fontWeight:800,color:C.green}}>Mining Complete!</div>
+              <div style={{fontSize:13,color:C.muted,marginTop:2}}>+{mineAccum.toLocaleString()} pts ready to claim</div>
+            </div>
+          )}
+          {/* Primary action button */}
+          {!mineStarted ? (
+            <button onClick={startMiningWithAd} style={{width:"100%",background:"linear-gradient(135deg,#f59e0b,#d97706)",border:"none",borderRadius:14,padding:"15px",color:"#000",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 6px 24px rgba(245,158,11,.45)",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all .2s"}}>
+              <span style={{fontSize:18}}>▶</span> Watch Ad to Start Mining
+            </button>
+          ) : mineReady ? (
+            <button onClick={claimMining} style={{width:"100%",background:"linear-gradient(135deg,#10b981,#059669)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 6px 24px rgba(16,185,129,.4)"}}>
+              🎁 Claim {mineAccum.toLocaleString()} pts
+            </button>
+          ) : (
+            <div style={{width:"100%",background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.2)",borderRadius:14,padding:"14px",color:C.muted,fontWeight:700,fontSize:14,textAlign:"center"}}>
+              ⛏️ Mining in Progress…
+            </div>
+          )}
+          {/* Boost buttons — only available during active session */}
+          {mineStarted&&!mineReady&&(
+            <div style={{marginTop:14}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,textTransform:"uppercase",letterSpacing:.08,display:"flex",alignItems:"center",gap:6}}>
+                <span>⚡ Boost Mining</span>
+                <span style={{color:C.gold}}>(+{MINE_BOOST_PTS} pts each, watch ad)</span>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                {[0,1,2,3,4].map(i=>{
+                  const used = i < mineBoosts;
+                  const next = i === mineBoosts;
+                  return(
+                    <button key={i} onClick={()=>next&&boostMining()} disabled={used||!next} style={{flex:1,background:used?"rgba(16,185,129,.2)":next?"rgba(139,92,246,.2)":"rgba(255,255,255,.04)",border:`1px solid ${used?"rgba(16,185,129,.4)":next?"rgba(139,92,246,.4)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"9px 0",color:used?C.green:next?C.brandLt:C.muted,fontSize:13,fontWeight:700,cursor:next?"pointer":"default",transition:"all .2s"}}>
+                      {used?"✓":"⚡"}<br/><span style={{fontSize:9,letterSpacing:.5}}>+500</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     ),
-    earn:(
+    earn:(()=>{
+      const now=Date.now();
+      const hasFree=now>=spinNextFree;
+      const spinsLeft=(hasFree?1:0)+extraSpins;
+      const msLeft=spinNextFree-now;
+      const hLeft=Math.floor(msLeft/3600000);
+      const mLeft=Math.floor((msLeft%3600000)/60000);
+      const freeLabel=hasFree?"🟢 Free spin ready!":
+        `🕐 Next free spin in ${hLeft}h ${mLeft}m`;
+      return(
       <div style={{padding:"0 16px 16px"}}>
-        <div style={{background:C.s2,borderRadius:16,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:4}}>📺 {L("watchAd")}</div>
-          <div style={{fontSize:13,color:C.muted,marginBottom:12}}>{adLeft} {L("adsLeft")}</div>
-          <button onClick={watchAd} disabled={adLeft<=0} style={{width:"100%",background:adLeft>0?`linear-gradient(135deg,${C.brand},${C.pink})`:"rgba(255,255,255,.1)",border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:adLeft>0?"pointer":"not-allowed",opacity:adLeft>0?1:.5}}>
-            {adLeft>0?"Watch Ad (+20–40 pts)":"No Ads Left Today"}
-          </button>
-        </div>
         <div style={{background:`linear-gradient(160deg,${C.s2},${C.s3})`,borderRadius:20,padding:20,border:`1px solid ${C.border}`,overflow:"hidden",position:"relative"}}>
           <div style={{position:"absolute",top:-40,right:-40,width:180,height:180,borderRadius:"50%",background:`radial-gradient(circle,${C.brand}20,transparent 70%)`,pointerEvents:"none"}}/>
-          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:2}}>🎡 {L("spinNow")}</div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
+            <div style={{fontSize:15,fontWeight:700,color:C.white}}>🎡 {L("spinNow")}</div>
+            <div style={{background:"rgba(139,92,246,.18)",borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:700,color:C.brandLt}}>{spinsLeft} spin{spinsLeft!==1?"s":""}</div>
+          </div>
+          <div style={{fontSize:12,color:hasFree?C.green:C.muted,marginBottom:4}}>{freeLabel}</div>
           <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Win up to 500 pts & cash prizes!</div>
           <div style={{display:"flex",justifyContent:"center",marginBottom:16,transform:"scale(1.15)",transformOrigin:"center top"}}>
             <SpinWheel angle={spinAngle} spinning={spinning} phase="points"/>
@@ -4181,12 +4893,25 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:13,color:C.muted}}>& +${spinResult.usd.toFixed(2)} USD added!</div>
             </div>
           )}
-          <button onClick={doSpin} disabled={spinning} style={{width:"100%",background:spinning?"rgba(255,255,255,.08)":`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:spinning?"not-allowed":"pointer",boxShadow:spinning?"none":`0 4px 20px rgba(245,158,11,.35)`,transition:"all .3s"}}>
-            {spinning?"⏳ Spinning…":"🎰 Spin Now!"}
+          <button onClick={doSpin} disabled={spinning||spinsLeft<=0}
+            style={{width:"100%",border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,transition:"all .3s",
+              background:spinning?"rgba(255,255,255,.08)":spinsLeft>0?`linear-gradient(135deg,${C.gold},${C.pink})`:"rgba(255,255,255,.1)",
+              cursor:spinning||spinsLeft<=0?"not-allowed":"pointer",
+              boxShadow:spinning||spinsLeft<=0?"none":`0 4px 20px rgba(245,158,11,.35)`,
+              opacity:spinsLeft<=0&&!spinning?.5:1,
+            }}>
+            {spinning?"⏳ Spinning…":spinsLeft>0?"🎰 Spin Now!":"No Spins — Watch Ad to Play"}
           </button>
+          {!hasFree&&spinsLeft===0&&!spinning&&(
+            <button onClick={watchSpinAd}
+              style={{marginTop:10,width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"13px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",boxShadow:`0 3px 14px rgba(139,92,246,.28)`}}>
+              📺 Watch Ad → Get 1 Spin
+            </button>
+          )}
         </div>
       </div>
-    ),
+      );
+    })(),
     tasks:(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>SOCIAL TASKS</div>
@@ -4232,91 +4957,151 @@ function MainApp({user,onLogout,lang,setLang}){
         ))}
       </div>
     ),
-    mining:(
-      <div style={{padding:"0 16px 16px"}}>
-        <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16}}>
-          <div style={{position:"relative",width:110,height:110,margin:"0 auto 16px",display:"flex",alignItems:"center",justifyContent:"center"}}>
-            {mineStarted&&<div style={{position:"absolute",width:"100%",height:"100%",borderRadius:"50%",border:"2px dashed rgba(245,158,11,.5)",animation:"rotate 8s linear infinite"}}/>}
-            {mineStarted&&<div style={{position:"absolute",width:10,height:10,borderRadius:"50%",background:C.gold,animation:"orbit 2s linear infinite",boxShadow:`0 0 8px ${C.gold}`}}/>}
-            <div style={{
-              width:90,height:90,borderRadius:"50%",
-              background:`radial-gradient(circle at 35% 35%,${C.gold}40,${C.brandDk}90)`,
-              border:`2.5px solid ${C.gold}80`,
-              display:"flex",alignItems:"center",justifyContent:"center",
-              fontSize:44,
-              animation:mineStarted?"mine-pulse 1.8s ease-in-out infinite":"pulse-glow 3s infinite",
-              boxShadow:mineStarted?`0 0 30px rgba(245,158,11,.7),0 0 60px rgba(139,92,246,.4)`:`0 0 18px rgba(139,92,246,.4)`,
-              transition:"all .5s ease",
-            }}>⛏️</div>
-          </div>
-          <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>{L("miningTitle")}</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:16}}>{L("season")} 1 · 500 pts per cycle</div>
-          {!mineStarted
-            ?<>
-              <div style={{fontSize:13,color:"rgba(255,255,255,.8)",marginBottom:16,background:"rgba(0,0,0,.2)",borderRadius:10,padding:"10px 16px"}}>Watch a short ad to activate your mining session</div>
-              <button onClick={()=>setMAd(true)} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 36px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.4)"}}>▶ Start Mining</button>
-            </>
-            :mineReady
-              ?<button onClick={claimMining} style={{background:C.gold,border:"none",borderRadius:14,padding:"14px 32px",color:"#000",fontWeight:800,fontSize:16,cursor:"pointer"}}>🎁 Claim 500 pts!</button>
-              :<><div style={{fontSize:13,color:"rgba(255,255,255,.7)",marginBottom:8}}>{L("miningNext")}</div><div style={{fontSize:36,fontWeight:800,color:C.gold,fontFamily:"monospace"}}>{fmtTime(mineT)}</div><div style={{marginTop:8,fontSize:12,color:"rgba(255,255,255,.5)"}}>⚡ Mining active</div></>
-          }
-        </div>
-        <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:14,fontWeight:700,color:C.brandLt,marginBottom:8}}>How Mining Works</div>
-          <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>Watch a short ad to start mining. Earn 500 pts every 8 hours. After claiming, start a new session anytime!</div>
-        </div>
-      </div>
-    ),
     wallet:(
-      <div style={{padding:"0 16px 16px"}}>
-        {u.pts===0&&u.usd===0
-          ?<div style={{background:`linear-gradient(135deg,${C.s3},${C.s2})`,borderRadius:20,padding:28,marginBottom:16,border:`1px dashed ${C.border}`,textAlign:"center"}}>
-            <div style={{fontSize:40,marginBottom:10}}>💰</div>
-            <div style={{fontSize:16,fontWeight:700,color:C.white,marginBottom:6}}>No Balance Yet</div>
-            <div style={{fontSize:13,color:C.muted}}>Start earning by watching ads, completing tasks, or mining to see your balance here.</div>
+      <WalletTab u={u} C={C} setU={setU} />
+    ),
+    convert:(()=>{
+      const tokens=u.tokens??0;
+      const canMint=Math.floor(u.pts/PTS_PER_TOKEN);
+      const ptsUsed=canMint*PTS_PER_TOKEN;
+      const ptsRemainder=u.pts%PTS_PER_TOKEN;
+      const progressPct=Math.min(100,Math.round(ptsRemainder/PTS_PER_TOKEN*100));
+      return(
+      <div style={{padding:"0 16px 32px",animation:"up .3s ease"}}>
+
+        {/* ── Token vault hero ── */}
+        <div style={{position:"relative",borderRadius:24,overflow:"hidden",marginBottom:18,
+          background:"linear-gradient(145deg,#1a0a3e,#2d1060,#1a0a3e)",
+          border:`1px solid rgba(245,158,11,.25)`,
+          boxShadow:`0 8px 40px rgba(245,158,11,.12),0 2px 12px rgba(0,0,0,.5)`}}>
+          {/* ambient glows */}
+          <div style={{position:"absolute",top:-40,left:-40,width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(245,158,11,.18),transparent 70%)",pointerEvents:"none"}}/>
+          <div style={{position:"absolute",bottom:-30,right:-30,width:130,height:130,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.2),transparent 70%)",pointerEvents:"none"}}/>
+          <div style={{padding:"28px 20px 24px",textAlign:"center",position:"relative"}}>
+            {/* animated coin */}
+            <div style={{fontSize:56,lineHeight:1,marginBottom:10,
+              animation:convSuccess?"coin-drop .5s ease":"float 3s ease infinite",
+              filter:convSuccess?`drop-shadow(0 0 18px ${C.gold})`:`drop-shadow(0 0 10px rgba(245,158,11,.5))`}}>🪙</div>
+            <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.55)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:4}}>Total Wish Tokens</div>
+            <div style={{fontSize:44,fontWeight:900,letterSpacing:-2,
+              background:`linear-gradient(135deg,${C.goldLt},${C.gold})`,
+              WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
+              lineHeight:1.1}}>
+              {tokens.toLocaleString()}
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.35)",marginTop:6}}>🪙 Wish Tokens in your vault</div>
           </div>
-          :<div style={{background:`linear-gradient(135deg,${C.s3},${C.s2})`,borderRadius:20,padding:24,marginBottom:16,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:13,color:C.muted,marginBottom:4}}>Total Balance</div>
-            <div style={{fontSize:36,fontWeight:800,color:C.white}}>${u.usd.toFixed(2)}</div>
-            <div style={{fontSize:13,color:C.muted,marginTop:4}}>{u.pts.toLocaleString()} pts</div>
+        </div>
+
+        {/* ── Conversion engine card ── */}
+        <div style={{background:C.s2,borderRadius:20,padding:"20px",marginBottom:14,
+          border:`1px solid ${C.border2}`,
+          boxShadow:`0 4px 24px rgba(139,92,246,.08)`}}>
+
+          {/* pts ➜ tokens flow */}
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:18}}>
+            {/* left: pts */}
+            <div style={{flex:1,background:"rgba(139,92,246,.08)",border:`1px solid rgba(139,92,246,.2)`,borderRadius:14,padding:"14px 12px",textAlign:"center"}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.brandLt,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>You Spend</div>
+              <div style={{fontSize:28,fontWeight:900,color:C.white,letterSpacing:-1}}>{ptsUsed.toLocaleString()}</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:3}}>⭐ Points</div>
+            </div>
+            {/* arrow */}
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flexShrink:0}}>
+              <div style={{width:32,height:32,borderRadius:"50%",
+                background:`linear-gradient(135deg,${C.brand},${C.pink})`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:16,boxShadow:`0 4px 12px ${C.brand}55`}}>→</div>
+              <div style={{fontSize:9,color:C.muted,letterSpacing:.5}}>swap</div>
+            </div>
+            {/* right: tokens */}
+            <div style={{flex:1,background:"rgba(245,158,11,.07)",border:`1px solid rgba(245,158,11,.25)`,borderRadius:14,padding:"14px 12px",textAlign:"center"}}>
+              <div style={{fontSize:10,fontWeight:700,color:C.goldLt,textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>You Receive</div>
+              <div style={{fontSize:28,fontWeight:900,letterSpacing:-1,
+                background:`linear-gradient(135deg,${C.goldLt},${C.gold})`,
+                WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{canMint.toLocaleString()}</div>
+              <div style={{fontSize:11,color:"rgba(245,158,11,.6)",marginTop:3}}>🪙 Tokens</div>
+            </div>
           </div>
-        }
-        <div style={{background:C.s2,borderRadius:16,padding:16,marginBottom:16,border:`1px solid ${C.border}`}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:12}}>💱 {L("exchange")}</div>
-          {[["Points",u.pts.toLocaleString()],["Rate","1000 pts = $1.00"],].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-              <span style={{color:C.muted,fontSize:13}}>{k}</span>
-              <span style={{color:C.white,fontWeight:700}}>{v}</span>
+
+          {/* rate pill */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:16}}>
+            <div style={{height:1,flex:1,background:C.border}}/>
+            <div style={{fontSize:11,color:C.muted,background:C.s3,borderRadius:99,padding:"3px 10px",border:`1px solid ${C.border}`,whiteSpace:"nowrap"}}>
+              {PTS_PER_TOKEN.toLocaleString()} pts = 1 🪙 Wish Token
+            </div>
+            <div style={{height:1,flex:1,background:C.border}}/>
+          </div>
+
+          {/* progress to next token */}
+          <div style={{marginBottom:4}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:11,color:C.muted}}>Progress to next token</span>
+              <span style={{fontSize:11,fontWeight:700,color:C.brandLt}}>{ptsRemainder.toLocaleString()} / {PTS_PER_TOKEN.toLocaleString()} pts</span>
+            </div>
+            <div className="ptr">
+              <div className="ptrf" style={{
+                width:`${progressPct}%`,
+                background:`linear-gradient(90deg,${C.brand},${C.gold})`
+              }}/>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Convert button ── */}
+        <button
+          onClick={doConvert}
+          disabled={canMint===0}
+          style={{width:"100%",padding:"17px",borderRadius:16,border:"none",
+            cursor:canMint>0?"pointer":"not-allowed",fontWeight:800,fontSize:17,
+            letterSpacing:.3,transition:"transform .18s, box-shadow .18s",
+            transform:convSuccess?"scale(1.02)":"scale(1)",
+            color: convSuccess?"#fff":canMint>0?"#fff":"rgba(255,255,255,.3)",
+            background: convSuccess
+              ? `linear-gradient(135deg,${C.green},#16a34a)`
+              : canMint>0
+                ? `linear-gradient(270deg,${C.gold},${C.brand},${C.pink},${C.brand},${C.gold})`
+                : "rgba(255,255,255,.06)",
+            backgroundSize: canMint>0&&!convSuccess ? "300% 100%" : "100% 100%",
+            animation: canMint>0&&!convSuccess ? "conv-btn-shine 3s linear infinite" : "none",
+            boxShadow: convSuccess
+              ? `0 0 0 0 ${C.green}`
+              : canMint>0
+                ? `0 6px 28px rgba(245,158,11,.35),0 2px 8px rgba(139,92,246,.3)`
+                : "none"
+          }}
+        >
+          {convSuccess ? "✅  Tokens Added to Vault!" : canMint>0 ? "🪙  "+L("convBtn") : "⭐  "+L("convNone")}
+        </button>
+        {canMint>0&&!convSuccess&&(
+          <div style={{textAlign:"center",fontSize:11,color:C.muted,marginTop:8}}>
+            {ptsUsed.toLocaleString()} pts will be deducted · {canMint} token{canMint>1?"s":""} earned
+          </div>
+        )}
+
+        {/* ── Stats strip ── */}
+        <div style={{display:"flex",gap:10,marginTop:18}}>
+          {[
+            {label:"Points Balance",val:u.pts.toLocaleString(),icon:"⭐",col:C.brandLt},
+            {label:"Tokens Owned",val:tokens.toLocaleString(),icon:"🪙",col:C.gold},
+          ].map(s=>(
+            <div key={s.label} style={{flex:1,background:C.s2,borderRadius:14,padding:"14px 12px",
+              border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
+              <div style={{fontSize:18,fontWeight:800,color:s.col}}>{s.val}</div>
+              <div style={{fontSize:10,color:C.muted,marginTop:2}}>{s.label}</div>
             </div>
           ))}
-          <div style={{height:1,background:C.border,margin:"12px 0"}}/>
-          <div style={{display:"flex",justifyContent:"space-between"}}>
-            <span style={{color:C.muted,fontSize:13}}>USD Value</span>
-            <span style={{color:C.green,fontWeight:800,fontSize:16}}>${(u.pts*USD_PER_POINT).toFixed(2)}</span>
-          </div>
-        </div>
-        <div style={{background:C.s2,borderRadius:16,padding:16,border:`1px solid ${C.border}`,textAlign:"center"}}>
-          <div style={{fontSize:32,marginBottom:8}}>🏦</div>
-          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:6}}>{L("withdrawal")}</div>
-          <div style={{fontSize:13,color:C.muted}}>USDT, EasyPaisa & JazzCash — coming soon</div>
         </div>
       </div>
-    ),
+      );
+    })(),
     profile:(
       <div style={{padding:"0 16px 16px"}}>
         {/* Profile Header */}
         <div style={{background:`linear-gradient(135deg,${C.brandDk},${C.brand})`,borderRadius:20,padding:24,textAlign:"center",marginBottom:16,position:"relative"}}>
-          {/* Hidden file input — reused for both camera & gallery */}
-          <input ref={fileInputRef} type="file" accept="image/*" capture={picCapture?"user":undefined} style={{display:"none"}} onChange={e=>{
-            const f=e.target.files&&e.target.files[0];
-            if(!f)return;
-            const rd=new FileReader();
-            rd.onload=ev=>{ setU(p=>({...p,avatar:ev.target.result})); setAP(false); };
-            rd.readAsDataURL(f);
-            e.target.value="";
-          }}/>
-          <div onClick={()=>setAP(p=>!p)} style={{width:84,height:84,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,fontWeight:800,border:"3px solid rgba(255,255,255,.5)",margin:"0 auto 12px",cursor:"pointer",position:"relative",boxShadow:"0 0 20px rgba(0,0,0,.3)",overflow:"hidden"}}>
-            {u.avatar&&u.avatar.startsWith("data:")
+<div onClick={()=>setAP(p=>!p)} style={{width:84,height:84,borderRadius:"50%",background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,fontWeight:800,border:"3px solid rgba(255,255,255,.5)",margin:"0 auto 12px",cursor:"pointer",position:"relative",boxShadow:"0 0 20px rgba(0,0,0,.3)",overflow:"hidden"}}>
+            {u.avatar
               ? <img src={u.avatar} style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:"50%"}} alt="avatar"/>
               : <span style={{fontSize:36}}>{u.name[0].toUpperCase()}</span>
             }
@@ -4391,45 +5176,568 @@ function MainApp({user,onLogout,lang,setLang}){
     ),
   };
 
+  const NAV_ICONS={
+    home:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('path',{d:"M3 12L12 4l9 8"}),
+      React.createElement('path',{d:"M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9",fill:a?"currentColor":"none",fillOpacity:a?.18:0})
+    ),
+    earn:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('circle',{cx:12,cy:12,r:9}),
+      React.createElement('polygon',{points:"10,8 17,12 10,16",fill:"currentColor",stroke:"none"}),
+      a&&React.createElement('circle',{cx:19,cy:5,r:3,fill:"#f59e0b",stroke:"none"})
+    ),
+    tasks:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('rect',{x:3,y:3,width:18,height:18,rx:3,fill:a?"currentColor":"none",fillOpacity:a?.12:0}),
+      React.createElement('path',{d:"M8 12l3 3 5-5"}),
+      React.createElement('path',{d:"M8 7h3M8 17h3"})
+    ),
+    convert:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('polyline',{points:"17 2 21 6 17 10"}),
+      React.createElement('path',{d:"M3 11V9a4 4 0 014-4h14"}),
+      React.createElement('polyline',{points:"7 22 3 18 7 14"}),
+      React.createElement('path',{d:"M21 13v2a4 4 0 01-4 4H3"})
+    ),
+    wallet:(a)=>React.createElement('svg',{viewBox:"0 0 24 24",width:22,height:22,fill:"none",stroke:"currentColor",strokeWidth:a?2:1.8,strokeLinecap:"round",strokeLinejoin:"round"},
+      React.createElement('path',{d:"M20 7H6a2 2 0 000 4h14a2 2 0 012 2v5a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h12l2 2z",fill:a?"currentColor":"none",fillOpacity:a?.12:0}),
+      React.createElement('circle',{cx:16,cy:14,r:1.5,fill:"currentColor",stroke:"none"})
+    ),
+  };
   const NAV=[
-    {id:"home",icon:"🏠",label:L("home")},
-    {id:"earn",icon:"📺",label:L("earn")},
-    {id:"tasks",icon:"✅",label:L("tasks")},
-    {id:"mining",icon:"⛏️",label:L("mining")},
-    {id:"wallet",icon:"💰",label:L("wallet")},
-    {id:"profile",icon:"👤",label:L("profile")},
+    {id:"home",label:L("home")},
+    {id:"earn",label:L("earn")},
+    {id:"tasks",label:L("tasks")},
+    {id:"convert",label:L("convert")},
+    {id:"wallet",label:L("wallet")},
   ];
 
   return(
     <div style={{minHeight:"100vh",background:C.bg,color:C.white,fontFamily:"'DM Sans',sans-serif",maxWidth:480,margin:"0 auto",position:"relative",display:"flex",flexDirection:"column",direction:dir}}>
+      <style>{CSS}</style>
       {/* Header */}
       <div style={{padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",background:C.s1,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:10}}>
-        <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <button onClick={()=>setSO(true)} style={{background:"none",border:"none",cursor:"pointer",padding:"4px 2px",display:"flex",flexDirection:"column",gap:5,justifyContent:"center"}}>
+            <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
+            <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
+            <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
+          </button>
+          <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+        </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
           <div style={{position:"relative"}}>
             <button onClick={()=>setLM(p=>!p)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.white,fontSize:13,cursor:"pointer"}}>{(LANGS[lang]||LANGS.en).flag} {lang.toUpperCase()}</button>
             {langMenu&&(
               <div style={{position:"absolute",right:0,top:"110%",background:C.s2,border:`1px solid ${C.border}`,borderRadius:10,zIndex:99,minWidth:140,overflow:"hidden"}}>
                 {Object.entries(LANGS).map(([k,v])=>(
-                  <button key={k} onClick={()=>{setLang(k);setLM(false);}} style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",color:lang===k?C.brandLt:C.white,cursor:"pointer",textAlign:"left",fontSize:13}}>{v.flag} {v.name}</button>
+                  <button key={k} onClick={()=>{
+                    setLang(k);setLM(false);
+                    Security.save('lang',k);
+                    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+                      body:JSON.stringify({id:u.id,email:u.email,lang:k})
+                    }).catch(()=>{});
+                  }} style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",color:lang===k?C.brandLt:C.white,cursor:"pointer",textAlign:"left",fontSize:13}}>{v.flag} {v.name}</button>
                 ))}
               </div>
             )}
           </div>
-          <button onClick={()=>setLD(true)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.red,fontSize:13,cursor:"pointer",fontWeight:600}}>{L("logout")}</button>
         </div>
       </div>
       {/* Content */}
       <div style={{flex:1,overflowY:"auto",paddingTop:16,paddingBottom:80}}>{TAB[tab]}</div>
       {/* Bottom Nav */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.s1,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:10}}>
-        {NAV.map(n=>(
-          <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"8px 2px",background:"none",border:"none",color:tab===n.id?C.brandLt:C.muted,cursor:"pointer",textAlign:"center"}}>
-            <div style={{fontSize:20}}>{n.icon}</div>
-            <div style={{fontSize:10,fontWeight:tab===n.id?700:400,marginTop:1}}>{n.label}</div>
-          </button>
-        ))}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:C.s1,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:10,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+        {NAV.map(n=>{
+          const active=tab===n.id;
+          const accentCol=n.id==="wallet"?"#f59e0b":n.id==="earn"?"#a78bfa":n.id==="convert"?"#34d399":C.brandLt;
+          return(
+            <button key={n.id} onClick={()=>setTab(n.id)} style={{flex:1,padding:"10px 2px 6px",background:"none",border:"none",color:active?accentCol:C.muted,cursor:"pointer",textAlign:"center",transition:"color .2s"}}>
+              <div className={active?(n.id==="convert"?"nav-ico-convert-active":"nav-ico-active"):""} style={{display:"flex",justifyContent:"center",alignItems:"center",height:26}}>
+                {NAV_ICONS[n.id](active)}
+              </div>
+              <div style={{fontSize:9.5,fontWeight:active?700:400,marginTop:2,letterSpacing:active?.4:0,transition:"all .2s"}}>{n.label}</div>
+              {active&&<span className="nav-pill" style={{background:accentCol}}/>}
+            </button>
+          );
+        })}
       </div>
+      {/* Global hidden file input — reused for camera & gallery from any screen */}
+      <input ref={fileInputRef} type="file" accept="image/*" capture={picCapture?"user":undefined} style={{display:"none"}} onChange={e=>{
+        const f=e.target.files&&e.target.files[0];
+        if(!f)return;
+        const rd=new FileReader();
+        rd.onload=ev=>{
+          // 1. Resize to max 400 px on the client so the payload stays small
+          const img=new Image();
+          img.onload=()=>{
+            const MAX=400;
+            const scale=Math.min(MAX/img.width,MAX/img.height,1);
+            const cvs=document.createElement("canvas");
+            cvs.width=Math.round(img.width*scale);
+            cvs.height=Math.round(img.height*scale);
+            cvs.getContext("2d").drawImage(img,0,0,cvs.width,cvs.height);
+            const dataUrl=cvs.toDataURL("image/jpeg",0.85);
+            // 2. Show local preview immediately so the user sees feedback at once
+            setU(p=>({...p,avatar:dataUrl}));
+            setAP(false);
+            // 3. Upload to Supabase Storage — get back a permanent public URL,
+            //    then save it to the DB immediately (don't rely on auto-save,
+            //    which would send the huge data-URL and get rejected).
+            fetch("/api/upload-avatar",{method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({userId:u.id,imageData:dataUrl,mimeType:"image/jpeg"})
+            })
+            .then(r=>r.json())
+            .then(d=>{
+              if(!d.url) return;
+              // Swap preview for real URL in UI
+              setU(p=>({...p,avatar:d.url}));
+              // Persist URL to DB right now
+              fetch("/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({id:u.id,email:u.email,avatar:d.url})
+              }).catch(()=>{});
+            })
+            .catch(()=>{/* preview remains in UI; DB keeps previous avatar */});
+          };
+          img.src=ev.target.result;
+        };
+        rd.readAsDataURL(f);
+        e.target.value="";
+      }}/>
+      {/* Sidebar Overlay */}
+      {sidebarOpen&&(
+        <>
+          <div className="menu-overlay" onClick={()=>setSO(false)}/>
+          <div className="menu-drawer" style={{animation:"slideL .25s ease both"}}>
+            {/* Sidebar Header */}
+            <div style={{padding:"20px 24px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid rgba(139,92,246,.15)`}}>
+              <div style={{fontSize:18,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+              <button onClick={()=>setSO(false)} style={{background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer",lineHeight:1,padding:4}}>✕</button>
+            </div>
+            {/* User info */}
+            <div style={{padding:"16px 24px",display:"flex",alignItems:"center",gap:12,borderBottom:`1px solid rgba(139,92,246,.1)`}}>
+              <div style={{width:44,height:44,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",flexShrink:0,overflow:"hidden"}}>
+                {u.avatar
+                  ? <img src={u.avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="avatar"/>
+                  : u.name[0].toUpperCase()
+                }
+              </div>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:C.white}}>{u.name}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:2}}>{u.email}</div>
+              </div>
+            </div>
+            {/* Menu Items */}
+            <div style={{flex:1,overflowY:"auto",paddingTop:8}}>
+              {[
+                {icon:"👤",label:"Profile"},
+                {icon:"🏆",label:"Leader Board"},
+                {icon:"👥",label:"Referral Team"},
+                {icon:"📢",label:"Announcement"},
+                {icon:"📄",label:"White Paper"},
+                {icon:"🎧",label:"Support Portal"},
+                {icon:"🔐",label:"Security"},
+              ].map(item=>(
+                <button key={item.label} className="menu-item" onClick={()=>{
+                  if(item.label==="Profile"){setSO(false);setSV("profile");}
+                  else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
+                  else if(item.label==="Security"){setSO(false);setSV("security");}
+                  else if(item.label==="Referral Team"){setSO(false);setSV("referral");}
+                  else setSO(false);
+                }}>
+                  <span style={{fontSize:20}}>{item.icon}</span>
+                  <span>{item.label}</span>
+                  <span style={{marginLeft:"auto",color:C.muted,fontSize:18}}>›</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+      {/* Profile Screen (from sidebar) */}
+      {sidebarView==="profile"&&(
+        <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+          {/* Profile Header */}
+          <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+            <div style={{fontSize:18,fontWeight:800,color:C.white}}>Account</div>
+          </div>
+          {/* Profile Content */}
+          <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
+
+            {/* ── Profile Photo Card ── */}
+            <div style={{
+              background:"linear-gradient(160deg,rgba(139,92,246,.09),rgba(236,72,153,.05),rgba(6,182,212,.04))",
+              border:"1px solid rgba(139,92,246,.2)",
+              borderRadius:24,
+              padding:"28px 20px 20px",
+              marginBottom:20,
+              textAlign:"center",
+              position:"relative",
+              overflow:"hidden",
+            }}>
+              {/* Subtle ambient glow */}
+              <div style={{position:"absolute",top:-40,left:"50%",transform:"translateX(-50%)",width:200,height:200,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)",pointerEvents:"none"}}/>
+
+              {/* Avatar with gradient ring */}
+              <div onClick={()=>setAP(p=>!p)} style={{
+                display:"inline-flex",alignItems:"center",justifyContent:"center",
+                width:96,height:96,borderRadius:"50%",
+                background:"linear-gradient(135deg,#8b5cf6,#ec4899,#06b6d4)",
+                padding:3,
+                margin:"0 auto 14px",
+                cursor:"pointer",
+                position:"relative",
+                boxShadow:"0 8px 32px rgba(139,92,246,.38),0 2px 10px rgba(0,0,0,.5)",
+                transition:"transform .18s ease,box-shadow .18s ease",
+              }}>
+                {/* Inner circle — clips photo */}
+                <div style={{
+                  width:"100%",height:"100%",borderRadius:"50%",
+                  overflow:"hidden",
+                  background:"#0a0818",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  position:"relative",
+                }}>
+                  {u.avatar
+                    ?<img src={u.avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="profile"/>
+                    :<span style={{fontSize:36,fontWeight:800,color:"#fff",lineHeight:1,userSelect:"none"}}>{u.name[0].toUpperCase()}</span>
+                  }
+                  {/* Hover scrim */}
+                  <div style={{position:"absolute",inset:0,borderRadius:"50%",background:"rgba(0,0,0,.0)",display:"flex",alignItems:"center",justifyContent:"center"}}/>
+                </div>
+                {/* Camera badge */}
+                <div style={{
+                  position:"absolute",bottom:0,right:0,
+                  width:30,height:30,borderRadius:"50%",
+                  background:"linear-gradient(135deg,#8b5cf6,#ec4899)",
+                  border:"2.5px solid #0a0818",
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:14,
+                  boxShadow:"0 2px 10px rgba(139,92,246,.6)",
+                }}>📷</div>
+              </div>
+
+              {/* Name & hint */}
+              <div style={{fontSize:17,fontWeight:800,color:"#fff",marginBottom:3,position:"relative"}}>{u.name}</div>
+              <div style={{fontSize:12,color:C.muted,position:"relative"}}>
+                {avatarPick?"Choose an option below":"Tap photo to update"}
+              </div>
+
+              {/* ── Action sheet ── */}
+              {avatarPick&&(
+                <div style={{
+                  marginTop:20,
+                  background:"rgba(8,6,22,.94)",
+                  backdropFilter:"blur(20px)",
+                  borderRadius:20,
+                  border:"1px solid rgba(139,92,246,.22)",
+                  overflow:"hidden",
+                  animation:"splashFade .2s ease",
+                  position:"relative",
+                }}>
+                  <div style={{padding:"13px 16px 10px",fontSize:11,fontWeight:700,color:"rgba(255,255,255,.3)",textTransform:"uppercase",letterSpacing:.12}}>
+                    Profile Photo
+                  </div>
+
+                  {/* Take Photo */}
+                  <button
+                    onClick={()=>{setPC(true);setAP(false);setTimeout(()=>{fileInputRef.current&&fileInputRef.current.click();},50);}}
+                    style={{width:"100%",background:"none",border:"none",borderTop:"1px solid rgba(255,255,255,.06)",padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:"inherit"}}>
+                    <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,rgba(139,92,246,.22),rgba(139,92,246,.1))",border:"1px solid rgba(139,92,246,.32)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>📷</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:700,color:"#fff",textAlign:"left"}}>Take Photo</div>
+                      <div style={{fontSize:12,color:C.muted,marginTop:1,textAlign:"left"}}>Open camera and capture</div>
+                    </div>
+                    <div style={{color:"rgba(255,255,255,.18)",fontSize:18,fontWeight:300}}>›</div>
+                  </button>
+
+                  {/* Choose from Gallery */}
+                  <button
+                    onClick={()=>{setPC(false);setAP(false);setTimeout(()=>{fileInputRef.current&&fileInputRef.current.click();},50);}}
+                    style={{width:"100%",background:"none",border:"none",borderTop:"1px solid rgba(255,255,255,.06)",padding:"14px 16px",cursor:"pointer",display:"flex",alignItems:"center",gap:14,textAlign:"left",fontFamily:"inherit"}}>
+                    <div style={{width:44,height:44,borderRadius:14,background:"linear-gradient(135deg,rgba(6,182,212,.18),rgba(6,182,212,.08))",border:"1px solid rgba(6,182,212,.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🖼️</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:14,fontWeight:700,color:"#fff",textAlign:"left"}}>Choose from Gallery</div>
+                      <div style={{fontSize:12,color:C.muted,marginTop:1,textAlign:"left"}}>Select an existing photo</div>
+                    </div>
+                    <div style={{color:"rgba(255,255,255,.18)",fontSize:18,fontWeight:300}}>›</div>
+                  </button>
+
+                  {/* Cancel */}
+                  <button
+                    onClick={()=>setAP(false)}
+                    style={{width:"100%",background:"none",border:"none",borderTop:"1px solid rgba(255,255,255,.06)",padding:"13px 16px",color:"rgba(255,255,255,.28)",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Account Settings */}
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:10,padding:"0 4px"}}>Account Settings</div>
+            <div style={{background:C.s2,borderRadius:16,marginBottom:16,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+              {/* Change Name */}
+              <div style={{padding:"16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.white}}>Change Name</div>
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>Update your display name.</div>
+                  </div>
+                  <button onClick={()=>setEF(editingField==="name"?null:"name")} style={{background:editingField==="name"?"rgba(255,255,255,.1)":C.brand,border:editingField==="name"?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:editingField==="name"?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{editingField==="name"?"CANCEL":"CHANGE"}</button>
+                </div>
+                {editingField==="name"&&(
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input value={editName} onChange={e=>setEN(e.target.value)} style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="Your display name"/>
+                    <button onClick={()=>{if(editName.trim()){setU(p=>({...p,name:editName.trim()}));setPMsg("Name updated!");setEF(null);}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+                  </div>
+                )}
+              </div>
+              <div style={{height:1,background:C.border}}/>
+              {/* Change Email */}
+              <div style={{padding:"16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.white}}>Change Email</div>
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>Update your email address for account access.</div>
+                  </div>
+                  <button onClick={()=>setEF(editingField==="email"?null:"email")} style={{background:editingField==="email"?"rgba(255,255,255,.1)":C.brand,border:editingField==="email"?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:editingField==="email"?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{editingField==="email"?"CANCEL":"CHANGE"}</button>
+                </div>
+                {editingField==="email"&&(
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input value={editEmail} onChange={e=>setEE(e.target.value)} type="email" style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="you@email.com"/>
+                    <button onClick={()=>{if(editEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){setU(p=>({...p,email:editEmail}));setPMsg("Email updated!");setEF(null);}else setPMsg("Invalid email!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+                  </div>
+                )}
+              </div>
+              <div style={{height:1,background:C.border}}/>
+              {/* Change Password */}
+              <div style={{padding:"16px"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:700,color:C.white}}>Change Password</div>
+                    <div style={{fontSize:12,color:C.muted,marginTop:3}}>Update your password to keep account secure.</div>
+                  </div>
+                  <button onClick={()=>setEF(editingField==="pass"?null:"pass")} style={{background:editingField==="pass"?"rgba(255,255,255,.1)":C.brand,border:editingField==="pass"?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:editingField==="pass"?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{editingField==="pass"?"CANCEL":"CHANGE"}</button>
+                </div>
+                {editingField==="pass"&&(
+                  <div style={{marginTop:12}}>
+                    <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Min 6 characters"/>
+                    <button onClick={()=>{if(editPass.length>=6){setU(p=>({...p,pass:editPass}));setEP("");setPMsg("Password updated!");setEF(null);}else setPMsg("Min 6 characters!");setTimeout(()=>setPMsg(""),2500);}} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE PASSWORD</button>
+                  </div>
+                )}
+              </div>
+            </div>
+            {profileMsg&&(
+              <div style={{marginBottom:16,textAlign:"center",padding:"10px 14px",borderRadius:12,background:profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",color:profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?C.red:C.green,fontWeight:700,fontSize:13}}>
+                {profileMsg.includes("Invalid")||profileMsg.includes("Min")||profileMsg.includes("empty")?`⚠️ ${profileMsg}`:`✓ ${profileMsg}`}
+              </div>
+            )}
+            {/* Account Verification */}
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:10,padding:"0 4px"}}>Account Verification</div>
+            <div style={{background:C.s2,borderRadius:16,marginBottom:24,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+              {/* Email Verify */}
+              <div style={{padding:"16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:15,fontWeight:700,color:C.white}}>Email</div>
+                  <div style={{fontSize:13,color:C.brandLt,marginTop:2}}>{u.email}</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:4}}>Link your email for communication and account recovery.</div>
+                </div>
+                <button style={{background:C.cyan,border:"none",borderRadius:8,padding:"7px 16px",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0,marginTop:2}}>VERIFY</button>
+              </div>
+              <div style={{height:1,background:C.border}}/>
+              {/* KYC */}
+              <div style={{padding:"16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:15,fontWeight:700,color:C.white}}>Identity Verification (KYC)</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:4}}>Secure your account with identity verification.</div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,flexShrink:0}}>
+                  <button disabled style={{background:"rgba(255,255,255,.06)",border:`1px solid ${C.border}`,borderRadius:8,padding:"7px 14px",color:"rgba(255,255,255,.25)",fontWeight:700,fontSize:12,cursor:"default"}}>VERIFY</button>
+                  <span style={{fontSize:9,color:C.gold,fontWeight:700,background:"rgba(245,158,11,.15)",borderRadius:4,padding:"2px 7px",whiteSpace:"nowrap"}}>COMING SOON</span>
+                </div>
+              </div>
+            </div>
+            {/* Logout Button */}
+            <button onClick={()=>setLD(true)} style={{width:"100%",background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",boxShadow:`0 4px 20px ${C.red}40`}}>
+              👋 Logout
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Leaderboard Screen (from sidebar) */}
+      {sidebarView==="leaders"&&(
+        <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+          <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+            <div style={{fontSize:18,fontWeight:800,color:C.white}}>🏆 Leaderboard</div>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
+            {/* Top 3 podium */}
+            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:12,marginBottom:20,padding:"12px 0"}}>
+              {[1,0,2].map(pos=>{
+                const l=FAKE_LEADERS[pos]||{name:"—",pts:0,country:"🌍"};
+                const heights=["60px","80px","48px"];
+                const colors=[`linear-gradient(135deg,${C.gold},#d97706)`,`linear-gradient(135deg,#9ca3af,#6b7280)`,`linear-gradient(135deg,#cd7c32,#92400e)`];
+                const medals=["🥇","🥈","🥉"];
+                const displayPos=[2,1,3];
+                return(
+                  <div key={pos} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
+                    <div style={{fontSize:20}}>{medals[pos]}</div>
+                    <div style={{width:44,height:44,borderRadius:"50%",background:colors[pos],display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",border:"2px solid rgba(255,255,255,.3)"}}>{l.country}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:C.white,textAlign:"center",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.name}</div>
+                    <div style={{fontSize:11,color:C.gold,fontWeight:700}}>{l.pts.toLocaleString()}</div>
+                    <div style={{width:"100%",height:heights[pos],background:colors[pos],borderRadius:"8px 8px 0 0",opacity:.4}}/>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>ALL EARNERS</div>
+            {[...FAKE_LEADERS.slice(0,-1),{...FAKE_LEADERS[FAKE_LEADERS.length-1],name:u.name,pts:u.pts,country:u.country,isMe:true}].map((l,i)=>(
+              <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12,transition:"all .2s"}}>
+                <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
+                <div style={{fontSize:22}}>{l.country}</div>
+                <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Security Settings Screen (from sidebar) */}
+      {sidebarView==="security"&&(
+        <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+          <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+            <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+            <div style={{fontSize:18,fontWeight:800,color:C.white}}>🔐 Security</div>
+          </div>
+          <div style={{flex:1,overflowY:"auto"}}>
+            <SecuritySettingsView user={u}/>
+          </div>
+        </div>
+      )}
+      {/* ── Referral Panel ─────────────────────────────────────────── */}
+      {sidebarView==="referral"&&(()=>{
+        const refLink=`${window.location.origin}/ref/${u.refCode||""}`;
+        const copyCode=()=>{navigator.clipboard?.writeText(u.refCode||"").catch(()=>{});setRefCopied("code");setTimeout(()=>setRefCopied(""),2000);};
+        const copyLink=()=>{navigator.clipboard?.writeText(refLink).catch(()=>{});setRefCopied("link");setTimeout(()=>setRefCopied(""),2000);};
+        const shareLink=()=>{
+          if(navigator.share){navigator.share({title:`Join ${APP_NAME}`,text:`Join me on ${APP_NAME} and earn rewards! Use my code: ${u.refCode}`,url:refLink}).catch(()=>{});}
+          else{window.open(`https://wa.me/?text=${encodeURIComponent(`Join me on ${APP_NAME} and earn rewards!\nUse my referral code: *${u.refCode}*\n${refLink}`)}`,"_blank");}
+        };
+        const refs=u.refs||[];
+        const statCard=(icon,val,label,col)=>(
+          <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:"16px 12px",textAlign:"center"}}>
+            <div style={{fontSize:26,marginBottom:4}}>{icon}</div>
+            <div style={{fontSize:22,fontWeight:800,color:col||C.brandLt}}>{val}</div>
+            <div style={{fontSize:11,color:C.muted,marginTop:2}}>{label}</div>
+          </div>
+        );
+        return(
+          <div style={{position:"fixed",inset:0,background:C.bg,zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
+            {/* Header */}
+            <div style={{padding:"14px 16px",display:"flex",alignItems:"center",gap:14,background:C.s1,borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+              <button onClick={()=>setSV(null)} style={{background:"none",border:"none",color:C.white,fontSize:22,cursor:"pointer",lineHeight:1,padding:4}}>←</button>
+              <div style={{fontSize:18,fontWeight:800,color:C.white}}>Referral Program</div>
+            </div>
+            {/* Content */}
+            <div style={{flex:1,overflowY:"auto",padding:"16px 16px 40px"}}>
+              {/* Hero */}
+              <div style={{background:"linear-gradient(135deg,rgba(139,92,246,.18),rgba(236,72,153,.12))",border:"1px solid rgba(139,92,246,.3)",borderRadius:20,padding:"22px 20px 18px",marginBottom:14,textAlign:"center",position:"relative",overflow:"hidden"}}>
+                <div style={{position:"absolute",width:160,height:160,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.15),transparent 70%)",top:-40,right:-40,pointerEvents:"none"}}/>
+                <div style={{fontSize:44,marginBottom:8}}>🔗</div>
+                <div style={{fontSize:20,fontWeight:800,color:C.white,marginBottom:8}}>Invite & Earn Together</div>
+                <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>
+                  <span style={{color:C.brandLt,fontWeight:700}}>+2,000 pts</span> when a friend signs up with your code<br/>
+                  <span style={{color:"#f59e0b",fontWeight:700}}>+10%</span> of their daily mining rewards — automatically, forever
+                </div>
+              </div>
+
+              {/* Your Referral Code */}
+              <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:12}}>
+                <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:10,fontWeight:600}}>Your Referral Code</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{flex:1,background:"rgba(139,92,246,.1)",border:"1px solid rgba(139,92,246,.35)",borderRadius:10,padding:"11px 14px",fontFamily:"monospace",fontSize:19,fontWeight:800,color:C.brandLt,letterSpacing:3}}>
+                    {u.refCode||"—"}
+                  </div>
+                  <button onClick={copyCode} style={{flexShrink:0,background:refCopied==="code"?"rgba(52,211,153,.2)":"rgba(139,92,246,.15)",border:`1px solid ${refCopied==="code"?"rgba(52,211,153,.5)":"rgba(139,92,246,.4)"}`,borderRadius:10,padding:"11px 16px",color:refCopied==="code"?"#34d399":C.brandLt,fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+                    {refCopied==="code"?"✓ Copied":"📋 Copy"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Referral Link */}
+              <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:16,marginBottom:14}}>
+                <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:1.2,marginBottom:10,fontWeight:600}}>Your Referral Link</div>
+                <div style={{background:"rgba(6,182,212,.07)",border:"1px solid rgba(6,182,212,.2)",borderRadius:10,padding:"10px 13px",fontSize:12,color:"#67e8f9",wordBreak:"break-all",marginBottom:10,lineHeight:1.5}}>
+                  {refLink}
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={copyLink} style={{flex:1,background:refCopied==="link"?"rgba(52,211,153,.15)":"rgba(6,182,212,.1)",border:`1px solid ${refCopied==="link"?"rgba(52,211,153,.4)":"rgba(6,182,212,.3)"}`,borderRadius:10,padding:"10px 8px",color:refCopied==="link"?"#34d399":"#67e8f9",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+                    {refCopied==="link"?"✓ Copied":"📋 Copy Link"}
+                  </button>
+                  <button onClick={shareLink} style={{flex:1,background:"linear-gradient(135deg,rgba(139,92,246,.25),rgba(236,72,153,.2))",border:"1px solid rgba(139,92,246,.4)",borderRadius:10,padding:"10px 8px",color:C.white,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                    📤 Share
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+                {statCard("👥",refs.length,"Total Referrals",C.brandLt)}
+                {statCard("⭐",(u.refPts||0).toLocaleString(),"Pts from Referrals","#f59e0b")}
+              </div>
+
+              {/* Team List */}
+              <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden"}}>
+                <div style={{padding:"14px 16px 10px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:C.white}}>Your Team</div>
+                  {refs.length>0&&<div style={{fontSize:12,color:C.muted}}>{refs.length} member{refs.length!==1?"s":""}</div>}
+                </div>
+                {refs.length===0?(
+                  <div style={{padding:"28px 20px",textAlign:"center"}}>
+                    <div style={{fontSize:32,marginBottom:10}}>👀</div>
+                    <div style={{fontSize:13,color:C.muted,lineHeight:1.6}}>No referrals yet.<br/>Share your code and start earning!</div>
+                  </div>
+                ):(
+                  refs.map((r,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderBottom:i<refs.length-1?`1px solid ${C.border}`:"none"}}>
+                      <div style={{width:38,height:38,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:800,color:"#fff",flexShrink:0}}>
+                        {(r.name||"?")[0].toUpperCase()}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:13,fontWeight:700,color:C.white,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.name||"Unknown"}</div>
+                        <div style={{fontSize:11,color:C.muted,marginTop:1}}>Joined {r.joined||"—"}</div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#f59e0b"}}>+{(r.pts||0).toLocaleString()}</div>
+                        <div style={{fontSize:10,color:C.muted}}>pts earned</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+      {/* Spin Ad Popup — shown after free spin is consumed and no extra spins remain */}
+      {spinAdPopup&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:28,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border2}`,animation:"popIn .3s ease"}}>
+            <div style={{fontSize:60,marginBottom:10}}>🎡</div>
+            <div style={{fontSize:20,fontWeight:800,color:C.white,marginBottom:6}}>Out of Spins!</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.6}}>
+              Your free spin has been used.<br/>
+              Watch a short ad to get <span style={{color:C.gold,fontWeight:700}}>1 extra spin</span> right now,<br/>
+              or wait for your free spin to reset in 24 hours.
+            </div>
+            <div style={{background:"rgba(139,92,246,.08)",borderRadius:12,padding:"12px",marginBottom:16,fontSize:12,color:C.muted,border:`1px solid ${C.border}`}}>📢 Sponsored content — supports the platform</div>
+            <button onClick={watchSpinAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(139,92,246,.3)",marginBottom:10}}>
+              📺 Watch Ad → Get 1 Spin
+            </button>
+            <button onClick={()=>setSAP(false)} style={{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Maybe later</button>
+          </div>
+        </div>
+      )}
       {/* Ad Modal */}
       {adShowing&&adData&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
@@ -4473,7 +5781,1011 @@ function MainApp({user,onLogout,lang,setLang}){
 }
 
 /* ═══════════════════════════════════════════════
-   ROOT
+   SECURITY UTILITIES
+   Namespaced localStorage wrapper + SHA-256 PIN hashing.
+   All keys stored under prefix "wish_" to avoid collisions.
+═══════════════════════════════════════════════ */
+const Security = {
+  /* SHA-256 PIN hash + app salt. Falls back to djb2 in environments without SubtleCrypto. */
+  async hashPin(pin) {
+    try {
+      const enc = new TextEncoder().encode(pin + '\u2605wish\u2605v1');
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    } catch(_) {
+      let h = 5381;
+      for (const c of (pin + 'wish_salt')) h = ((h << 5) + h + c.charCodeAt(0)) | 0;
+      return (h >>> 0).toString(16);
+    }
+  },
+  async verifyPin(pin, stored) { return (await this.hashPin(pin)) === stored; },
+
+  /* ── Global storage ── */
+  save(k, v)  { try { localStorage.setItem('wish_'+k, JSON.stringify(v)); } catch(_){} },
+  load(k, d=null) {
+    try { const v=localStorage.getItem('wish_'+k); return v===null?d:JSON.parse(v); }
+    catch(_){ return d; }
+  },
+  remove(k) { try { localStorage.removeItem('wish_'+k); } catch(_){} },
+
+  /* ── Per-user storage (key = "wish_uid_{userId}_{k}") ──
+     All security is scoped to a specific user ID so multiple users on the
+     same device each have fully independent PIN / biometric settings. */
+  _uk(uid,k) { return `uid_${uid}_${k}`; },
+  saveUser(uid,k,v)      { this.save(this._uk(uid,k),v); },
+  loadUser(uid,k,d=null) { return this.load(this._uk(uid,k),d); },
+  removeUser(uid,k)      { this.remove(this._uk(uid,k)); },
+
+  /* True once the user has completed the security-setup flow at least once */
+  hasSecuritySetup(uid) { return !!this.loadUser(uid,'security_done'); },
+
+  /* Web: checks PublicKeyCredential (Face ID / Touch ID in browser). */
+  checkBioSupport() {
+    return typeof window!=='undefined' && 'PublicKeyCredential' in window;
+  },
+
+  /* Check if device has platform biometric authenticator (async) */
+  async checkPlatformBio() {
+    if (!this.checkBioSupport()) return false;
+    try { return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }
+    catch(_) { return false; }
+  },
+
+  /* WebAuthn registration — creates a device-bound biometric credential and stores its ID.
+     Native equivalent: LocalAuthentication.authenticateAsync() / react-native-biometrics enroll */
+  async setupBiometric(uid) {
+    if (!this.checkBioSupport()) return { success:false, error:'not_supported' };
+    const avail = await this.checkPlatformBio();
+    if (!avail) return { success:false, error:'no_hardware' };
+    try {
+      /* User ID must be 1–64 bytes; pad/truncate the uid string */
+      const uid8 = new Uint8Array(16);
+      const enc  = new TextEncoder().encode(uid);
+      uid8.set(enc.slice(0,16));
+      const cred = await navigator.credentials.create({ publicKey:{
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp:  { name:'Wish App' },
+        user:{ id:uid8, name:uid, displayName:'Wish User' },
+        pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
+        authenticatorSelection:{ authenticatorAttachment:'platform', userVerification:'required' },
+        timeout:60000,
+      }});
+      /* Store the credential ID (base64) so we can reference it later for auth */
+      const credId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+      this.saveUser(uid,'bio_cred_id',credId);
+      return { success:true };
+    } catch(e) {
+      return { success:false, error: e.name==='NotAllowedError'?'cancelled':(e.message||'unknown') };
+    }
+  },
+
+  /* WebAuthn assertion — prompts the native biometric dialog to authenticate.
+     Native equivalent: LocalAuthentication.authenticateAsync({ promptMessage:'Unlock Wish' }) */
+  async authenticateBiometric(uid) {
+    const credStr = this.loadUser(uid,'bio_cred_id',null);
+    if (!credStr) return { success:false, error:'no_credential' };
+    try {
+      const credBytes = Uint8Array.from(atob(credStr), c=>c.charCodeAt(0));
+      const assertion = await navigator.credentials.get({ publicKey:{
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rpId: window.location.hostname || 'localhost',
+        allowCredentials:[{ id:credBytes, type:'public-key', transports:['internal'] }],
+        userVerification:'required',
+        timeout:60000,
+      }});
+      return { success:!!assertion };
+    } catch(e) {
+      return { success:false, error: e.name==='NotAllowedError'?'cancelled':(e.message||'unknown') };
+    }
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   PIN DOTS — visual indicator for entered digits
+═══════════════════════════════════════════════ */
+function PinDots({ filled, shake, visible, raw }) {
+  return (
+    <div style={{display:'flex',gap:18,justifyContent:'center',animation:shake?'shake .5s ease':'none'}}>
+      {[0,1,2,3].map(i=>{
+        const isFilled = i < filled;
+        return (
+          <div key={i} style={{
+            width:18, height:18, borderRadius:'50%',
+            background: isFilled ? `linear-gradient(135deg,#a78bfa,#ec4899)` : 'transparent',
+            border: `2.5px solid ${isFilled ? '#a78bfa' : 'rgba(255,255,255,.22)'}`,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:11, fontWeight:800, color:'#fff',
+            transition:'all .18s cubic-bezier(.34,1.56,.64,1)',
+            boxShadow: isFilled ? '0 0 10px rgba(167,139,250,.5)' : 'none',
+            transform: isFilled ? 'scale(1.1)' : 'scale(1)',
+          }}>
+            {visible && raw && i < raw.length ? raw[i] : ''}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   PIN KEYPAD — numeric 0-9 grid + backspace
+═══════════════════════════════════════════════ */
+function PinKeypad({ onKey, disabled }) {
+  const [activeKey, setAK] = useState(null);
+  const rows = [['1','2','3'],['4','5','6'],['7','8','9'],['','0','⌫']];
+  const press = (k) => {
+    if (!k || disabled) return;
+    setAK(k); setTimeout(()=>setAK(null), 140);
+    onKey(k);
+  };
+  /* Button size: cap at 72px but shrink on narrow viewports.
+     (100vw - 40px side padding - 2 × 16px gaps) / 3 columns */
+  const btnSize = 'min(72px, calc((100vw - 40px - 32px) / 3))';
+  const fontSize = 'min(26px, calc((100vw - 40px - 32px) / 3 * 0.38))';
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:'min(14px,2.5vh)',alignItems:'center',userSelect:'none',width:'100%'}}>
+      {rows.map((row,ri)=>(
+        <div key={ri} style={{display:'flex',gap:'min(16px,4vw)',width:'100%',justifyContent:'center'}}>
+          {row.map((k,ki)=>{
+            const isBack = k==='⌫';
+            const isEmpty = k==='';
+            const isActive = activeKey===k;
+            return (
+              <button key={ki} onPointerDown={()=>press(k)} style={{
+                width:btnSize, height:btnSize, borderRadius:'50%', flexShrink:0,
+                background: isEmpty ? 'transparent'
+                  : isActive ? (isBack ? 'rgba(239,68,68,.3)' : 'rgba(139,92,246,.35)')
+                  : isBack ? 'rgba(239,68,68,.1)' : 'rgba(139,92,246,.1)',
+                border: isEmpty ? 'none'
+                  : isBack ? '1px solid rgba(239,68,68,.25)' : '1px solid rgba(139,92,246,.22)',
+                color: isEmpty ? 'transparent' : isBack ? '#ef4444' : '#fff',
+                fontSize: isBack ? 'min(22px,5.5vw)' : fontSize,
+                fontWeight: 600,
+                cursor: isEmpty||disabled ? 'default' : 'pointer',
+                opacity: disabled ? .35 : 1,
+                transition: 'background .12s, transform .12s',
+                transform: isActive ? 'scale(0.93)' : 'scale(1)',
+                fontFamily:'inherit',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                WebkitTapHighlightColor:'transparent',
+                touchAction:'none',
+              }}>{k}</button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SPLASH SCREEN
+   Pendulum-swing logo, ambient orbs, dot loader.
+   Auto-navigates after 2.6s.
+═══════════════════════════════════════════════ */
+function SplashScreen({ onDone }) {
+  useEffect(()=>{ const t=setTimeout(onDone,2600); return()=>clearTimeout(t); },[]);
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9999,
+      background:'linear-gradient(160deg,#080616 0%,#13102a 52%,#0a0820 100%)',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",overflow:'hidden',
+    }}>
+      {/* Ambient orbs */}
+      <div style={{position:'absolute',top:'10%',left:'8%',width:240,height:240,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(139,92,246,.18),transparent 68%)',
+        animation:'float 4.5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',bottom:'16%',right:'6%',width:180,height:180,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(236,72,153,.13),transparent 68%)',
+        animation:'float 5.5s ease infinite reverse',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',top:'55%',left:'55%',width:320,height:320,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(6,182,212,.06),transparent 68%)',
+        transform:'translate(-30%,-40%)',pointerEvents:'none'}}/>
+
+      {/* Swinging logo block — transform-origin at top-center = pendulum pivot */}
+      <div style={{
+        animation:'swing 1.7s cubic-bezier(.36,.07,.19,.97) .15s both',
+        transformOrigin:'center top',
+        display:'flex',flexDirection:'column',alignItems:'center',gap:12,
+      }}>
+        <div style={{
+          fontSize:84,lineHeight:1,
+          filter:'drop-shadow(0 0 32px rgba(139,92,246,.7)) drop-shadow(0 0 14px rgba(236,72,153,.35))',
+        }}>⭐</div>
+        <div style={{
+          fontSize:48,fontWeight:900,letterSpacing:-2,
+          background:'linear-gradient(100deg,#c4b5fd 0%,#a78bfa 40%,#ec4899 100%)',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+        }}>Wish</div>
+      </div>
+
+      {/* Tagline */}
+      <div style={{
+        marginTop:16,fontSize:13,color:'rgba(255,255,255,.35)',fontWeight:500,
+        letterSpacing:2.5,textTransform:'uppercase',
+        animation:'splashFade .7s ease .95s both',
+      }}>Earn &amp; Reward Platform</div>
+
+      {/* Dot loader */}
+      <div style={{position:'absolute',bottom:76,display:'flex',gap:9}}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{
+            width:7,height:7,borderRadius:'50%',
+            background:'rgba(139,92,246,.65)',
+            animation:`dotPulse 1.15s ease ${i*.19}s infinite`,
+          }}/>
+        ))}
+      </div>
+
+      {/* Version tag */}
+      <div style={{
+        position:'absolute',bottom:34,fontSize:11,
+        color:'rgba(255,255,255,.15)',fontWeight:500,letterSpacing:.5,
+        animation:'splashFade .5s ease 1.5s both',
+      }}>v1.0.0 · Wish Platform</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SLIDE TO OPEN — iOS-style slide gesture for new users
+═══════════════════════════════════════════════ */
+function SlideToOpen({ onUnlock }) {
+  const [frac, setFrac]       = useState(0);   // 0–1 drag fraction
+  const [dragging, setDrag]   = useState(false);
+  const [done, setDone]       = useState(false);
+  const [fadeOut, setFO]      = useState(false);
+  const trackRef  = useRef(null);
+  const startRef  = useRef(null);
+  const THUMB = 64;
+
+  const getMax = () => Math.max(1, (trackRef.current?.offsetWidth||320) - THUMB - 8);
+
+  const onPD = (e) => {
+    if (done) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    startRef.current = e.clientX - frac * getMax();
+    setDrag(true);
+  };
+  const onPM = (e) => {
+    if (startRef.current===null||done) return;
+    const f = Math.max(0, Math.min(1, (e.clientX - startRef.current) / getMax()));
+    setFrac(f);
+    if (f >= 0.93 && !done) {
+      setDone(true); setFrac(1);
+      setTimeout(()=>{ setFO(true); setTimeout(onUnlock,380); }, 280);
+    }
+  };
+  const onPU = () => { if (!done) setFrac(0); startRef.current=null; setDrag(false); };
+
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9998,
+      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",overflow:'hidden',
+      opacity:fadeOut?0:1,transition:'opacity .38s ease',
+    }}>
+      {/* Ambient */}
+      <div style={{position:'absolute',top:'14%',right:'9%',width:210,height:210,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',
+        animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',bottom:'20%',left:'7%',width:170,height:170,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',
+        animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+
+      {/* Hero */}
+      <div style={{textAlign:'center',marginBottom:56,animation:'splashFade .6s ease .1s both'}}>
+        <div style={{fontSize:64,marginBottom:10,
+          filter:'drop-shadow(0 0 22px rgba(139,92,246,.55))'}}>⭐</div>
+        <div style={{fontSize:34,fontWeight:900,letterSpacing:-1,
+          background:'linear-gradient(100deg,#c4b5fd,#a78bfa,#ec4899)',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
+          Welcome to Wish
+        </div>
+        <div style={{fontSize:14,color:'rgba(255,255,255,.38)',fontWeight:500,lineHeight:1.6}}>
+          Your earning journey starts here
+        </div>
+      </div>
+
+      {/* Slide track */}
+      <div ref={trackRef} style={{
+        width:'78%',maxWidth:340,height:72,borderRadius:99,
+        background:'rgba(139,92,246,.07)',
+        border:'1px solid rgba(139,92,246,.2)',
+        position:'relative',overflow:'hidden',
+        boxShadow:'inset 0 2px 12px rgba(0,0,0,.3), 0 4px 24px rgba(0,0,0,.25)',
+        animation:'splashFade .6s ease .3s both',
+      }}>
+        {/* Progress fill */}
+        <div style={{
+          position:'absolute',top:0,left:0,bottom:0,
+          width:`calc(${frac*100}% + 36px)`,
+          background:`linear-gradient(90deg,rgba(139,92,246,.3),rgba(139,92,246,.1))`,
+          borderRadius:99,
+          transition:dragging?'none':'width .35s cubic-bezier(.34,1.56,.64,1)',
+        }}/>
+        {/* Label */}
+        <div style={{
+          position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',
+          fontSize:14,fontWeight:700,letterSpacing:.8,userSelect:'none',pointerEvents:'none',
+          color:`rgba(255,255,255,${Math.max(.15, .6 - frac*.7)})`,
+          transition:'color .1s',
+        }}>
+          {done?'Opening…':'Slide to Open  ›'}
+        </div>
+        {/* Thumb */}
+        <div
+          onPointerDown={onPD} onPointerMove={onPM}
+          onPointerUp={onPU}   onPointerCancel={onPU}
+          style={{
+            position:'absolute',left:4,top:4,
+            width:THUMB,height:THUMB,borderRadius:'50%',
+            background: done
+              ? 'linear-gradient(135deg,#10b981,#059669)'
+              : 'linear-gradient(135deg,#a78bfa,#8b5cf6)',
+            boxShadow: done
+              ? '0 4px 22px rgba(16,185,129,.55)'
+              : '0 4px 22px rgba(139,92,246,.55)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontSize:26,color:'#fff',fontWeight:700,
+            transform:`translateX(${frac*getMax()}px)`,
+            transition:dragging?'none':'transform .38s cubic-bezier(.34,1.56,.64,1), background .3s, box-shadow .3s',
+            cursor:done?'default':'grab',
+            touchAction:'none',userSelect:'none',
+            WebkitTapHighlightColor:'transparent',
+          }}
+        >{done?'✓':'›'}</div>
+      </div>
+
+      {/* Hint */}
+      <div style={{
+        marginTop:22,fontSize:12,color:'rgba(255,255,255,.22)',fontWeight:500,
+        animation:'splashFade .6s ease .55s both',
+      }}>Drag the button all the way to the right</div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SECURITY SETUP
+   Shown AFTER successful account creation / sign-in.
+   Two independent sections: PIN Code + Fingerprint.
+   Each has a checkbox and a dedicated setup button.
+   Fingerprint uses WebAuthn platform authenticator.
+   All settings are per-user, keyed by user.id.
+═══════════════════════════════════════════════ */
+function SecuritySetup({ user, onComplete }) {
+  const uid = user?.id;
+
+  /* ── What the user wants to enable (checkboxes) ── */
+  const [usePin, setUsePin]   = useState(false);
+  const [useBio, setUseBio]   = useState(false);
+
+  /* ── Completion state ── */
+  const [pinDone, setPinDone] = useState(false);
+  const [bioDone, setBioDone] = useState(false);
+
+  /* ── Biometric device support: null=checking, true, false ── */
+  const [bioSupp, setBioSupp] = useState(null);
+
+  /* ── PIN modal ── */
+  const [pinModal, setPinModal]   = useState(false);
+  const [pinStep,  setPinStep]    = useState('enter');  // 'enter' | 'confirm'
+  const [pin1,     setPin1]       = useState('');
+  const [pin2,     setPin2]       = useState('');
+  const [pinHint,  setPinHint]    = useState('');
+  const [showHintI,setShowHintI]  = useState(false);
+  const [pinShake, setPinShake]   = useState(false);
+  const [pinSaving,setPinSaving]  = useState(false);
+  const [pinErr,   setPinErr]     = useState('');
+  const [pinVis,   setPinVis]     = useState(false);
+
+  /* ── Biometric setup ── */
+  const [bioLoading, setBioLoading] = useState(false);
+  const [bioMsg,     setBioMsg]     = useState('');
+  const [bioMsgType, setBioMsgType] = useState('info'); // 'success' | 'error'
+
+  /* ── General error ── */
+  const [error, setError] = useState('');
+
+  /* Async platform check on mount */
+  useEffect(()=>{
+    Security.checkPlatformBio().then(ok=>setBioSupp(ok)).catch(()=>setBioSupp(false));
+  },[]);
+
+  const doShake = ()=>{ setPinShake(true); setTimeout(()=>setPinShake(false),620); };
+
+  /* ── PIN Modal handlers ── */
+  const openPinModal = ()=>{
+    setPin1(''); setPin2(''); setPinStep('enter'); setPinErr(''); setPinSaving(false);
+    setPinModal(true);
+  };
+  const closePinModal = ()=>{
+    setPinModal(false); setPin1(''); setPin2(''); setPinStep('enter'); setPinErr('');
+  };
+  const onPinKey = (k)=>{
+    if (pinSaving) return;
+    if (pinStep==='enter'){
+      if(k==='⌫'){ setPin1(p=>p.slice(0,-1)); return; }
+      if(pin1.length<4) setPin1(p=>p+k);
+    } else {
+      if(k==='⌫'){ setPin2(p=>p.slice(0,-1)); return; }
+      if(pin2.length<4) setPin2(p=>p+k);
+    }
+  };
+  /* Auto-advance enter → confirm */
+  useEffect(()=>{
+    if(pinStep==='enter'&&pin1.length===4) setTimeout(()=>setPinStep('confirm'),230);
+  },[pin1]);
+  /* Auto-verify at 4 confirm digits */
+  useEffect(()=>{
+    if(pinStep!=='confirm'||pin2.length!==4||pinSaving) return;
+    setPinSaving(true);
+    if(pin1===pin2){
+      Security.hashPin(pin1).then(hash=>{
+        Security.saveUser(uid,'pin_hash',hash);
+        if(pinHint.trim()) Security.saveUser(uid,'pin_hint',pinHint.trim());
+        setPinSaving(false); setPinDone(true); closePinModal();
+      });
+    } else {
+      doShake(); setPinErr('PINs do not match. Try again.');
+      setTimeout(()=>{ setPin2(''); setPinErr(''); setPinSaving(false); },1700);
+    }
+  },[pin2]);
+
+  /* ── Biometric setup via WebAuthn ── */
+  const handleBioSetup = async ()=>{
+    setBioLoading(true); setBioMsg('');
+    const res = await Security.setupBiometric(uid);
+    setBioLoading(false);
+    if(res.success){
+      Security.saveUser(uid,'has_bio',true);
+      setBioDone(true);
+      setBioMsgType('success'); setBioMsg('Fingerprint set up successfully!');
+    } else {
+      setBioMsgType('error');
+      if(res.error==='cancelled')   setBioMsg('Setup cancelled. Tap again to retry.');
+      else if(res.error==='no_hardware') { setBioMsg('Your device does not support fingerprint authentication.'); setBioSupp(false); }
+      else setBioMsg('Fingerprint setup failed. Please try again.');
+    }
+  };
+
+  /* ── Continue / finalize ── */
+  const handleContinue = ()=>{
+    if(usePin&&!pinDone){ setError('Please complete your PIN setup first.'); return; }
+    if(useBio&&!bioDone){ setError('Please complete fingerprint setup first.'); return; }
+    setError('');
+    Security.saveUser(uid,'security_done',true);
+    Security.save('first_launch','1');
+    onComplete();
+  };
+
+  const BG = {position:'fixed',inset:0,zIndex:9997,background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start',fontFamily:"'Plus Jakarta Sans',sans-serif",padding:'60px 24px 40px',overflow:'auto'};
+  const ORBS = <>
+    <div style={{position:'absolute',top:'6%',right:'5%',width:200,height:200,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.15),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+    <div style={{position:'absolute',bottom:'8%',left:'5%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.1),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+  </>;
+
+  /* ── PIN Modal overlay ── */
+  const PinModalEl = pinModal&&(
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.88)',display:'flex',alignItems:'center',justifyContent:'center',padding:24,backdropFilter:'blur(8px)'}}>
+      <div style={{background:'linear-gradient(160deg,#13102a,#0d0b1e)',border:'1px solid rgba(139,92,246,.3)',borderRadius:24,padding:'28px 20px',width:'100%',maxWidth:340,display:'flex',flexDirection:'column',alignItems:'center'}}>
+        {/* Modal header */}
+        <div style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+          <div style={{fontSize:16,fontWeight:800,color:'#fff'}}>{pinStep==='enter'?'Create PIN':'Confirm PIN'}</div>
+          <button onClick={closePinModal} style={{background:'none',border:'none',color:'rgba(255,255,255,.4)',fontSize:20,cursor:'pointer',lineHeight:1,fontFamily:'inherit'}}>✕</button>
+        </div>
+        {/* Step dots */}
+        <div style={{display:'flex',gap:8,marginBottom:20}}>
+          {['enter','confirm'].map((s,i)=>(
+            <div key={s} style={{height:6,borderRadius:99,width:pinStep===s?24:6,background:pinStep===s||i===0?'#a78bfa':'rgba(255,255,255,.15)',transition:'all .3s'}}/>
+          ))}
+        </div>
+        <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:24,textAlign:'center'}}>
+          {pinStep==='enter'?'Choose a 4-digit PIN to protect your account':'Re-enter the same PIN to confirm'}
+        </div>
+        <PinDots filled={pinStep==='enter'?pin1.length:pin2.length} shake={pinShake} visible={pinVis} raw={pinStep==='enter'?pin1:pin2}/>
+        {pinErr
+          ?<div style={{marginTop:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {pinErr}</div>
+          :<button onClick={()=>setPinVis(v=>!v)} style={{marginTop:12,background:'none',border:'none',color:'rgba(255,255,255,.28)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>
+            {pinVis?'🙈 Hide PIN':'👁 Show PIN'}
+          </button>
+        }
+        {pinStep==='enter'&&(
+          <div style={{marginTop:14,width:'100%'}}>
+            {!showHintI
+              ?<button onClick={()=>setShowHintI(true)} style={{background:'none',border:'none',color:'rgba(255,255,255,.22)',fontSize:12,cursor:'pointer',fontFamily:'inherit',display:'block',margin:'0 auto'}}>+ Add PIN hint (optional)</button>
+              :<input value={pinHint} onChange={e=>setPinHint(e.target.value)} maxLength={40} placeholder="e.g. Favourite year…"
+                  style={{width:'100%',background:'rgba(139,92,246,.07)',border:'1px solid rgba(139,92,246,.22)',borderRadius:11,padding:'10px 14px',color:'#fff',fontSize:13,outline:'none',fontFamily:'inherit',textAlign:'center'}}/>
+            }
+          </div>
+        )}
+        <div style={{marginTop:22}}><PinKeypad onKey={onPinKey} disabled={pinSaving}/></div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={BG}>
+      {ORBS}
+      {PinModalEl}
+
+      {/* Header */}
+      <div style={{width:76,height:76,borderRadius:24,marginBottom:16,background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',border:'1px solid rgba(139,92,246,.32)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:38,boxShadow:'0 8px 32px rgba(139,92,246,.22)',flexShrink:0}}>🔐</div>
+      <div style={{fontSize:22,fontWeight:800,color:'#fff',marginBottom:6,textAlign:'center'}}>Secure Your Account</div>
+      <div style={{fontSize:13,color:'rgba(255,255,255,.38)',marginBottom:28,textAlign:'center',lineHeight:1.6,maxWidth:290}}>
+        Add extra security to protect your account.<br/>Both options are optional.
+      </div>
+
+      {/* ── PIN Code section ── */}
+      <div style={{width:'100%',maxWidth:340,display:'flex',flexDirection:'column',gap:14,marginBottom:24}}>
+        <div style={{background:'rgba(255,255,255,.04)',border:`1.5px solid ${usePin?'rgba(139,92,246,.45)':'rgba(255,255,255,.1)'}`,borderRadius:18,padding:'18px 20px',transition:'all .2s',boxShadow:usePin?'0 0 22px rgba(139,92,246,.15)':'none'}}>
+          {/* Checkbox row */}
+          <div style={{display:'flex',alignItems:'center',gap:12,cursor:'pointer',marginBottom:usePin?14:0}} onClick={()=>{ setUsePin(p=>!p); setError(''); }}>
+            <div style={{width:26,height:26,borderRadius:8,background:usePin?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.08)',border:`2px solid ${usePin?'#8b5cf6':'rgba(255,255,255,.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'#fff',transition:'all .2s',flexShrink:0}}>
+              {usePin?'✓':''}
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:15,fontWeight:700,color:usePin?'#a78bfa':'#fff'}}>🔢 Use PIN Code</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,.35)',marginTop:2}}>4-digit secret code</div>
+            </div>
+            {pinDone&&<div style={{background:'rgba(16,185,129,.15)',border:'1px solid rgba(16,185,129,.3)',borderRadius:20,padding:'3px 10px',fontSize:11,color:'#34d399',fontWeight:700,flexShrink:0}}>✓ Set</div>}
+          </div>
+          {/* Set PIN button */}
+          {usePin&&(
+            <button onClick={openPinModal} style={{width:'100%',background:pinDone?'rgba(16,185,129,.1)':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(109,40,217,.22))',border:`1px solid ${pinDone?'rgba(16,185,129,.3)':'rgba(139,92,246,.35)'}`,borderRadius:13,padding:'13px',color:pinDone?'#34d399':'#a78bfa',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
+              {pinDone?'✓ PIN Configured — Change PIN':'Set PIN Code'}
+            </button>
+          )}
+        </div>
+
+        {/* ── Fingerprint section (only if device may support it) ── */}
+        {bioSupp!==false&&(
+          <div style={{background:'rgba(255,255,255,.04)',border:`1.5px solid ${useBio?'rgba(139,92,246,.45)':'rgba(255,255,255,.1)'}`,borderRadius:18,padding:'18px 20px',transition:'all .2s',boxShadow:useBio?'0 0 22px rgba(139,92,246,.15)':'none'}}>
+            {/* Checkbox row */}
+            <div style={{display:'flex',alignItems:'center',gap:12,cursor:bioSupp===null?'default':'pointer',marginBottom:useBio?14:0,opacity:bioSupp===null?.65:1}} onClick={()=>{ if(bioSupp) { setUseBio(p=>!p); setError(''); } }}>
+              <div style={{width:26,height:26,borderRadius:8,background:useBio?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.08)',border:`2px solid ${useBio?'#8b5cf6':'rgba(255,255,255,.2)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'#fff',transition:'all .2s',flexShrink:0}}>
+                {useBio?'✓':''}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:15,fontWeight:700,color:useBio?'#a78bfa':'#fff'}}>👆 Use Fingerprint</div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,.35)',marginTop:2}}>
+                  {bioSupp===null?'Checking device support…':'Fingerprint / Face ID'}
+                </div>
+              </div>
+              {bioDone&&<div style={{background:'rgba(16,185,129,.15)',border:'1px solid rgba(16,185,129,.3)',borderRadius:20,padding:'3px 10px',fontSize:11,color:'#34d399',fontWeight:700,flexShrink:0}}>✓ Set</div>}
+            </div>
+            {/* Set Up Fingerprint button */}
+            {useBio&&(
+              <>
+                <button onClick={handleBioSetup} disabled={bioLoading||bioDone}
+                  style={{width:'100%',background:bioDone?'rgba(16,185,129,.1)':bioLoading?'rgba(139,92,246,.07)':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(109,40,217,.22))',border:`1px solid ${bioDone?'rgba(16,185,129,.3)':bioLoading?'rgba(139,92,246,.2)':'rgba(139,92,246,.35)'}`,borderRadius:13,padding:'13px',color:bioDone?'#34d399':bioLoading?'rgba(255,255,255,.45)':'#a78bfa',fontSize:14,fontWeight:700,cursor:bioLoading||bioDone?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:8,transition:'all .2s'}}>
+                  {bioLoading&&<div style={{width:16,height:16,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite',flexShrink:0}}/>}
+                  {bioDone?'✓ Fingerprint Configured':bioLoading?'Waiting for biometric…':'Set Up Fingerprint'}
+                </button>
+                {bioMsg&&(
+                  <div style={{marginTop:10,padding:'8px 14px',borderRadius:10,background:bioMsgType==='success'?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)',border:`1px solid ${bioMsgType==='success'?'rgba(16,185,129,.25)':'rgba(239,68,68,.25)'}`,fontSize:12,color:bioMsgType==='success'?'#34d399':'#f87171',textAlign:'center'}}>
+                    {bioMsgType==='success'?'✓ ':'⚠ '}{bioMsg}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        <div style={{textAlign:'center',fontSize:12,color:'rgba(255,255,255,.22)',marginTop:-4}}>
+          You can skip both options and add security later in Settings
+        </div>
+      </div>
+
+      {error&&<div style={{marginBottom:14,fontSize:13,color:'#ef4444',fontWeight:600,textAlign:'center',animation:'splashFade .25s ease'}}>⚠ {error}</div>}
+
+      <button onClick={handleContinue} style={{width:'100%',maxWidth:340,background:'linear-gradient(135deg,#8b5cf6,#6d28d9)',border:'none',borderRadius:14,padding:'15px',color:'#fff',fontWeight:800,fontSize:15,cursor:'pointer',boxShadow:'0 6px 24px rgba(139,92,246,.4)',flexShrink:0}}>
+        Continue →
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   UNLOCK SCREEN
+   Shown when a returning user already has security set up.
+   Per-user: reads/writes Security.loadUser(uid, …).
+   Supports PIN keypad + Fingerprint / Face ID button.
+   Escalating lockout: 30s → 60s → 2m → 5m per wave.
+═══════════════════════════════════════════════ */
+function UnlockScreen({ user, onUnlock }) {
+  const uid    = user?.id;
+  const hasPin = uid && !!Security.loadUser(uid,'pin_hash',null);
+  const hasBio = uid &&  Security.loadUser(uid,'has_bio',false);
+  const hint   = uid ?   Security.loadUser(uid,'pin_hint',null) : null;
+
+  const [pin, setPin]       = useState('');
+  const [error, setError]   = useState('');
+  const [shake, setShake]   = useState(false);
+  const [verifying, setVfy] = useState(false);
+  const [visible, setVis]   = useState(false);
+  const [showHint, setSH]   = useState(false);
+  const [bioMsg,     setBioMsg]     = useState('');
+  const [bioLoading, setBioLoading] = useState(false);
+  const [failed, setFailed] = useState(()=> uid ? Security.loadUser(uid,'failed_pin',0) : 0);
+  const [lockUntil, setLU]  = useState(()=> uid ? Security.loadUser(uid,'lock_until',0) : 0);
+  const [now, setNow]       = useState(()=>Date.now());
+
+  const isLocked = lockUntil > now;
+  const secsLeft = Math.max(0, Math.ceil((lockUntil - now)/1000));
+
+  /* Escalating lockout durations (ms) */
+  const lockDur = (n) => n>=8?300000 : n>=7?120000 : n>=6?60000 : 30000;
+
+  /* Tick every 500ms while locked */
+  useEffect(()=>{
+    if (!isLocked) return;
+    const iv=setInterval(()=>{
+      const n=Date.now(); setNow(n);
+      if (lockUntil<=n){
+        setFailed(0); Security.saveUser(uid,'failed_pin',0);
+        setLU(0);     Security.saveUser(uid,'lock_until',0);
+        setError('');
+      }
+    },500);
+    return()=>clearInterval(iv);
+  },[lockUntil,isLocked]);
+
+  /* Auto-verify at 4 digits */
+  useEffect(()=>{
+    if (pin.length!==4||verifying||isLocked) return;
+    setVfy(true);
+    Security.verifyPin(pin, Security.loadUser(uid,'pin_hash')).then(ok=>{
+      if (ok){
+        Security.saveUser(uid,'failed_pin',0); Security.saveUser(uid,'lock_until',0);
+        setPin(''); setVfy(false); onUnlock();
+      } else {
+        const nf=failed+1;
+        setFailed(nf); Security.saveUser(uid,'failed_pin',nf);
+        const msg=nf>=5
+          ? 'Too many attempts. Temporarily locked.'
+          : `Incorrect PIN. ${5-nf} attempt${5-nf===1?'':'s'} left.`;
+        if (nf>=5){ const u2=Date.now()+lockDur(nf); setLU(u2); Security.saveUser(uid,'lock_until',u2); }
+        setShake(true); setError(msg);
+        setTimeout(()=>{ setShake(false); setPin(''); setError(''); setVfy(false); },1700);
+      }
+    });
+  },[pin]);
+
+  const onKey=(k)=>{
+    if (verifying||isLocked) return;
+    if (k==='⌫'){ setPin(p=>p.slice(0,-1)); setError(''); return; }
+    if (pin.length<4) setPin(p=>p+k);
+  };
+
+  /* Biometric unlock via WebAuthn platform authenticator.
+     Native (Expo): swap Security.authenticateBiometric() for:
+       import * as LA from 'expo-local-authentication';
+       const r = await LA.authenticateAsync({ promptMessage:'Unlock Wish' });
+       if (r.success) onUnlock(); */
+  const tryBiometric = async ()=>{
+    if (bioLoading) return;
+    setBioMsg(''); setBioLoading(true);
+    const res = await Security.authenticateBiometric(uid);
+    setBioLoading(false);
+    if (res.success){
+      onUnlock();
+    } else if (res.error==='cancelled'){
+      setBioMsg('Authentication cancelled.');
+      setTimeout(()=>setBioMsg(''),3000);
+    } else if (res.error==='no_credential'){
+      setBioMsg('Biometric not configured. Please use your PIN.');
+      setTimeout(()=>setBioMsg(''),4000);
+    } else {
+      setBioMsg('Fingerprint not recognized. Please try again.');
+      setTimeout(()=>setBioMsg(''),3000);
+    }
+  };
+
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9997,
+      background:'linear-gradient(160deg,#080616,#13102a 52%,#0a0820)',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",
+      overflowY:'auto',overflowX:'hidden',
+    }}>
+      {/* Ambient orbs — decorative only, pointer-events off */}
+      <div style={{position:'fixed',top:'8%',left:'5%',width:160,height:160,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.14),transparent 68%)',animation:'float 5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'fixed',bottom:'10%',right:'5%',width:120,height:120,borderRadius:'50%',background:'radial-gradient(circle,rgba(236,72,153,.09),transparent 68%)',animation:'float 4s ease infinite reverse',pointerEvents:'none'}}/>
+
+      {/* Scrollable content column */}
+      <div style={{
+        minHeight:'100%',display:'flex',flexDirection:'column',alignItems:'center',
+        justifyContent:'center',padding:'24px 20px 32px',boxSizing:'border-box',
+      }}>
+
+        {/* ── Greeting row (avatar + name inline, compact) ── */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16,animation:'splashFade .5s ease both'}}>
+          <div style={{width:40,height:40,borderRadius:'50%',background:'linear-gradient(135deg,#8b5cf6,#ec4899)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,fontWeight:800,color:'#fff',flexShrink:0,boxShadow:'0 3px 14px rgba(139,92,246,.4)'}}>
+            {user?.name?.[0]?.toUpperCase()||'U'}
+          </div>
+          <div style={{fontSize:14,fontWeight:700,color:'#fff'}}>Hi, {user?.name?.split(' ')[0]||'Welcome back'}!</div>
+        </div>
+
+        {/* ── Lock icon + title ── */}
+        <div style={{
+          width:64,height:64,borderRadius:20,marginBottom:12,
+          background:isLocked?'linear-gradient(135deg,rgba(239,68,68,.22),rgba(185,28,28,.14))':'linear-gradient(135deg,rgba(139,92,246,.22),rgba(236,72,153,.14))',
+          border:`1px solid ${isLocked?'rgba(239,68,68,.3)':'rgba(139,92,246,.3)'}`,
+          display:'flex',alignItems:'center',justifyContent:'center',fontSize:32,
+          boxShadow:`0 6px 24px ${isLocked?'rgba(239,68,68,.2)':'rgba(139,92,246,.2)'}`,
+          transition:'all .4s ease',
+        }}>
+          {isLocked?'🔒':'🔓'}
+        </div>
+
+        <div style={{fontSize:20,fontWeight:800,color:'#fff',marginBottom:4,textAlign:'center'}}>
+          {isLocked?'App Locked':'Enter your PIN'}
+        </div>
+        <div style={{fontSize:12,color:'rgba(255,255,255,.38)',marginBottom:isLocked?14:18,textAlign:'center',lineHeight:1.5}}>
+          {isLocked?'Too many failed attempts — please wait':'Enter your 4-digit PIN to continue'}
+        </div>
+
+        {/* ── Lockout countdown ── */}
+        {isLocked&&(
+          <div style={{width:80,height:80,borderRadius:'50%',marginBottom:20,border:'3px solid rgba(239,68,68,.35)',background:'rgba(239,68,68,.08)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:'0 0 26px rgba(239,68,68,.2)'}}>
+            <div style={{fontSize:26,fontWeight:800,color:'#ef4444',fontFamily:'monospace'}}>{secsLeft}</div>
+            <div style={{fontSize:9,color:'rgba(239,68,68,.6)',letterSpacing:.5}}>SEC</div>
+          </div>
+        )}
+
+        {/* ── PIN entry ── */}
+        {!isLocked&&hasPin&&(<>
+          <PinDots filled={pin.length} shake={shake} visible={visible} raw={pin}/>
+
+          {/* Error or show/hint toggles */}
+          <div style={{height:28,display:'flex',alignItems:'center',justifyContent:'center',gap:16,marginTop:6}}>
+            {error
+              ?<div style={{fontSize:12,color:'#ef4444',fontWeight:600,animation:'splashFade .3s ease'}}>⚠ {error}</div>
+              :<>
+                <button onClick={()=>setVis(v=>!v)} style={{background:'none',border:'none',color:'rgba(255,255,255,.3)',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>
+                  {visible?'🙈 Hide':'👁 Show'}
+                </button>
+                {hint&&<button onClick={()=>setSH(s=>!s)} style={{background:'none',border:'none',color:'rgba(255,255,255,.25)',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>💡 Hint</button>}
+              </>
+            }
+          </div>
+          {showHint&&hint&&(
+            <div style={{marginBottom:8,background:'rgba(245,158,11,.1)',border:'1px solid rgba(245,158,11,.22)',borderRadius:10,padding:'6px 14px',fontSize:11,color:'#f59e0b',textAlign:'center'}}>💡 {hint}</div>
+          )}
+
+          {/* Keypad — responsive button size via vw */}
+          <div style={{marginTop:14,width:'100%',maxWidth:300}}>
+            <PinKeypad onKey={onKey} disabled={verifying}/>
+          </div>
+
+          {/* Failed-attempt pips */}
+          {failed>0&&failed<5&&(
+            <div style={{marginTop:12,display:'flex',gap:6,justifyContent:'center'}}>
+              {[0,1,2,3,4].map(i=>(
+                <div key={i} style={{width:8,height:8,borderRadius:'50%',background:i<failed?'#ef4444':'rgba(255,255,255,.15)',transition:'background .3s'}}/>
+              ))}
+            </div>
+          )}
+        </>)}
+
+        {/* ── Biometric button ── */}
+        {!isLocked&&hasBio&&(
+          <>
+            {hasPin&&(
+              <div style={{display:'flex',alignItems:'center',gap:10,width:'100%',maxWidth:280,margin:'14px 0 10px'}}>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
+                <span style={{fontSize:11,color:'rgba(255,255,255,.28)',letterSpacing:.5}}>or</span>
+                <div style={{flex:1,height:1,background:'rgba(255,255,255,.1)'}}/>
+              </div>
+            )}
+            <button onClick={tryBiometric} disabled={bioLoading}
+              style={{width:'100%',maxWidth:280,display:'flex',alignItems:'center',justifyContent:'center',gap:10,
+                background:bioLoading?'rgba(139,92,246,.06)':'rgba(139,92,246,.1)',
+                border:'1px solid rgba(139,92,246,.28)',borderRadius:16,
+                padding:'13px 20px',color:'#a78bfa',fontSize:14,fontWeight:700,
+                cursor:bioLoading?'default':'pointer',fontFamily:'inherit',
+                boxShadow:'0 3px 14px rgba(139,92,246,.16)',transition:'all .2s',
+              }}>
+              {bioLoading
+                ?<><div style={{width:18,height:18,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite',flexShrink:0}}/> Waiting…</>
+                :<><span style={{fontSize:24}}>👆</span> Use Fingerprint / Face ID</>
+              }
+            </button>
+          </>
+        )}
+
+        {/* Biometric status message */}
+        {bioMsg&&(
+          <div style={{marginTop:10,background:'rgba(139,92,246,.1)',border:'1px solid rgba(139,92,246,.2)',borderRadius:10,padding:'8px 14px',fontSize:11,color:'#a78bfa',maxWidth:280,textAlign:'center',animation:'splashFade .3s ease'}}>
+            ℹ️ {bioMsg}
+          </div>
+        )}
+
+      </div>{/* end content column */}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   SECURITY SETTINGS VIEW
+   Rendered inside the MainApp sidebar overlay.
+   Allows users to change PIN and toggle biometric.
+   Changing PIN requires verifying the current PIN first.
+═══════════════════════════════════════════════ */
+function SecuritySettingsView({ user }) {
+  const uid = user?.id;
+  const [hasPin, setHasPin]   = useState(()=> uid&&!!Security.loadUser(uid,'pin_hash',null));
+  const [hasBio, setHasBio]   = useState(()=> uid&&Security.loadUser(uid,'has_bio',false));
+  const [mode, setMode]       = useState('view');  // view|verifyPin|newPin|confirmPin
+  const [oldPin, setOP]       = useState('');
+  const [newPin, setNP]       = useState('');
+  const [confPin, setCP]      = useState('');
+  const [error, setError]     = useState('');
+  const [shake, setShake]     = useState(false);
+  const [msg, setMsg]         = useState('');
+  const [verifying, setVfy]   = useState(false);
+  const [bioLoading, setBioL] = useState(false);
+  const [bioSupp, setBioSupp] = useState(null);
+
+  useEffect(()=>{
+    Security.checkPlatformBio().then(ok=>setBioSupp(ok)).catch(()=>setBioSupp(false));
+  },[]);
+
+  const doShake = ()=>{ setShake(true); setTimeout(()=>setShake(false),620); };
+  const showMsg = (m)=>{ setMsg(m); setTimeout(()=>setMsg(''),3000); };
+  const reset   = ()=>{ setMode('view'); setOP(''); setNP(''); setCP(''); setError(''); setVfy(false); };
+
+  const onKey=(k)=>{
+    if (verifying) return;
+    const map={verifyPin:[oldPin,setOP],newPin:[newPin,setNP],confirmPin:[confPin,setCP]};
+    const [val,setVal]=map[mode]||[];
+    if(!setVal) return;
+    if(k==='⌫'){setVal(p=>p.slice(0,-1));return;}
+    if(val.length<4) setVal(p=>p+k);
+  };
+
+  /* Verify current PIN */
+  useEffect(()=>{
+    if(mode!=='verifyPin'||oldPin.length!==4||verifying) return;
+    setVfy(true);
+    Security.verifyPin(oldPin, Security.loadUser(uid,'pin_hash')).then(ok=>{
+      if(ok){ setOP(''); setMode('newPin'); setError(''); setVfy(false); }
+      else{ doShake(); setError('Incorrect current PIN.'); setTimeout(()=>{setOP('');setError('');setVfy(false);},1700); }
+    });
+  },[oldPin]);
+
+  /* Auto-advance to confirm */
+  useEffect(()=>{
+    if(mode==='newPin'&&newPin.length===4) setTimeout(()=>setMode('confirmPin'),230);
+  },[newPin]);
+
+  /* Validate and save new PIN */
+  useEffect(()=>{
+    if(mode!=='confirmPin'||confPin.length!==4||verifying) return;
+    setVfy(true);
+    if(newPin===confPin){
+      Security.hashPin(newPin).then(hash=>{
+        Security.saveUser(uid,'pin_hash',hash);
+        setNP(''); setCP(''); setHasPin(true);
+        showMsg('PIN changed successfully!'); reset();
+      });
+    } else {
+      doShake(); setError('PINs do not match.');
+      setTimeout(()=>{setCP('');setError('');setVfy(false);},1700);
+    }
+  },[confPin]);
+
+  const currentPin={verifyPin:oldPin,newPin:newPin,confirmPin:confPin}[mode]||'';
+  const pinTitles={verifyPin:'Enter current PIN',newPin:'Enter new PIN',confirmPin:'Confirm new PIN'};
+
+  /* ── Inline PIN entry (change PIN flow) ── */
+  if (mode!=='view') return (
+    <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 24px 40px'}}>
+      <div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:32,textAlign:'center'}}>{pinTitles[mode]}</div>
+      <PinDots filled={currentPin.length} shake={shake} visible={false}/>
+      {error&&<div style={{marginTop:14,fontSize:13,color:C.red,fontWeight:600,textAlign:'center',animation:'splashFade .3s ease'}}>⚠ {error}</div>}
+      <div style={{marginTop:28}}><PinKeypad onKey={onKey} disabled={verifying}/></div>
+      <button onClick={reset} style={{marginTop:20,background:'none',border:'none',color:C.muted,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+    </div>
+  );
+
+  /* ── Settings view ── */
+  return (
+    <div style={{flex:1,overflowY:'auto',padding:'16px 16px 32px'}}>
+      {msg&&<div style={{background:'rgba(16,185,129,.15)',border:`1px solid rgba(16,185,129,.3)`,borderRadius:12,padding:'10px 16px',fontSize:13,color:C.green,marginBottom:16,textAlign:'center',fontWeight:600}}>✓ {msg}</div>}
+
+      {/* PIN section */}
+      <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.1,marginBottom:10}}>PIN Code</div>
+      <div style={{background:C.s2,borderRadius:16,marginBottom:20,border:`1px solid ${C.border}`,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:hasPin?12:0}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:C.white}}>4-Digit PIN</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>{hasPin?'Active — tap to change':'Not configured'}</div>
+          </div>
+          <div style={{fontSize:11,fontWeight:700,color:hasPin?C.green:C.red,background:hasPin?'rgba(16,185,129,.15)':'rgba(239,68,68,.15)',borderRadius:6,padding:'3px 9px'}}>{hasPin?'✓ ON':'✗ OFF'}</div>
+        </div>
+        {hasPin&&(
+          <button onClick={()=>setMode('verifyPin')} style={{width:'100%',background:'rgba(139,92,246,.12)',border:`1px solid rgba(139,92,246,.25)`,borderRadius:10,padding:'10px',color:C.brandLt,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+            🔄 Change PIN
+          </button>
+        )}
+        {!hasPin&&(
+          <button onClick={()=>setMode('newPin')} style={{width:'100%',background:C.brand,border:'none',borderRadius:10,padding:'10px',color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginTop:12}}>
+            + Set Up PIN
+          </button>
+        )}
+      </div>
+
+      {/* Biometric section */}
+      <div style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:.1,marginBottom:10}}>Biometric</div>
+      <div style={{background:C.s2,borderRadius:16,marginBottom:20,border:`1px solid ${C.border}`,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:(hasBio||bioSupp===false)?0:12}}>
+          <div>
+            <div style={{fontSize:15,fontWeight:700,color:C.white}}>Fingerprint / Face ID</div>
+            <div style={{fontSize:12,color:C.muted,marginTop:2}}>
+              {bioSupp===false?'Not supported on this device':hasBio?'Active — tap to disable':'Not configured'}
+            </div>
+          </div>
+          {bioSupp!==false&&(
+            <button onClick={()=>{ const n=!hasBio; setHasBio(n); Security.saveUser(uid,'has_bio',n); if(!n){Security.removeUser(uid,'bio_cred_id');} }} style={{width:48,height:28,borderRadius:99,border:'none',cursor:'pointer',background:hasBio?'linear-gradient(135deg,#8b5cf6,#6d28d9)':'rgba(255,255,255,.15)',position:'relative',transition:'background .2s',flexShrink:0}}>
+              <div style={{position:'absolute',width:22,height:22,borderRadius:'50%',background:'#fff',top:3,left:hasBio?23:3,transition:'left .2s'}}/>
+            </button>
+          )}
+        </div>
+        {/* Register / re-register fingerprint via WebAuthn */}
+        {bioSupp!==false&&(
+          <button onClick={async ()=>{
+            setBioL(true);
+            const res = await Security.setupBiometric(uid);
+            setBioL(false);
+            if(res.success){
+              Security.saveUser(uid,'has_bio',true);
+              setHasBio(true);
+              showMsg(hasBio?'Fingerprint re-registered!':'Fingerprint enabled!');
+            } else if(res.error==='cancelled'){
+              showMsg('Setup cancelled.');
+            } else if(res.error==='no_hardware'){
+              setBioSupp(false);
+              showMsg('No biometric hardware detected.');
+            } else {
+              showMsg('Fingerprint setup failed. Please try again.');
+            }
+          }} disabled={bioLoading}
+            style={{marginTop:12,width:'100%',background:'rgba(139,92,246,.1)',border:`1px solid rgba(139,92,246,.25)`,borderRadius:10,padding:'10px',color:C.brandLt,fontSize:13,fontWeight:700,cursor:bioLoading?'default':'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+            {bioLoading
+              ?<><div style={{width:14,height:14,borderRadius:'50%',border:'2px solid #8b5cf6',borderTopColor:'transparent',animation:'spin 1s linear infinite'}}/> Waiting for biometric…</>
+              :<>👆 {hasBio?'Re-register Fingerprint':'Register Fingerprint'}</>
+            }
+          </button>
+        )}
+      </div>
+
+      {/* Info footer */}
+      <div style={{background:C.s2,borderRadius:16,padding:14,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:13,color:C.muted,lineHeight:1.7}}>
+          🔐 Your security settings are tied to your account (<strong style={{color:C.brandLt}}>{user?.name}</strong>) and stored only on this device. Logging out preserves your settings for your next login.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   ROOT  —  Corrected phase-based router
+   ─────────────────────────────────────────────
+   Correct flow:
+     splash → slide (1st launch) │ auth (returning, no session)
+                                 │ unlock (returning, session + security)
+                                 │ secSetup (returning, session, no security)
+     slide  → auth
+     auth   → secSetup (1st security setup) │ app (already secured)
+     secSetup → app
+     unlock → app
+     logout → auth
 ═══════════════════════════════════════════════ */
 function WishApp(){
   const [loggedUser,setLU] = useState(null);
