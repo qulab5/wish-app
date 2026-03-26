@@ -223,6 +223,7 @@ const PERMISSIONS = {
     "manage_api_keys",
     "manage_webhooks",
     "manage_email_templates",
+    "manage_rate_limits",
   ],
   moderator: [
     "view_dashboard",
@@ -1338,6 +1339,145 @@ const INITIAL_EMAIL_TEMPLATES = [
 ];
 
 /* ═══════════════════════════════════════════════
+   RATE LIMIT CONSTANTS
+═══════════════════════════════════════════════ */
+const RL_CATEGORIES = {
+  auth:   { label:"Authentication", icon:"🔐", color:"#ec4899" },
+  api:    { label:"API Endpoints",  icon:"⚡", color:"#06b6d4" },
+  app:    { label:"App Actions",    icon:"🎮", color:"#f59e0b" },
+};
+
+const RL_PENALTIES = [
+  { id:"block",    label:"Block (429)",  desc:"Reject with HTTP 429 Too Many Requests" },
+  { id:"delay",    label:"Throttle",     desc:"Slow down — queue requests with a delay" },
+  { id:"log_only", label:"Log Only",     desc:"Allow but record the violation (monitoring)" },
+];
+
+const RL_SCOPES = [
+  { id:"ip",     label:"Per IP",   desc:"Limit per client IP address" },
+  { id:"user",   label:"Per User", desc:"Limit per authenticated user account" },
+  { id:"global", label:"Global",   desc:"Shared pool across all clients" },
+];
+
+// Formats a window in seconds to a readable string
+function fmtWindow(secs){
+  if(secs<60)   return `${secs}s`;
+  if(secs<3600) return `${secs/60}m`;
+  if(secs<86400) return `${secs/3600}h`;
+  return `${secs/86400}d`;
+}
+
+function fmtRate(limit, windowSecs){
+  return `${limit} / ${fmtWindow(windowSecs)}`;
+}
+
+const INITIAL_RATE_LIMITS = [
+  // ── Auth ──────────────────────────────────────
+  {
+    id:"rl_send_otp", category:"auth",
+    name:"Send OTP",
+    description:"Controls how often a client can request a new OTP code.",
+    endpoint:"POST /api/send-otp",
+    enabled:true,
+    limit:5, windowSecs:900,        // 5 per 15 min
+    scope:"ip", penalty:"block", blockDurationSecs:900,
+    hits24h:284, blocked24h:12,
+  },
+  {
+    id:"rl_verify_otp", category:"auth",
+    name:"Verify OTP",
+    description:"Prevents brute-forcing OTP codes.",
+    endpoint:"POST /api/verify-otp",
+    enabled:true,
+    limit:10, windowSecs:900,       // 10 per 15 min
+    scope:"ip", penalty:"block", blockDurationSecs:1800,
+    hits24h:271, blocked24h:3,
+  },
+  {
+    id:"rl_login_attempts", category:"auth",
+    name:"Login Attempts",
+    description:"Hard lockout after repeated failed password attempts.",
+    endpoint:"POST /api/send-otp",
+    enabled:true,
+    limit:3, windowSecs:600,        // 3 per 10 min (failed only)
+    scope:"ip", penalty:"block", blockDurationSecs:3600,
+    hits24h:41, blocked24h:7,
+  },
+  // ── API ───────────────────────────────────────
+  {
+    id:"rl_user_read", category:"api",
+    name:"User Read",
+    description:"Throttles GET requests to the user profile endpoint.",
+    endpoint:"GET /api/user",
+    enabled:true,
+    limit:60, windowSecs:60,        // 60 per min
+    scope:"user", penalty:"block", blockDurationSecs:60,
+    hits24h:14302, blocked24h:0,
+  },
+  {
+    id:"rl_user_write", category:"api",
+    name:"User Write",
+    description:"Limits how frequently a user can save profile changes.",
+    endpoint:"POST /api/user",
+    enabled:true,
+    limit:30, windowSecs:60,        // 30 per min
+    scope:"user", penalty:"delay", blockDurationSecs:30,
+    hits24h:8841, blocked24h:19,
+  },
+  {
+    id:"rl_api_global", category:"api",
+    name:"Global API Burst",
+    description:"Hard ceiling across all API traffic — protects infrastructure.",
+    endpoint:"ALL /api/*",
+    enabled:true,
+    limit:500, windowSecs:10,       // 500 per 10s globally
+    scope:"global", penalty:"block", blockDurationSecs:5,
+    hits24h:23443, blocked24h:0,
+  },
+  // ── App Actions ───────────────────────────────
+  {
+    id:"rl_daily_ads", category:"app",
+    name:"Daily Ad Views",
+    description:"Max ads a single user can watch per calendar day.",
+    endpoint:null,
+    enabled:true,
+    limit:15, windowSecs:86400,     // 15 per day
+    scope:"user", penalty:"block", blockDurationSecs:0,
+    hits24h:3210, blocked24h:88,
+  },
+  {
+    id:"rl_spin_wheel", category:"app",
+    name:"Spin Wheel",
+    description:"How many times a user can spin the reward wheel per day.",
+    endpoint:null,
+    enabled:true,
+    limit:1, windowSecs:86400,      // 1 per day
+    scope:"user", penalty:"block", blockDurationSecs:0,
+    hits24h:712, blocked24h:34,
+  },
+  {
+    id:"rl_task_complete", category:"app",
+    name:"Task Completions",
+    description:"Maximum task completions recorded per user per day.",
+    endpoint:null,
+    enabled:true,
+    limit:20, windowSecs:86400,     // 20 per day
+    scope:"user", penalty:"log_only", blockDurationSecs:0,
+    hits24h:4109, blocked24h:0,
+  },
+  {
+    id:"rl_withdraw", category:"app",
+    name:"Withdrawal Requests",
+    description:"Limits withdrawal requests to prevent abuse.",
+    endpoint:null,
+    enabled:true,
+    limit:2, windowSecs:86400,      // 2 per day
+    scope:"user", penalty:"block", blockDurationSecs:0,
+    hits24h:83, blocked24h:5,
+  },
+];
+
+/* ═══════════════════════════════════════════════
    ADMIN PANEL — RBAC
 ═══════════════════════════════════════════════ */
 function RoleBadge({role}){
@@ -2426,6 +2566,424 @@ function AdminEmailTemplates(){
   );
 }
 
+/* ── Rate Limits Tab ───────────────────────────── */
+function AdminRateLimits(){
+  const [rules, setRules]   = useState(INITIAL_RATE_LIMITS);
+  const [editId, setEditId] = useState(null);    // rule being edited
+  const [addModal, setAdd]  = useState(false);   // create new rule
+  const [globalOn, setGO]   = useState(true);    // master kill-switch
+  const [saved, setSaved]   = useState(false);
+  const [filterCat, setFC]  = useState("all");
+
+  // Draft used for both edit and create
+  const blankDraft = ()=>({
+    name:"", description:"", category:"api", endpoint:"",
+    enabled:true, limit:60, windowSecs:60,
+    scope:"user", penalty:"block", blockDurationSecs:60,
+  });
+  const [draft, setDraft] = useState(blankDraft());
+  const df = (k) => (v) => setDraft(p=>({...p,[k]:v}));
+
+  const openEdit = (r) => {
+    setDraft({...r});
+    setEditId(r.id);
+    setAdd(false);
+    setSaved(false);
+  };
+  const openAdd = () => {
+    setDraft(blankDraft());
+    setAdd(true);
+    setEditId(null);
+    setSaved(false);
+  };
+  const closeModal = () => { setEditId(null); setAdd(false); };
+
+  const saveEdit = () => {
+    if(!draft.name.trim()) return;
+    setRules(prev=>prev.map(r=>r.id===editId?{...r,...draft}:r));
+    setSaved(true);
+    setTimeout(()=>{setSaved(false); closeModal();}, 900);
+  };
+
+  const createRule = () => {
+    if(!draft.name.trim()) return;
+    setRules(prev=>[...prev,{
+      ...draft,
+      id:`rl_custom_${Date.now()}`,
+      hits24h:0, blocked24h:0,
+    }]);
+    closeModal();
+  };
+
+  const toggleRule = (id) => setRules(prev=>prev.map(r=>r.id===id?{...r,enabled:!r.enabled}:r));
+  const deleteRule = (id) => setRules(prev=>prev.filter(r=>r.id!==id));
+
+  const displayed = filterCat==="all" ? rules : rules.filter(r=>r.category===filterCat);
+  const totalBlocked = rules.reduce((s,r)=>s+r.blocked24h,0);
+  const totalHits    = rules.reduce((s,r)=>s+r.hits24h,0);
+  const activeRules  = rules.filter(r=>r.enabled).length;
+
+  /* ── window/scope/penalty selector row ── */
+  const WindowSelector = ({value, onChange}) => {
+    const presets = [
+      {label:"10 s", v:10},{label:"30 s",v:30},{label:"1 m",v:60},
+      {label:"5 m",v:300},{label:"15 m",v:900},{label:"1 h",v:3600},
+      {label:"6 h",v:21600},{label:"24 h",v:86400},
+    ];
+    return (
+      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+        {presets.map(p=>(
+          <button key={p.v} onClick={()=>onChange(p.v)}
+            style={{
+              padding:"5px 11px",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",
+              background:value===p.v?`rgba(139,92,246,.25)`:"rgba(255,255,255,.05)",
+              border:`1px solid ${value===p.v?C.brand:"rgba(255,255,255,.1)"}`,
+              color:value===p.v?C.brandLt:"rgba(255,255,255,.5)",
+              transition:"all .15s",
+            }}
+          >{p.label}</button>
+        ))}
+        <input type="number" min={1} value={value}
+          onChange={e=>onChange(Math.max(1,parseInt(e.target.value)||1))}
+          title="Custom value in seconds"
+          style={{width:72,background:"rgba(255,255,255,.06)",border:`1px solid ${C.border}`,color:C.white,borderRadius:8,padding:"5px 8px",fontSize:12,outline:"none"}}
+        />
+      </div>
+    );
+  };
+
+  const ChipSelector = ({options, value, onChange}) => (
+    <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+      {options.map(o=>(
+        <button key={o.id} onClick={()=>onChange(o.id)}
+          style={{
+            padding:"7px 14px",borderRadius:9,fontSize:12,fontWeight:600,cursor:"pointer",textAlign:"left",
+            background:value===o.id?`rgba(139,92,246,.2)`:"rgba(255,255,255,.04)",
+            border:`1px solid ${value===o.id?C.brand:"rgba(255,255,255,.1)"}`,
+            color:value===o.id?C.white:"rgba(255,255,255,.5)",
+            transition:"all .15s",
+          }}
+        >
+          <div style={{color:value===o.id?C.brandLt:"inherit"}}>{o.label}</div>
+          <div style={{fontSize:10,opacity:.7,marginTop:1,fontWeight:400}}>{o.desc}</div>
+        </button>
+      ))}
+    </div>
+  );
+
+  const RuleCard = ({r}) => {
+    const cat = RL_CATEGORIES[r.category];
+    const pct = r.hits24h>0 ? Math.min(100,Math.round((r.blocked24h/r.hits24h)*100)) : 0;
+    return (
+      <div className="user-row" style={{flexDirection:"column",alignItems:"stretch",gap:10,opacity:r.enabled?1:.55}}>
+        {/* Top row */}
+        <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+          <div style={{
+            width:38,height:38,borderRadius:9,flexShrink:0,
+            background:`${cat.color}18`,border:`1px solid ${cat.color}40`,
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,
+          }}>{cat.icon}</div>
+
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,color:C.white,fontSize:14}}>{r.name}</span>
+              <span style={{
+                fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:99,
+                background:r.enabled?"rgba(16,185,129,.12)":"rgba(255,255,255,.06)",
+                color:r.enabled?C.green:"rgba(255,255,255,.3)",
+                border:`1px solid ${r.enabled?"rgba(16,185,129,.25)":"rgba(255,255,255,.1)"}`,
+              }}>{r.enabled?"ON":"OFF"}</span>
+              <span style={{
+                fontSize:10,fontWeight:600,padding:"2px 7px",borderRadius:99,
+                background:`${cat.color}18`,color:cat.color,border:`1px solid ${cat.color}30`,
+              }}>{cat.label}</span>
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:2}}>{r.description}</div>
+            {r.endpoint&&<div style={{fontSize:10,fontFamily:"monospace",color:"rgba(255,255,255,.25)",marginTop:2}}>{r.endpoint}</div>}
+          </div>
+
+          <div style={{display:"flex",gap:7,flexShrink:0,alignItems:"center"}}>
+            <button onClick={()=>toggleRule(r.id)}
+              className={`toggle ${r.enabled?"on":"off"}`}
+              style={{fontSize:0,width:40,height:22}}
+            />
+            <button onClick={()=>openEdit(r)}
+              style={{background:"rgba(139,92,246,.1)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"6px 11px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+            >Edit</button>
+            {r.id.startsWith("rl_custom_")&&(
+              <button onClick={()=>deleteRule(r.id)}
+                style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"6px 8px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+                title="Delete custom rule"
+              >🗑</button>
+            )}
+          </div>
+        </div>
+
+        {/* Stats + config row */}
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",paddingLeft:48}}>
+          {/* Rate badge */}
+          <div style={{
+            background:"rgba(139,92,246,.1)",border:`1px solid ${C.border}`,
+            borderRadius:8,padding:"5px 11px",display:"flex",alignItems:"center",gap:6,
+          }}>
+            <span style={{fontSize:15}}>⚡</span>
+            <span style={{fontSize:12,fontWeight:700,color:C.brandLt}}>{fmtRate(r.limit,r.windowSecs)}</span>
+          </div>
+          {/* Scope badge */}
+          <div style={{
+            background:"rgba(6,182,212,.08)",border:"1px solid rgba(6,182,212,.2)",
+            borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:600,color:C.cyan,
+          }}>{RL_SCOPES.find(s=>s.id===r.scope)?.label}</div>
+          {/* Penalty badge */}
+          <div style={{
+            background:r.penalty==="block"?"rgba(239,68,68,.08)":r.penalty==="delay"?"rgba(245,158,11,.08)":"rgba(255,255,255,.05)",
+            border:`1px solid ${r.penalty==="block"?"rgba(239,68,68,.2)":r.penalty==="delay"?"rgba(245,158,11,.2)":"rgba(255,255,255,.1)"}`,
+            borderRadius:8,padding:"5px 11px",fontSize:11,fontWeight:600,
+            color:r.penalty==="block"?C.red:r.penalty==="delay"?C.gold:"rgba(255,255,255,.4)",
+          }}>{RL_PENALTIES.find(p=>p.id===r.penalty)?.label}</div>
+          {/* 24h stats */}
+          <div style={{marginLeft:"auto",display:"flex",gap:12,alignItems:"center"}}>
+            <span style={{fontSize:11,color:"rgba(255,255,255,.3)"}}>
+              <span style={{color:"rgba(255,255,255,.55)",fontWeight:600}}>{r.hits24h.toLocaleString()}</span> hits/24h
+            </span>
+            {r.blocked24h>0&&(
+              <span style={{fontSize:11,fontWeight:700,color:C.red}}>
+                {r.blocked24h} blocked
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Mini bar showing block rate */}
+        {r.hits24h>0&&(
+          <div style={{paddingLeft:48,paddingRight:4}}>
+            <div style={{height:3,background:"rgba(255,255,255,.07)",borderRadius:99,overflow:"hidden"}}>
+              <div style={{
+                height:"100%",borderRadius:99,width:`${pct}%`,
+                background:pct>10?`linear-gradient(90deg,${C.gold},${C.red})`:`linear-gradient(90deg,${C.green},${C.brandLt})`,
+                transition:"width .4s ease",
+              }}/>
+            </div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.2)",marginTop:2}}>{pct}% block rate</div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  /* ── Edit / Create modal ── */
+  const RuleModal = ({isCreate}) => (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:999,padding:16}}>
+      <div style={{background:C.s1,borderRadius:"20px 20px 14px 14px",padding:24,width:"100%",maxWidth:520,border:`1px solid ${C.border}`,maxHeight:"88vh",overflowY:"auto"}}>
+        <div style={{fontWeight:800,fontSize:17,color:C.white,marginBottom:20}}>
+          {isCreate?"New Rate Limit Rule":"Edit Rule"}
+        </div>
+
+        {/* Name */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Rule Name <span style={{color:C.red}}>*</span></div>
+          <input className="inp-base" placeholder="e.g. Custom Auth Limit" value={draft.name} onChange={e=>df("name")(e.target.value)}/>
+        </div>
+
+        {/* Description */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Description</div>
+          <input className="inp-base" placeholder="What does this rule protect?" value={draft.description} onChange={e=>df("description")(e.target.value)}/>
+        </div>
+
+        {/* Category */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Category</div>
+          <div style={{display:"flex",gap:8}}>
+            {Object.entries(RL_CATEGORIES).map(([id,cat])=>(
+              <button key={id} onClick={()=>df("category")(id)}
+                style={{
+                  flex:1,padding:"8px 6px",borderRadius:10,fontSize:12,fontWeight:600,cursor:"pointer",
+                  background:draft.category===id?`${cat.color}20`:"rgba(255,255,255,.04)",
+                  border:`1px solid ${draft.category===id?cat.color:"rgba(255,255,255,.1)"}`,
+                  color:draft.category===id?cat.color:"rgba(255,255,255,.4)",
+                }}
+              >{cat.icon} {cat.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Endpoint */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Endpoint / Action <span style={{fontWeight:400,color:"rgba(255,255,255,.25)"}}>(optional)</span></div>
+          <input className="inp-base" placeholder="e.g. POST /api/send-otp or leave blank for app actions" value={draft.endpoint||""} onChange={e=>df("endpoint")(e.target.value||null)} style={{fontFamily:"monospace",fontSize:12}}/>
+        </div>
+
+        {/* Limit + window */}
+        <div style={{marginBottom:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Request Limit <span style={{color:C.red}}>*</span>
+            </div>
+            <input type="number" min={1} className="inp-base"
+              value={draft.limit}
+              onChange={e=>df("limit")(Math.max(1,parseInt(e.target.value)||1))}
+            />
+          </div>
+          <div>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Enabled
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10,paddingTop:10}}>
+              <button onClick={()=>df("enabled")(!draft.enabled)}
+                className={`toggle ${draft.enabled?"on":"off"}`}
+                style={{fontSize:0,width:46,height:26}}
+              />
+              <span style={{fontSize:13,color:draft.enabled?C.green:"rgba(255,255,255,.35)",fontWeight:600}}>
+                {draft.enabled?"Active":"Disabled"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Time window */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+            Time Window
+            <span style={{fontWeight:400,color:C.brandLt,marginLeft:6}}>= {fmtWindow(draft.windowSecs)}</span>
+          </div>
+          <WindowSelector value={draft.windowSecs} onChange={df("windowSecs")}/>
+        </div>
+
+        {/* Scope */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Scope</div>
+          <ChipSelector options={RL_SCOPES} value={draft.scope} onChange={df("scope")}/>
+        </div>
+
+        {/* Penalty */}
+        <div style={{marginBottom:draft.penalty==="block"?14:20}}>
+          <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>Penalty</div>
+          <ChipSelector options={RL_PENALTIES} value={draft.penalty} onChange={df("penalty")}/>
+        </div>
+
+        {/* Block duration — only when penalty is block */}
+        {draft.penalty==="block"&&draft.windowSecs<86400&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:6}}>
+              Block Duration
+              <span style={{fontWeight:400,color:C.red,marginLeft:6}}>= {fmtWindow(draft.blockDurationSecs)}</span>
+            </div>
+            <WindowSelector value={draft.blockDurationSecs} onChange={df("blockDurationSecs")}/>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:4}}>How long to block the client after hitting the limit.</div>
+          </div>
+        )}
+
+        {/* Preview summary */}
+        <div style={{
+          background:"rgba(139,92,246,.07)",border:`1px solid ${C.border}`,
+          borderRadius:10,padding:"10px 14px",marginBottom:20,
+          fontSize:12,color:"rgba(255,255,255,.55)",lineHeight:1.7,
+        }}>
+          <strong style={{color:C.brandLt}}>Summary:</strong> Allow{" "}
+          <strong style={{color:C.white}}>{draft.limit} requests</strong> per{" "}
+          <strong style={{color:C.white}}>{fmtWindow(draft.windowSecs)}</strong>{" "}
+          {draft.scope==="ip"?"per IP address":draft.scope==="user"?"per user account":"globally"}.{" "}
+          {draft.penalty==="block"&&<>Violators are <strong style={{color:C.red}}>blocked for {fmtWindow(draft.blockDurationSecs)}</strong>.</>}
+          {draft.penalty==="delay"&&<>Excess requests are <strong style={{color:C.gold}}>throttled / queued</strong>.</>}
+          {draft.penalty==="log_only"&&<>Violations are <strong style={{color:C.muted}}>logged only</strong> — no enforcement.</>}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <button onClick={closeModal} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:12,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
+          <button
+            onClick={isCreate?createRule:saveEdit}
+            disabled={!draft.name.trim()}
+            style={{
+              background:saved?`linear-gradient(135deg,${C.green},#047857)`:!draft.name.trim()?"rgba(255,255,255,.07)":`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+              border:"none",borderRadius:12,padding:12,
+              color:!draft.name.trim()?"rgba(255,255,255,.3)":"#fff",
+              fontWeight:700,cursor:!draft.name.trim()?"default":"pointer",
+              transition:"background .3s",
+            }}
+          >{saved?"✓ Saved":isCreate?"Create Rule":"Save Changes"}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header row */}
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        <div>
+          <div style={{fontWeight:700,color:C.white,fontSize:15}}>Rate Limit Rules</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>
+            {activeRules} active · {rules.length-activeRules} disabled
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          {/* Master switch */}
+          <div style={{
+            display:"flex",alignItems:"center",gap:8,
+            background:globalOn?"rgba(16,185,129,.08)":"rgba(239,68,68,.08)",
+            border:`1px solid ${globalOn?"rgba(16,185,129,.25)":"rgba(239,68,68,.25)"}`,
+            borderRadius:10,padding:"7px 12px",
+          }}>
+            <button onClick={()=>setGO(g=>!g)}
+              className={`toggle ${globalOn?"on":"off"}`}
+              style={{fontSize:0,width:40,height:22,flexShrink:0}}
+            />
+            <span style={{fontSize:12,fontWeight:700,color:globalOn?C.green:C.red,whiteSpace:"nowrap"}}>
+              {globalOn?"Enforcing":"Disabled globally"}
+            </span>
+          </div>
+          <button onClick={openAdd} style={{background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",color:"#fff",borderRadius:10,padding:"9px 16px",fontSize:13,fontWeight:700,cursor:"pointer",boxShadow:`0 4px 16px ${C.brand}60`,whiteSpace:"nowrap"}}>+ Add Rule</button>
+        </div>
+      </div>
+
+      {/* Global off banner */}
+      {!globalOn&&(
+        <div style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.3)",borderRadius:11,padding:"10px 14px",marginBottom:16,display:"flex",gap:9,alignItems:"center"}}>
+          <span style={{fontSize:18}}>⚠️</span>
+          <span style={{fontSize:13,color:C.red,fontWeight:600}}>Rate limiting is globally disabled. All rules are suspended — enable to enforce them.</span>
+        </div>
+      )}
+
+      {/* 24h summary cards */}
+      <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
+        {Object.entries(RL_CATEGORIES).map(([id,cat])=>{
+          const catRules = rules.filter(r=>r.category===id);
+          const blocked  = catRules.reduce((s,r)=>s+r.blocked24h,0);
+          const hits     = catRules.reduce((s,r)=>s+r.hits24h,0);
+          return (
+            <div key={id} className="stat-card" style={{flex:"1 1 120px",cursor:"pointer",border:filterCat===id?`1px solid ${cat.color}`:undefined}}
+              onClick={()=>setFC(f=>f===id?"all":id)}>
+              <div style={{fontSize:22,marginBottom:4}}>{cat.icon}</div>
+              <div style={{fontSize:16,fontWeight:800,color:cat.color}}>{blocked}</div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>blocked / 24h</div>
+              <div style={{fontSize:10,color:"rgba(255,255,255,.25)",marginTop:2}}>{hits.toLocaleString()} total hits</div>
+            </div>
+          );
+        })}
+        <div className="stat-card" style={{flex:"1 1 120px"}}>
+          <div style={{fontSize:22,marginBottom:4}}>🛡️</div>
+          <div style={{fontSize:16,fontWeight:800,color:C.brandLt}}>{totalBlocked}</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>total blocked</div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,.25)",marginTop:2}}>{totalHits.toLocaleString()} total hits</div>
+        </div>
+      </div>
+
+      {filterCat!=="all"&&(
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+          <span style={{fontSize:12,color:"rgba(255,255,255,.4)"}}>Filtered: <strong style={{color:RL_CATEGORIES[filterCat].color}}>{RL_CATEGORIES[filterCat].label}</strong></span>
+          <button onClick={()=>setFC("all")} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:12,textDecoration:"underline"}}>Clear</button>
+        </div>
+      )}
+
+      {/* Rule cards */}
+      {displayed.map(r=><RuleCard key={r.id} r={r}/>)}
+
+      {(editId||addModal) && <RuleModal isCreate={addModal}/>}
+    </div>
+  );
+}
+
 /* ── Main AdminPanel ───────────────────────────── */
 function AdminPanel({user, onExit, lang}){
   const role = user.role || (user.isAdmin ? "super_admin" : "user");
@@ -2438,8 +2996,9 @@ function AdminPanel({user, onExit, lang}){
     { id:"roles",     label:"Roles",     icon:"🛡️", perm:"manage_roles" },
     { id:"apikeys",   label:"API Keys",  icon:"🔑", perm:"manage_api_keys" },
     { id:"webhooks",  label:"Webhooks",  icon:"🔗", perm:"manage_webhooks" },
-    { id:"emails",    label:"Emails",    icon:"✉️", perm:"manage_email_templates" },
-    { id:"settings",  label:"Settings",  icon:"⚙️", perm:"view_settings" },
+    { id:"emails",     label:"Emails",      icon:"✉️", perm:"manage_email_templates" },
+    { id:"ratelimits", label:"Rate Limits", icon:"🛡️", perm:"manage_rate_limits" },
+    { id:"settings",   label:"Settings",   icon:"⚙️", perm:"view_settings" },
   ].filter(t=>can(user,t.perm));
 
   // Ensure current tab is accessible; fall back to first allowed tab
@@ -2493,8 +3052,9 @@ function AdminPanel({user, onExit, lang}){
         {activeTab==="roles"     && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
         {activeTab==="apikeys"   && <AdminApiKeys/>}
         {activeTab==="webhooks"  && <AdminWebhooks/>}
-        {activeTab==="emails"    && <AdminEmailTemplates/>}
-        {activeTab==="settings"  && <AdminSettings/>}
+        {activeTab==="emails"      && <AdminEmailTemplates/>}
+        {activeTab==="ratelimits" && <AdminRateLimits/>}
+        {activeTab==="settings"   && <AdminSettings/>}
       </div>
     </div>
   );
