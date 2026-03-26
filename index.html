@@ -1036,7 +1036,7 @@ function AuthScreen({onLogin,lang}){
       }catch(e){}
       const fullPhone=form.countryCode+form.phone;
       const _uid="u"+Date.now();
-      const _rc=form.name.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+_uid.slice(-4);
+      const _rc=form.name.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+String(Math.floor(Math.random()*90)+10);
       const nu={id:_uid,name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true,
         refCode:_rc,refBy:form.refCode.trim().toLowerCase()||null,refPts:0,refs:[]};
       setLoading(false);
