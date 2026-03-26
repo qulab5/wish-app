@@ -353,14 +353,7 @@ const DEFAULT_AD_CONFIG = {
    MULTILINGUAL
 ═══════════════════════════════════════════════ */
 const LANGS = {
-  en:{ name:"English",   flag:"🇬🇧", dir:"ltr" },
-  ur:{ name:"اردو",      flag:"🇵🇰", dir:"rtl" },
-  ar:{ name:"العربية",   flag:"🇸🇦", dir:"rtl" },
-  hi:{ name:"हिंदी",     flag:"🇮🇳", dir:"ltr" },
-  bn:{ name:"বাংলা",     flag:"🇧🇩", dir:"ltr" },
-  tr:{ name:"Türkçe",    flag:"🇹🇷", dir:"ltr" },
-  fr:{ name:"Français",  flag:"🇫🇷", dir:"ltr" },
-  id:{ name:"Indonesia", flag:"🇮🇩", dir:"ltr" },
+  en:{ name:"English", flag:"🇬🇧", dir:"ltr" },
 };
 const TR = {
   en:{ login:"Login", register:"Register", email:"Email Address", phone:"Phone Number",
@@ -5721,24 +5714,6 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
           </button>
           <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
-        </div>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <div style={{position:"relative"}}>
-            <button onClick={()=>setLM(p=>!p)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.white,fontSize:13,cursor:"pointer"}}>{(LANGS[lang]||LANGS.en).flag} {lang.toUpperCase()}</button>
-            {langMenu&&(
-              <div style={{position:"absolute",right:0,top:"110%",background:C.s2,border:`1px solid ${C.border}`,borderRadius:10,zIndex:99,minWidth:140,overflow:"hidden"}}>
-                {Object.entries(LANGS).map(([k,v])=>(
-                  <button key={k} onClick={()=>{
-                    setLang(k);setLM(false);
-                    Security.save('lang',k);
-                    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-                      body:JSON.stringify({id:u.id,email:u.email,lang:k})
-                    }).catch(()=>{});
-                  }} style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",color:lang===k?C.brandLt:C.white,cursor:"pointer",textAlign:"left",fontSize:13}}>{v.flag} {v.name}</button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
       {/* Content */}
