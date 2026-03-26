@@ -117,23 +117,26 @@ export default async function handler(req, res) {
   if (!body?.trim())    return res.status(400).json({ success: false, error: 'body is required' });
 
   try {
-    const recipients = await fetchRecipients(audience);
-
-    // Always push to in-app announcement store so all users see it in their feed
+    // Always push to in-app announcement store first (works regardless of recipient count)
     await pushAnnouncement({ id, type, subject: subject.trim(), body: body.trim(), sentBy });
+
+    // For in-app channel: announcement is already saved to Supabase and visible to all users.
+    // Count total real users (excluding system rows) as the "delivered" figure.
+    if (channel === 'in_app') {
+      const { data: allUsers } = await supabase
+        .from('users').select('id').neq('id', SYS_ID);
+      const total = (allUsers || []).length;
+      return res.status(200).json({
+        success: true, sent: total, failed: 0, total,
+        note: 'Announcement saved to Supabase. All users will see it in their Announcements tab.',
+      });
+    }
+
+    // For email channel: fetch filtered recipients and send via Resend
+    const recipients = await fetchRecipients(audience);
 
     if (recipients.length === 0) {
       return res.status(200).json({ success: true, sent: 0, failed: 0, total: 0, recipients: [] });
-    }
-
-    // In-app channel: no email sending — announcement already persisted above
-    if (channel === 'in_app') {
-      return res.status(200).json({
-        success: true, sent: recipients.length, failed: 0,
-        total: recipients.length,
-        recipients: recipients.map(u => u.email),
-        note: 'In-app announcement saved. Users will see it in their Announcements tab.',
-      });
     }
 
     // Email channel — send via Resend

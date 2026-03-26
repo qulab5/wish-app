@@ -4317,7 +4317,7 @@ function AdminBroadcast({ users, adminUser }) {
           </div>
           {sendResult.ok && (
             <div style={{ fontSize:13, color:"rgba(255,255,255,.6)" }}>
-              <strong style={{ color:C.white }}>{sendResult.sent}</strong> delivered
+              <strong style={{ color:C.white }}>{sendResult.sent}</strong> {channel==="in_app"?"users will see this in Announcements":"delivered"}
               {sendResult.failed > 0 && <span style={{ color:C.red }}> · {sendResult.failed} failed</span>}
               {sendResult.note  && <div style={{ fontSize:11, color:"rgba(255,255,255,.35)", marginTop:4 }}>ℹ {sendResult.note}</div>}
             </div>
