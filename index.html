@@ -5851,6 +5851,12 @@ function MainApp({user,onLogout,lang,setLang}){
                 ));
               })()}
             </div>
+            {/* Logout Button */}
+            <div style={{padding:"16px 24px 24px",borderTop:`1px solid rgba(139,92,246,.1)`}}>
+              <button onClick={()=>{setSO(false);setLD(true);}} style={{width:"100%",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",borderRadius:12,padding:"13px",color:"#f87171",fontWeight:700,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                👋 Logout
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -6064,10 +6070,6 @@ function MainApp({user,onLogout,lang,setLang}){
                 </div>
               </div>
             </div>
-            {/* Logout Button */}
-            <button onClick={()=>setLD(true)} style={{width:"100%",background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",boxShadow:`0 4px 20px ${C.red}40`}}>
-              👋 Logout
-            </button>
           </div>
         </div>
       )}
