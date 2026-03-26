@@ -4931,7 +4931,7 @@ function MainApp({user,onLogout,lang,setLang}){
         // are permanently blocked for those accounts.
         dbLoaded.current = true;
         if(!d.user) return;
-        const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
+        const {pts,usd,avatar,name,pass:dbPass,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
                spinNextFree:snf,extraSpins:es,lang:dbLang,tokens:dbTokens,
                refCode:dbRefCode,refBy:dbRefBy,refPts:dbRefPts,refs:dbRefs,
                walletAddress:dbWa}=d.user;
@@ -4946,6 +4946,7 @@ function MainApp({user,onLogout,lang,setLang}){
           tokens: dbTokens ?? p.tokens ?? 0,
           avatar:avatar||p.avatar,
           name:name||p.name,
+          pass:dbPass||p.pass,
           refCode:       dbRefCode||p.refCode||null,
           refBy:         dbRefBy  ||p.refBy  ||null,
           refPts:        Math.max(dbRefPts??0, p.refPts??0),
@@ -4982,15 +4983,11 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(()=>{ dbLoaded.current = true; });  // unlock even on network error
   },[]);
 
-  // Keep last_user in localStorage in sync so page refreshes restore the
-  // session without forcing re-login.  Tracks pts, usd, name, and avatar.
-  // Skip base64 data-URLs (large upload preview) — only persist the real URL.
+  // Keep last_user in localStorage in sync so page refreshes restore the session.
   useEffect(()=>{
     if(!dbLoaded.current) return;
-    const snap = {...u};
-    if(snap.avatar?.startsWith('data:')) delete snap.avatar;
-    Security.save('last_user', snap);
-  },[u.pts,u.usd,u.name,u.avatar]);
+    Security.save('last_user', {...u});
+  },[u.pts,u.usd,u.name,u.avatar,u.pass]);
 
   // Persist spinNextFree to localStorage immediately on change so it survives
   // a page refresh even if the DB save hasn't completed yet.
@@ -5007,17 +5004,15 @@ function MainApp({user,onLogout,lang,setLang}){
     // would overwrite the DB 2 seconds after every page refresh.
     if(!dbLoaded.current) return;
     const t=setTimeout(()=>{
-      // Don't send base64 data-URLs — avatar gets saved via the explicit upload flow
-      const avatarVal = u.avatar?.startsWith('data:') ? undefined : u.avatar;
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
-          ...(avatarVal!==undefined?{avatar:avatarVal}:{}),
+        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pass:u.pass,pts:u.pts,usd:u.usd,
+          avatar:u.avatar,
           tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins,
           refCode:u.refCode||null,refPts:u.refPts??0,refs:u.refs??[]})
       }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[auto-save]',d);}).catch(e=>console.error('[auto-save]',e));
     },2000);
     return()=>clearTimeout(t);
-  },[u.pts,u.usd,u.name,u.avatar,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
+  },[u.pts,u.usd,u.name,u.avatar,u.pass,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
@@ -5723,13 +5718,13 @@ function MainApp({user,onLogout,lang,setLang}){
           // 1. Resize to max 400 px on the client so the payload stays small
           const img=new Image();
           img.onload=()=>{
-            const MAX=400;
+            const MAX=150;
             const scale=Math.min(MAX/img.width,MAX/img.height,1);
             const cvs=document.createElement("canvas");
             cvs.width=Math.round(img.width*scale);
             cvs.height=Math.round(img.height*scale);
             cvs.getContext("2d").drawImage(img,0,0,cvs.width,cvs.height);
-            const dataUrl=cvs.toDataURL("image/jpeg",0.85);
+            const dataUrl=cvs.toDataURL("image/jpeg",0.72);
             // 2. Show local preview immediately so the user sees feedback at once
             setU(p=>({...p,avatar:dataUrl}));
             setAP(false);
