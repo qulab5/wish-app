@@ -6049,13 +6049,15 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:10,padding:"0 4px"}}>Account Verification</div>
             <div style={{background:C.s2,borderRadius:16,marginBottom:24,border:`1px solid ${C.border}`,overflow:"hidden"}}>
               {/* Email Verify */}
-              <div style={{padding:"16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+              <div style={{padding:"16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
                 <div style={{flex:1}}>
                   <div style={{fontSize:15,fontWeight:700,color:C.white}}>Email</div>
                   <div style={{fontSize:13,color:C.brandLt,marginTop:2}}>{u.email}</div>
-                  <div style={{fontSize:11,color:C.muted,marginTop:4}}>Link your email for communication and account recovery.</div>
                 </div>
-                <button style={{background:C.cyan,border:"none",borderRadius:8,padding:"7px 16px",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0,marginTop:2}}>VERIFY</button>
+                <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(16,185,129,.12)",border:"1px solid rgba(16,185,129,.3)",borderRadius:8,padding:"6px 12px",flexShrink:0}}>
+                  <span style={{fontSize:13}}>✓</span>
+                  <span style={{fontSize:12,fontWeight:700,color:C.green}}>Verified</span>
+                </div>
               </div>
               <div style={{height:1,background:C.border}}/>
               {/* KYC */}
