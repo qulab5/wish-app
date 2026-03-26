@@ -765,7 +765,7 @@ body{background:#0d0b1e;}
 function AuthScreen({onLogin,lang}){
   const [mode,setMode]      = useState("welcome");
   const [method,setMethod]  = useState("email");
-  const [form,setForm]      = useState({name:"", email:"", phone:"", countryCode:"+1", pass:"", conf:"", refCode:""});
+  const [form,setForm]      = useState({name:"", username:"", email:"", phone:"", countryCode:"+1", pass:"", conf:"", refCode:"", country:""});
   const [errs,setErrs]      = useState({});
   const [loading,setLoading]= useState(false);
   const [users,setUsers]    = useState(INITIAL_USERS);
@@ -982,6 +982,8 @@ function AuthScreen({onLogin,lang}){
   const validate=()=>{
     const e={};
     if(mode==="register"&&!form.name.trim()) e.name=L("required");
+    if(mode==="register"&&!form.username.trim()) e.username="Username is required";
+    if(mode==="register"&&!form.country) e.country="Please select your country";
     if(method==="email"){
       if(!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email=L("invalidEmail");
     } else {
@@ -1036,8 +1038,8 @@ function AuthScreen({onLogin,lang}){
       }catch(e){}
       const fullPhone=form.countryCode+form.phone;
       const _uid="u"+Date.now();
-      const _rc=form.name.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+String(Math.floor(Math.random()*90)+10);
-      const nu={id:_uid,name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true,
+      const _rc=form.username.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+String(Math.floor(Math.random()*90)+10);
+      const nu={id:_uid,name:form.name,username:form.username,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:form.country||"🌍",isAdmin:false,active:true,
         refCode:_rc,refBy:form.refCode.trim().toLowerCase()||null,refPts:0,refs:[]};
       setLoading(false);
       sendOtp(nu);
@@ -1178,7 +1180,25 @@ function AuthScreen({onLogin,lang}){
 
       <div style={{animation:"up .3s ease .05s both"}}>
         {mode==="register"&&<Inp label={L("name")} val={form.name} onChange={f("name")} err={errs.name} placeholder="Your full name" icon="👤"/>}
-        
+        {mode==="register"&&<Inp label="Username" val={form.username} onChange={f("username")} err={errs.username} placeholder="Choose a username" icon="🏷️"/>}
+        {mode==="register"&&(
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:.08,textTransform:"uppercase",marginBottom:6}}>Country</div>
+            <div style={{position:"relative"}}>
+              <div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:18,lineHeight:1,pointerEvents:"none"}}>
+                {form.country ? PHONE_CODES.find(c=>c.flag===form.country)?.flag||"🌍" : "🌍"}
+              </div>
+              <select value={form.country} onChange={e=>f("country")(e.target.value)} className="country-select"
+                style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${errs.country?"rgba(239,68,68,.5)":C.border2}`,color:form.country?C.white:C.muted,borderRadius:13,padding:"13px 16px 13px 44px",fontSize:14,fontFamily:"inherit",outline:"none"}}>
+                <option value="">Select your country…</option>
+                {[...new Map(PHONE_CODES.map(c=>[c.flag,c])).values()].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>(
+                  <option key={c.flag} value={c.flag}>{c.flag} {c.name}</option>
+                ))}
+              </select>
+            </div>
+            {errs.country&&<div style={{fontSize:11,color:C.red,marginTop:4}}>⚠ {errs.country}</div>}
+          </div>
+        )}
         {method==="email"
           ?<Inp label={L("email")} type="email" val={form.email} onChange={f("email")} err={errs.email} placeholder="you@example.com" icon="📧"/>
           :<Inp 
