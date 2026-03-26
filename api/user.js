@@ -33,13 +33,32 @@ export default async function handler(req, res) {
       return res.status(200).json({ user: data || null });
     }
 
-    // ── POST /api/user?action=adminUpdate  (admin: toggle active) ──
+    // ── POST /api/user?action=adminUpdate  (admin: update any user fields) ──
     if (req.method === 'POST' && req.body?.action === 'adminUpdate') {
-      const { userId, active } = req.body;
+      const { userId, action: _a, ...fields } = req.body;
       if (!userId) return res.status(400).json({ error: 'userId required' });
-      const { error } = await supabase.from('users').update({ active }).eq('id', userId);
+      const { error } = await supabase.from('users').update(fields).eq('id', userId);
       if (error) throw error;
       return res.status(200).json({ success: true });
+    }
+
+    // ── POST /api/user?action=adminDelete  (admin: delete a user) ──
+    if (req.method === 'POST' && req.body?.action === 'adminDelete') {
+      const { userId } = req.body;
+      if (!userId) return res.status(400).json({ error: 'userId required' });
+      const { error } = await supabase.from('users').delete().eq('id', userId);
+      if (error) throw error;
+      return res.status(200).json({ success: true });
+    }
+
+    // ── POST /api/user?action=adminCreate  (admin: create a new user) ──
+    if (req.method === 'POST' && req.body?.action === 'adminCreate') {
+      const { action: _a, ...data } = req.body;
+      if (!data.email) return res.status(400).json({ error: 'email required' });
+      if (!data.id) data.id = `u_${Date.now()}`;
+      const { error } = await supabase.from('users').insert(data);
+      if (error) throw error;
+      return res.status(200).json({ success: true, id: data.id });
     }
 
     // ── POST /api/user  (upsert) ──────────────────────────────

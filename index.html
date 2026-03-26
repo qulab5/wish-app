@@ -246,7 +246,9 @@ const PERMISSIONS = {
   super_admin: [
     "view_dashboard",
     "view_users",
+    "create_users",
     "edit_users",
+    "edit_user_balance",
     "delete_users",
     "toggle_user_active",
     "view_analytics",
@@ -260,12 +262,17 @@ const PERMISSIONS = {
     "manage_rate_limits",
     "manage_backups",
     "send_broadcasts",
+    "view_transactions",
+    "view_audit_log",
+    "export_data",
   ],
   moderator: [
     "view_dashboard",
     "view_users",
     "toggle_user_active",
     "view_analytics",
+    "view_transactions",
+    "view_audit_log",
   ],
   user: [],
 };
@@ -273,6 +280,14 @@ const PERMISSIONS = {
 function can(user, permission){
   const role = user.role || (user.isAdmin ? "super_admin" : "user");
   return (PERMISSIONS[role] || []).includes(permission);
+}
+
+function logAudit(adminEmail, action, detail){
+  try {
+    const log = JSON.parse(localStorage.getItem('wish_audit_log')||'[]');
+    log.unshift({id:`audit_${Date.now()}`,adminEmail,action,detail,ts:new Date().toISOString()});
+    localStorage.setItem('wish_audit_log',JSON.stringify(log.slice(0,500)));
+  } catch {}
 }
 
 /* ═══════════════════════════════════════════════
@@ -1623,55 +1638,116 @@ function AdminDashboard({users, adminUser}){
 
 /* ── Users Tab ─────────────────────────────────── */
 function AdminUsers({users, setUsers, adminUser}){
-  const [search,setSearch] = useState("");
-  const [confirm,setConfirm] = useState(null); // {type,userId}
+  const [search,setSearch]   = useState("");
+  const [confirm,setConfirm] = useState(null);
+  const [modal,setModal]     = useState(null); // "create"|"edit"
+  const [form,setForm]       = useState({});
+  const [saving,setSaving]   = useState(false);
+  const [saveMsg,setSaveMsg] = useState("");
+
+  const canDelete  = can(adminUser,"delete_users");
+  const canToggle  = can(adminUser,"toggle_user_active");
+  const canEdit    = can(adminUser,"edit_users");
+  const canCreate  = can(adminUser,"create_users");
+  const canBalance = can(adminUser,"edit_user_balance");
 
   const regularUsers = users.filter(u=>u.role==="user"||(!u.isAdmin&&!u.role));
   const filtered = regularUsers.filter(u=>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
+    (u.name||"").toLowerCase().includes(search.toLowerCase()) ||
+    (u.email||"").toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleActive = (id) => {
-    setUsers(prev=>prev.map(u=>u.id===id?{...u,active:!u.active}:u));
-    setConfirm(null);
+  const fv = (k,type="text") => e => setForm(p=>({...p,[k]:type==="number"?Number(e.target.value):type==="bool"?e.target.checked:e.target.value}));
+
+  const openCreate = () => {
+    setForm({name:"",email:"",pts:0,usd:0,country:"",active:true});
+    setModal("create");
+    setSaveMsg("");
   };
-  const deleteUser = (id) => {
-    setUsers(prev=>prev.filter(u=>u.id!==id));
+
+  const openEdit = (u) => {
+    setForm({name:u.name||"",email:u.email||"",pts:u.pts||0,usd:u.usd||0,country:u.country||"",active:u.active??true,_id:u.id});
+    setModal("edit");
+    setSaveMsg("");
+  };
+
+  const saveUser = async () => {
+    if(!form.email?.trim()||!form.name?.trim()){setSaveMsg("Name and email are required.");return;}
+    setSaving(true); setSaveMsg("");
+    try {
+      if(modal==="create"){
+        const newId = `u_${Date.now()}`;
+        const payload = {action:"adminCreate",id:newId,name:form.name.trim(),email:form.email.trim(),pts:Number(form.pts)||0,usd:Number(form.usd)||0,country:form.country||"",active:form.active??true,role:"user",joined:new Date().toISOString().slice(0,10)};
+        const r = await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const d = await r.json();
+        if(!r.ok) throw new Error(d.error||"Failed to create user");
+        setUsers(prev=>[...prev,{...payload,id:newId}]);
+        logAudit(adminUser.email,"create_user",`Created ${form.name} (${form.email})`);
+        setSaveMsg("✓ User created!");
+      } else {
+        const updates = {action:"adminUpdate",userId:form._id,name:form.name.trim(),email:form.email.trim(),active:form.active??true};
+        if(canBalance){updates.pts=Number(form.pts)||0;updates.usd=Number(form.usd)||0;}
+        if(form.country!==undefined)updates.country=form.country;
+        const r = await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});
+        const d = await r.json();
+        if(!r.ok) throw new Error(d.error||"Failed to save");
+        setUsers(prev=>prev.map(u=>u.id===form._id?{...u,...updates}:u));
+        logAudit(adminUser.email,"edit_user",`Edited ${form.name} (${form.email})`);
+        setSaveMsg("✓ Saved!");
+      }
+      setTimeout(()=>{setModal(null);setSaveMsg("");},1200);
+    } catch(err){setSaveMsg("Error: "+err.message);}
+    finally{setSaving(false);}
+  };
+
+  const toggleActive = async (id) => {
+    const u = users.find(x=>x.id===id);
+    const newActive = !u.active;
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminUpdate",userId:id,active:newActive})}).catch(()=>{});
+    setUsers(prev=>prev.map(x=>x.id===id?{...x,active:newActive}:x));
+    logAudit(adminUser.email,newActive?"activate_user":"ban_user",`${newActive?"Activated":"Banned"} ${u?.name||id}`);
     setConfirm(null);
   };
 
-  const canDelete = can(adminUser,"delete_users");
-  const canToggle = can(adminUser,"toggle_user_active");
-  const canEdit   = can(adminUser,"edit_users");
+  const deleteUser = async (id) => {
+    const u = users.find(x=>x.id===id);
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminDelete",userId:id})}).catch(()=>{});
+    setUsers(prev=>prev.filter(x=>x.id!==id));
+    logAudit(adminUser.email,"delete_user",`Deleted ${u?.name||id} (${u?.email||""})`);
+    setConfirm(null);
+  };
+
+  const resetPoints = async (u) => {
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminUpdate",userId:u.id,pts:0,usd:0})}).catch(()=>{});
+    setUsers(prev=>prev.map(x=>x.id===u.id?{...x,pts:0,usd:0}:x));
+    logAudit(adminUser.email,"reset_balance",`Reset balance for ${u.name}`);
+    setConfirm(null);
+  };
 
   return (
     <div>
-      <div style={{position:"relative",marginBottom:16}}>
-        <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
-        <input
-          className="inp-base"
-          placeholder="Search users by name or email…"
-          value={search}
-          onChange={e=>setSearch(e.target.value)}
-          style={{paddingLeft:38}}
-        />
+      {/* Toolbar */}
+      <div style={{display:"flex",gap:10,marginBottom:16}}>
+        <div style={{position:"relative",flex:1}}>
+          <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
+          <input className="inp-base" placeholder="Search by name or email…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:38,margin:0}}/>
+        </div>
+        {canCreate&&(
+          <button onClick={openCreate} style={{background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",borderRadius:12,padding:"0 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
+            + New User
+          </button>
+        )}
       </div>
 
       <div style={{fontSize:12,color:"rgba(255,255,255,.35)",marginBottom:12}}>
         {filtered.length} user{filtered.length!==1?"s":""} found
-        {!canDelete&&<span style={{marginLeft:8,color:C.cyan}}>· view &amp; toggle only</span>}
       </div>
 
       {filtered.map(u=>(
         <div key={u.id} className="user-row">
-          <div style={{
-            width:38,height:38,borderRadius:"50%",flexShrink:0,
-            background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:16,fontWeight:700,color:C.white,
-          }}>{u.name.charAt(0).toUpperCase()}</div>
-
+          <div style={{width:38,height:38,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:C.white}}>
+            {(u.name||"?").charAt(0).toUpperCase()}
+          </div>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
               {u.name}
@@ -1679,62 +1755,84 @@ function AdminUsers({users, setUsers, adminUser}){
             </div>
             <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
             <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:1}}>
-              {u.country} · {u.pts?.toLocaleString()||0} pts · Joined {u.joined}
+              {u.country} · <span style={{color:C.gold}}>{(u.pts||0).toLocaleString()} pts</span> · ${(u.usd||0).toFixed(2)}
             </div>
           </div>
-
-          <div style={{display:"flex",gap:8,flexShrink:0}}>
-            {canToggle&&(
-              <button
-                onClick={()=>setConfirm({type:"toggle",userId:u.id,userName:u.name,active:u.active})}
-                title={u.active?"Deactivate":"Activate"}
-                style={{
-                  background:u.active?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",
-                  border:`1px solid ${u.active?"rgba(239,68,68,.3)":"rgba(16,185,129,.3)"}`,
-                  color:u.active?C.red:C.green,
-                  borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
-                }}
-              >{u.active?"🚫 Ban":"✅ Activate"}</button>
-            )}
-            {canDelete&&(
-              <button
-                onClick={()=>setConfirm({type:"delete",userId:u.id,userName:u.name})}
-                title="Delete user"
-                style={{
-                  background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",
-                  color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
-                }}
-              >🗑</button>
-            )}
+          <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
+            {canEdit&&<button onClick={()=>openEdit(u)} style={{background:"rgba(139,92,246,.15)",border:`1px solid ${C.border2}`,color:C.brandLt,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>✏️</button>}
+            {canBalance&&<button onClick={()=>setConfirm({type:"reset",userId:u.id,userName:u.name,user:u})} title="Reset balance" style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",color:C.gold,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>🔄</button>}
+            {canToggle&&<button onClick={()=>setConfirm({type:"toggle",userId:u.id,userName:u.name,active:u.active})} style={{background:u.active?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",border:`1px solid ${u.active?"rgba(239,68,68,.3)":"rgba(16,185,129,.3)"}`,color:u.active?C.red:C.green,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{u.active?"🚫":"✅"}</button>}
+            {canDelete&&<button onClick={()=>setConfirm({type:"delete",userId:u.id,userName:u.name})} style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>🗑</button>}
           </div>
         </div>
       ))}
+
+      {/* Create / Edit modal */}
+      {modal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:380,width:"100%",border:`1px solid ${C.border}`,maxHeight:"90vh",overflowY:"auto"}}>
+            <div style={{fontWeight:800,color:C.white,fontSize:17,marginBottom:20}}>
+              {modal==="create"?"➕ Create New User":"✏️ Edit User"}
+            </div>
+            {[
+              {label:"Full Name",key:"name",type:"text",placeholder:"e.g. John Doe"},
+              {label:"Email",key:"email",type:"email",placeholder:"user@example.com"},
+              {label:"Country",key:"country",type:"text",placeholder:"e.g. US, UK, 🇺🇸"},
+            ].map(f=>(
+              <div key={f.key} style={{marginBottom:14}}>
+                <div style={{fontSize:12,fontWeight:600,color:"rgba(255,255,255,.5)",marginBottom:5}}>{f.label}</div>
+                <input className="inp-base" type={f.type} placeholder={f.placeholder} value={form[f.key]||""} onChange={fv(f.key)} style={{margin:0}}/>
+              </div>
+            ))}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+              {[
+                {label:"Points (pts)",key:"pts",disabled:!canBalance},
+                {label:"USD Balance",key:"usd",disabled:!canBalance},
+              ].map(f=>(
+                <div key={f.key}>
+                  <div style={{fontSize:12,fontWeight:600,color:f.disabled?"rgba(255,255,255,.2)":"rgba(255,255,255,.5)",marginBottom:5}}>{f.label}{f.disabled&&<span style={{fontSize:10,marginLeft:4}}>(no perm)</span>}</div>
+                  <input className="inp-base" type="number" min="0" value={form[f.key]||0} onChange={fv(f.key,"number")} disabled={f.disabled} style={{margin:0,opacity:f.disabled?.4:1}}/>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,padding:"10px 14px",background:"rgba(255,255,255,.04)",borderRadius:10,border:`1px solid ${C.border}`}}>
+              <span style={{fontSize:13,color:"rgba(255,255,255,.6)",flex:1}}>Account Active</span>
+              <input type="checkbox" checked={form.active??true} onChange={fv("active","bool")} style={{width:18,height:18,accentColor:C.brand,cursor:"pointer"}}/>
+            </div>
+            {saveMsg&&<div style={{fontSize:12,color:saveMsg.startsWith("✓")?C.green:C.red,marginBottom:12,textAlign:"center"}}>{saveMsg}</div>}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <button onClick={()=>setModal(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer",fontSize:14}}>Cancel</button>
+              <button onClick={saveUser} disabled={saving} style={{background:saving?"rgba(139,92,246,.4)":`linear-gradient(135deg,${C.brand},${C.brandDk})`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:saving?"not-allowed":"pointer",fontSize:14}}>
+                {saving?"Saving…":modal==="create"?"Create":"Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confirmation dialog */}
       {confirm&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
           <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
             <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>
-              {confirm.type==="delete"?"🗑️":"⚠️"}
+              {confirm.type==="delete"?"🗑️":confirm.type==="reset"?"🔄":"⚠️"}
             </div>
             <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>
-              {confirm.type==="delete"
-                ? `Delete "${confirm.userName}"?`
-                : `${confirm.active?"Deactivate":"Activate"} "${confirm.userName}"?`}
+              {confirm.type==="delete"?`Delete "${confirm.userName}"?`
+              :confirm.type==="reset"?`Reset "${confirm.userName}"'s balance?`
+              :`${confirm.active?"Deactivate":"Activate"} "${confirm.userName}"?`}
             </div>
             <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>
-              {confirm.type==="delete"
-                ? "This action cannot be undone."
-                : confirm.active
-                  ? "The user will lose access to the app."
-                  : "The user will regain access to the app."}
+              {confirm.type==="delete"?"This cannot be undone."
+              :confirm.type==="reset"?"Points and USD balance will be set to 0."
+              :confirm.active?"User will lose access.":"User will regain access."}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <button onClick={()=>setConfirm(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
               <button
-                onClick={()=>confirm.type==="delete"?deleteUser(confirm.userId):toggleActive(confirm.userId)}
-                style={{background:confirm.type==="delete"||confirm.active?`linear-gradient(135deg,${C.red},#b91c1c)`:`linear-gradient(135deg,${C.green},#047857)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
-              >{confirm.type==="delete"?"Delete":confirm.active?"Deactivate":"Activate"}</button>
+                onClick={()=>confirm.type==="delete"?deleteUser(confirm.userId):confirm.type==="reset"?resetPoints(confirm.user):toggleActive(confirm.userId)}
+                style={{background:confirm.type==="reset"?`linear-gradient(135deg,${C.gold},#b45309)`:confirm.type==="delete"||confirm.active?`linear-gradient(135deg,${C.red},#b91c1c)`:`linear-gradient(135deg,${C.green},#047857)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
+              >{confirm.type==="delete"?"Delete":confirm.type==="reset"?"Reset Balance":confirm.active?"Deactivate":"Activate"}</button>
             </div>
           </div>
         </div>
@@ -1899,6 +1997,308 @@ function AdminSettings(){
           boxShadow:saved?"none":`0 4px 20px ${C.brand}80`,
         }}
       >{saved?"✓ Saved!":"Save Settings"}</button>
+    </div>
+  );
+}
+
+/* ── Transactions Tab ──────────────────────────── */
+function AdminTransactions({users}){
+  const [search,setSearch] = useState("");
+  const realUsers = users.filter(u=>!u.email?.includes('sys.internal'));
+  const sorted = [...realUsers].sort((a,b)=>(b.pts||0)-(a.pts||0));
+  const filtered = sorted.filter(u=>
+    (u.name||"").toLowerCase().includes(search.toLowerCase())||
+    (u.email||"").toLowerCase().includes(search.toLowerCase())
+  );
+  const totalPts = realUsers.reduce((s,u)=>s+(u.pts||0),0);
+  const totalUsd = realUsers.reduce((s,u)=>s+(u.usd||0),0);
+  const topPts   = sorted[0]?.pts||1;
+
+  return (
+    <div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:20}}>
+        {[
+          {icon:"⭐",label:"Total Points Issued",value:totalPts.toLocaleString(),color:C.gold},
+          {icon:"💵",label:"Total USD Balance",value:`$${totalUsd.toFixed(2)}`,color:C.green},
+          {icon:"👥",label:"Users with Balance",value:realUsers.filter(u=>(u.pts||0)>0).length,color:C.brandLt},
+        ].map(s=><StatCard key={s.label} icon={s.icon} label={s.label} value={s.value} color={s.color}/>)}
+      </div>
+
+      <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>TOP EARNERS</div>
+      <div style={{marginBottom:16}}>
+        {sorted.slice(0,5).map((u,i)=>(
+          <div key={u.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+            <div style={{width:20,fontSize:12,color:"rgba(255,255,255,.35)",textAlign:"right",flexShrink:0}}>#{i+1}</div>
+            <div style={{width:28,height:28,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:C.white,flexShrink:0}}>
+              {(u.name||"?").charAt(0).toUpperCase()}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:700,color:C.white,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div>
+              <div style={{height:5,background:"rgba(255,255,255,.08)",borderRadius:99,marginTop:3,overflow:"hidden"}}>
+                <div style={{height:"100%",background:`linear-gradient(90deg,${C.brand},${C.brandLt})`,width:`${Math.round(((u.pts||0)/topPts)*100)}%`,borderRadius:99}}/>
+              </div>
+            </div>
+            <div style={{fontSize:13,fontWeight:700,color:C.gold,flexShrink:0}}>{(u.pts||0).toLocaleString()}</div>
+            <div style={{fontSize:11,color:C.green,flexShrink:0}}>${(u.usd||0).toFixed(2)}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12}}>ALL USER BALANCES</div>
+      <div style={{position:"relative",marginBottom:12}}>
+        <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
+        <input className="inp-base" placeholder="Search users…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:38,margin:0}}/>
+      </div>
+
+      {filtered.map((u,i)=>(
+        <div key={u.id} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 12px",background:i%2===0?"rgba(255,255,255,.025)":"transparent",borderRadius:10,marginBottom:2}}>
+          <div style={{width:22,fontSize:11,color:"rgba(255,255,255,.3)",textAlign:"right",flexShrink:0}}>#{i+1}</div>
+          <div style={{width:32,height:32,borderRadius:"50%",background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700,color:C.white,flexShrink:0}}>
+            {(u.name||"?").charAt(0).toUpperCase()}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.white,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.name}</div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,.35)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
+          </div>
+          <div style={{textAlign:"right",flexShrink:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.gold}}>{(u.pts||0).toLocaleString()} pts</div>
+            <div style={{fontSize:11,color:C.green}}>${(u.usd||0).toFixed(2)}</div>
+          </div>
+          <div style={{width:60,textAlign:"right",flexShrink:0}}>
+            <span style={{fontSize:10,padding:"2px 7px",borderRadius:99,background:u.active?"rgba(16,185,129,.12)":"rgba(239,68,68,.12)",color:u.active?C.green:C.red,border:`1px solid ${u.active?"rgba(16,185,129,.3)":"rgba(239,68,68,.3)"}`}}>
+              {u.active?"Active":"Inactive"}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Analytics Tab ────────────────────────────── */
+function AdminAnalytics({users}){
+  const regular = users.filter(u=>!u.email?.includes('sys.internal')&&(u.role==="user"||(!u.isAdmin&&!u.role)));
+  const top5 = [...regular].sort((a,b)=>(b.pts||0)-(a.pts||0)).slice(0,5);
+  const maxPts = top5[0]?.pts||1;
+  const activeCount = regular.filter(u=>u.active).length;
+  const inactiveCount = regular.length - activeCount;
+  const activePct = regular.length?Math.round(activeCount/regular.length*100):0;
+
+  const countryMap = {};
+  regular.forEach(u=>{const k=u.country||"🌍";countryMap[k]=(countryMap[k]||0)+1;});
+  const countries = Object.entries(countryMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxC = countries[0]?.[1]||1;
+
+  const buckets=[
+    {label:"0 – 1k",min:0,max:1000},
+    {label:"1k – 10k",min:1000,max:10000},
+    {label:"10k – 50k",min:10000,max:50000},
+    {label:"50k+",min:50000,max:Infinity},
+  ].map(b=>({...b,count:regular.filter(u=>(u.pts||0)>=b.min&&(u.pts||0)<b.max).length}));
+  const maxB = Math.max(...buckets.map(b=>b.count),1);
+
+  const BAR_COLORS=[C.gold,C.brandLt,C.cyan,C.green,C.pink];
+  const SL={fontSize:13,fontWeight:700,color:"rgba(255,255,255,.4)",letterSpacing:1,marginBottom:12};
+
+  return(
+    <div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:24}}>
+        <StatCard icon="👥" label="Total Users"   value={regular.length}                                    color={C.brandLt}/>
+        <StatCard icon="✅" label="Active Users"  value={activeCount}    sub={`${activePct}% active`}       color={C.green}/>
+        <StatCard icon="⭐" label="Total Points"  value={regular.reduce((s,u)=>s+(u.pts||0),0).toLocaleString()} color={C.gold}/>
+        <StatCard icon="🌍" label="Countries"     value={Object.keys(countryMap).length}                   color={C.cyan}/>
+      </div>
+
+      {/* Top 5 bar chart */}
+      <div style={SL}>TOP 5 EARNERS</div>
+      <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:18,marginBottom:24}}>
+        {top5.length===0?<div style={{color:"rgba(255,255,255,.3)",textAlign:"center",padding:16}}>No users yet.</div>:
+        top5.map((u,i)=>(
+          <div key={u.id} style={{marginBottom:i<4?14:0}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:14}}>{["🥇","🥈","🥉","4️⃣","5️⃣"][i]}</span>
+                <span style={{fontWeight:700,color:C.white,fontSize:13}}>{u.name}</span>
+                <span style={{fontSize:11,color:"rgba(255,255,255,.35)"}}>{u.country}</span>
+              </div>
+              <span style={{fontWeight:800,color:BAR_COLORS[i],fontSize:13}}>{(u.pts||0).toLocaleString()} pts</span>
+            </div>
+            <div style={{height:7,background:"rgba(255,255,255,.06)",borderRadius:99}}>
+              <div style={{height:"100%",width:`${Math.round((u.pts||0)/maxPts*100)}%`,background:`linear-gradient(90deg,${BAR_COLORS[i]},${BAR_COLORS[i]}88)`,borderRadius:99}}/>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Active vs Inactive */}
+      <div style={SL}>ACTIVE VS INACTIVE</div>
+      <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:18,marginBottom:24}}>
+        <div style={{display:"flex",borderRadius:99,overflow:"hidden",height:24,marginBottom:12}}>
+          {activeCount>0&&<div style={{flex:activeCount,background:`linear-gradient(90deg,${C.green},${C.green}99)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff"}}>{activePct}%</div>}
+          {inactiveCount>0&&<div style={{flex:inactiveCount,background:"rgba(239,68,68,.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:C.red}}>{100-activePct}%</div>}
+        </div>
+        <div style={{display:"flex",gap:20}}>
+          <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:C.green}}/><span style={{fontSize:12,color:"rgba(255,255,255,.6)"}}>Active: <strong style={{color:C.white}}>{activeCount}</strong></span></div>
+          <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:10,height:10,borderRadius:"50%",background:C.red}}/><span style={{fontSize:12,color:"rgba(255,255,255,.6)"}}>Inactive: <strong style={{color:C.white}}>{inactiveCount}</strong></span></div>
+        </div>
+      </div>
+
+      {/* Country distribution */}
+      <div style={SL}>COUNTRY DISTRIBUTION</div>
+      <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:18,marginBottom:24}}>
+        {countries.length===0?<div style={{color:"rgba(255,255,255,.3)",textAlign:"center",padding:12}}>No data.</div>:
+        countries.map(([flag,count])=>(
+          <div key={flag} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            <span style={{fontSize:20,width:28,textAlign:"center",flexShrink:0}}>{flag}</span>
+            <div style={{flex:1}}><div style={{height:6,background:"rgba(255,255,255,.06)",borderRadius:99}}><div style={{height:"100%",width:`${Math.round(count/maxC*100)}%`,background:`linear-gradient(90deg,${C.brandLt},${C.cyan})`,borderRadius:99}}/></div></div>
+            <span style={{fontSize:12,color:"rgba(255,255,255,.5)",width:28,textAlign:"right",flexShrink:0}}>{count}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Points distribution */}
+      <div style={SL}>POINTS DISTRIBUTION</div>
+      <div style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:16,padding:18}}>
+        {buckets.map(b=>(
+          <div key={b.label} style={{marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <span style={{fontSize:12,color:"rgba(255,255,255,.6)",fontWeight:600}}>{b.label}</span>
+              <span style={{fontSize:12,color:C.brandLt,fontWeight:700}}>{b.count} user{b.count!==1?"s":""}</span>
+            </div>
+            <div style={{height:6,background:"rgba(255,255,255,.06)",borderRadius:99}}><div style={{height:"100%",width:`${Math.round(b.count/maxB*100)}%`,background:`linear-gradient(90deg,${C.brand},${C.pink})`,borderRadius:99}}/></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Audit Log Tab ─────────────────────────────── */
+function AdminAuditLog({adminUser}){
+  const [log,setLog]     = useState(()=>{try{return JSON.parse(localStorage.getItem('wish_audit_log')||'[]');}catch{return [];}});
+  const [search,setSearch] = useState("");
+
+  const filtered = log.filter(e=>
+    (e.action||"").toLowerCase().includes(search.toLowerCase())||
+    (e.adminEmail||"").toLowerCase().includes(search.toLowerCase())||
+    (e.detail||"").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const clearLog = () => {
+    if(!window.confirm("Clear all audit log entries?"))return;
+    localStorage.removeItem('wish_audit_log');
+    setLog([]);
+  };
+
+  const exportLog = () => {
+    const csv=['Timestamp,Admin,Action,Detail',...log.map(e=>`"${e.ts}","${e.adminEmail||""}","${e.action||""}","${(e.detail||"").replace(/"/g,"'")}"`)].join('\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download='wish-audit-log.csv'; a.click();
+  };
+
+  const ACTION_COLOR={create_user:C.green,edit_user:C.brandLt,delete_user:C.red,ban_user:C.red,activate_user:C.green,reset_balance:C.gold,change_role:C.cyan};
+  const ACTION_ICON ={create_user:"➕",edit_user:"✏️",delete_user:"🗑️",ban_user:"🚫",activate_user:"✅",reset_balance:"🔄",change_role:"🛡️"};
+
+  return (
+    <div>
+      <div style={{display:"flex",gap:10,marginBottom:16}}>
+        <div style={{position:"relative",flex:1}}>
+          <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
+          <input className="inp-base" placeholder="Search log…" value={search} onChange={e=>setSearch(e.target.value)} style={{paddingLeft:38,margin:0}}/>
+        </div>
+        <button onClick={exportLog} disabled={!log.length} style={{background:"rgba(6,182,212,.1)",border:"1px solid rgba(6,182,212,.3)",color:C.cyan,borderRadius:10,padding:"0 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>⬇ CSV</button>
+        <button onClick={clearLog} disabled={!log.length} style={{background:"rgba(239,68,68,.1)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:10,padding:"0 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Clear</button>
+      </div>
+
+      {filtered.length===0?(
+        <div style={{textAlign:"center",padding:"48px 16px"}}>
+          <div style={{fontSize:40,marginBottom:10}}>📋</div>
+          <div style={{fontSize:14,fontWeight:700,color:C.white,marginBottom:4}}>No audit entries yet</div>
+          <div style={{fontSize:12,color:"rgba(255,255,255,.4)"}}>Actions taken in the admin panel will appear here.</div>
+        </div>
+      ):(
+        <div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginBottom:10}}>{filtered.length} entr{filtered.length===1?"y":"ies"}</div>
+          {filtered.map(e=>{
+            const col=ACTION_COLOR[e.action]||C.brand;
+            const icon=ACTION_ICON[e.action]||"🔹";
+            const dt=new Date(e.ts);
+            return(
+              <div key={e.id} style={{display:"flex",gap:12,padding:"10px 0",borderBottom:`1px solid rgba(255,255,255,.05)`}}>
+                <div style={{width:32,height:32,borderRadius:10,background:`${col}18`,border:`1px solid ${col}44`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{icon}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.white}}>{e.detail||e.action}</div>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.35)",marginTop:2}}>
+                    <span style={{color:col}}>{e.adminEmail}</span>
+                    {" · "}
+                    {dt.toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Data Export Tab ───────────────────────────── */
+function AdminExport({users}){
+  const [done,setDone] = useState(null);
+  const exportable = users.filter(u=>!u.email?.includes('sys.internal'));
+
+  const dl = (content, filename, type) => {
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([content],{type}));
+    a.download=filename; a.click();
+  };
+
+  const exportCSV = () => {
+    const headers=['id','name','email','country','pts','usd','active','joined','refCode','role'];
+    const rows=exportable.map(u=>headers.map(h=>{const v=u[h]??'';return typeof v==='string'&&(v.includes(',')||v.includes('"'))?`"${v.replace(/"/g,'""')}"`:v;}).join(','));
+    dl([headers.join(','),...rows].join('\n'),`wish-users-${new Date().toISOString().slice(0,10)}.csv`,'text/csv');
+    setDone('csv'); setTimeout(()=>setDone(null),3000);
+  };
+
+  const exportJSON = () => {
+    dl(JSON.stringify(exportable,null,2),`wish-users-${new Date().toISOString().slice(0,10)}.json`,'application/json');
+    setDone('json'); setTimeout(()=>setDone(null),3000);
+  };
+
+  return (
+    <div>
+      <div style={{background:"rgba(139,92,246,.07)",border:`1px solid ${C.border2}`,borderRadius:14,padding:"16px",marginBottom:24,display:"flex",alignItems:"center",gap:14}}>
+        <div style={{fontSize:36}}>📥</div>
+        <div>
+          <div style={{fontSize:15,fontWeight:700,color:C.white,marginBottom:2}}>Export User Data</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,.5)"}}>{exportable.length} users ready to export</div>
+        </div>
+      </div>
+
+      <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {[
+          {label:"Export as CSV",sub:"Spreadsheet-compatible format, opens in Excel / Google Sheets",icon:"📊",fn:exportCSV,id:"csv",color:C.green},
+          {label:"Export as JSON",sub:"Raw data format, suitable for backups and developer use",icon:"📄",fn:exportJSON,id:"json",color:C.brandLt},
+        ].map(opt=>(
+          <div key={opt.id} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:14}}>
+            <div style={{fontSize:28,flexShrink:0}}>{opt.icon}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:C.white}}>{opt.label}</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,.4)",marginTop:2}}>{opt.sub}</div>
+            </div>
+            <button onClick={opt.fn} style={{background:done===opt.id?`${opt.color}22`:`linear-gradient(135deg,${opt.color},${opt.color}cc)`,border:done===opt.id?`1px solid ${opt.color}`:"none",borderRadius:10,padding:"9px 18px",color:done===opt.id?opt.color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer",flexShrink:0,transition:"all .3s"}}>
+              {done===opt.id?"✓ Downloaded":"Download"}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div style={{marginTop:24,background:"rgba(245,158,11,.06)",border:"1px solid rgba(245,158,11,.2)",borderRadius:12,padding:"12px 16px",display:"flex",gap:10,alignItems:"flex-start"}}>
+        <span style={{fontSize:14}}>⚠️</span>
+        <span style={{fontSize:12,color:"rgba(255,255,255,.5)",lineHeight:1.5}}>Exports contain personal data (emails, names). Handle in accordance with your privacy policy and applicable regulations.</span>
+      </div>
     </div>
   );
 }
@@ -4041,16 +4441,20 @@ function AdminPanel({user, onExit, lang}){
   },[]);
 
   const tabs = [
-    { id:"dashboard", label:"Dashboard", icon:"📊", perm:"view_dashboard" },
-    { id:"users",     label:"Users",     icon:"👥", perm:"view_users" },
-    { id:"roles",     label:"Roles",     icon:"🛡️", perm:"manage_roles" },
-    { id:"apikeys",   label:"API Keys",  icon:"🔑", perm:"manage_api_keys" },
-    { id:"webhooks",  label:"Webhooks",  icon:"🔗", perm:"manage_webhooks" },
-    { id:"emails",     label:"Emails",      icon:"✉️", perm:"manage_email_templates" },
-    { id:"ratelimits", label:"Rate Limits", icon:"🛡️", perm:"manage_rate_limits" },
-    { id:"backup",     label:"Backup",      icon:"💾", perm:"manage_backups" },
-    { id:"broadcast",  label:"Broadcast",   icon:"📢", perm:"send_broadcasts" },
-    { id:"settings",   label:"Settings",   icon:"⚙️", perm:"view_settings" },
+    { id:"dashboard",    label:"Dashboard",   icon:"📊", perm:"view_dashboard" },
+    { id:"users",        label:"Users",       icon:"👥", perm:"view_users" },
+    { id:"transactions", label:"Transactions",icon:"💳", perm:"view_transactions" },
+    { id:"analytics",    label:"Analytics",   icon:"📈", perm:"view_analytics" },
+    { id:"auditlog",     label:"Audit Log",   icon:"📋", perm:"view_audit_log" },
+    { id:"export",       label:"Export",      icon:"📤", perm:"export_data" },
+    { id:"roles",        label:"Roles",       icon:"🛡️", perm:"manage_roles" },
+    { id:"apikeys",      label:"API Keys",    icon:"🔑", perm:"manage_api_keys" },
+    { id:"webhooks",     label:"Webhooks",    icon:"🔗", perm:"manage_webhooks" },
+    { id:"emails",       label:"Emails",      icon:"✉️", perm:"manage_email_templates" },
+    { id:"ratelimits",   label:"Rate Limits", icon:"🛡️", perm:"manage_rate_limits" },
+    { id:"backup",       label:"Backup",      icon:"💾", perm:"manage_backups" },
+    { id:"broadcast",    label:"Broadcast",   icon:"📢", perm:"send_broadcasts" },
+    { id:"settings",     label:"Settings",    icon:"⚙️", perm:"view_settings" },
   ].filter(t=>can(user,t.perm));
 
   // Ensure current tab is accessible; fall back to first allowed tab
@@ -4099,16 +4503,20 @@ function AdminPanel({user, onExit, lang}){
 
       {/* Content */}
       <div style={{flex:1,overflowY:"auto",padding:20}}>
-        {activeTab==="dashboard" && <AdminDashboard users={users} adminUser={user}/>}
-        {activeTab==="users"     && <AdminUsers users={users} setUsers={setUsers} adminUser={user}/>}
-        {activeTab==="roles"     && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
-        {activeTab==="apikeys"   && <AdminApiKeys/>}
-        {activeTab==="webhooks"  && <AdminWebhooks/>}
-        {activeTab==="emails"      && <AdminEmailTemplates/>}
-        {activeTab==="ratelimits" && <AdminRateLimits/>}
-        {activeTab==="backup"     && <AdminBackup users={users} setUsers={setUsers} adminUser={user}/>}
-        {activeTab==="broadcast"  && <AdminBroadcast users={users} adminUser={user}/>}
-        {activeTab==="settings"   && <AdminSettings/>}
+        {activeTab==="dashboard"    && <AdminDashboard users={users} adminUser={user}/>}
+        {activeTab==="users"        && <AdminUsers users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="transactions" && <AdminTransactions users={users}/>}
+        {activeTab==="analytics"    && <AdminAnalytics users={users}/>}
+        {activeTab==="auditlog"     && <AdminAuditLog adminUser={user}/>}
+        {activeTab==="export"       && <AdminExport users={users}/>}
+        {activeTab==="roles"        && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="apikeys"      && <AdminApiKeys/>}
+        {activeTab==="webhooks"     && <AdminWebhooks/>}
+        {activeTab==="emails"       && <AdminEmailTemplates/>}
+        {activeTab==="ratelimits"   && <AdminRateLimits/>}
+        {activeTab==="backup"       && <AdminBackup users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="broadcast"    && <AdminBroadcast users={users} adminUser={user}/>}
+        {activeTab==="settings"     && <AdminSettings/>}
       </div>
     </div>
   );
