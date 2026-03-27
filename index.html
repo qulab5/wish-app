@@ -5196,7 +5196,9 @@ function MainApp({user,onLogout,lang,setLang}){
       .then(r=>r.json())
       .then(d=>{ if(!d.success) console.error('[spin save]',d); })
       .catch(e=>console.error('[spin save network]',e));
-      if(newEs<=0) setSAP(true);
+      // NOTE: Do NOT show spinAdPopup here — user must see their reward first.
+      // The inline "Watch Ad → Get 1 Spin" button appears below the wheel
+      // automatically when spinsLeft===0, after the result banner is visible.
     },4200);
   };
   const doConvert=()=>{
