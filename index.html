@@ -450,8 +450,11 @@ const SOCIAL_JOINS = [
 const PL = {YouTube:"#FF0000",Facebook:"#1877F2",Twitter:"#111",Instagram:"#E1306C",TikTok:"#010101",LinkedIn:"#0A66C2",Telegram:"#2AABEE",WhatsApp:"#25D366"};
 const GENERIC_ADS=[{e:"🛒",c:"Shopping"},{e:"🎮",c:"Gaming"},{e:"🍔",c:"Food"},{e:"✈️",c:"Travel"},{e:"👗",c:"Fashion"},{e:"💻",c:"Tech"},{e:"🏋️",c:"Fitness"},{e:"📱",c:"Apps"}];
 function rndAd(){const a=GENERIC_ADS[Math.floor(Math.random()*GENERIC_ADS.length)];return{emoji:a.e,cat:a.c,pts:Math.floor(20+Math.random()*20),id:Date.now()};}
-const SPIN_PTS=[100,150,200,250,300,350,400,500];
-const SPIN_USD=[1,2,3,1,2,3,2,1];
+const SPIN_PTS=[500,1000,1500,2000,2500,3000,3500,20000];
+// SPIN_USD × 0.01 = USD credited. Scaled to match new point values.
+const SPIN_USD=[50,100,150,200,250,300,350,2000];
+// Index of the jackpot slot (20,000 pts) — must match SPIN_PTS above.
+const SPIN_JACKPOT_IDX=7;
 const CURRENT_TASKS=TASK_SETS[Math.floor(Date.now()/(10*24*60*60*1000))%TASK_SETS.length];
 const FAKE_LEADERS=[
   {name:"Ahmad_786",pts:48200,country:"🇵🇰"},{name:"Sara_Wins",pts:41500,country:"🇮🇳"},
@@ -653,7 +656,8 @@ function Ring({val,max=5}){
 }
 
 function SpinWheel({angle,spinning,phase}){
-  const ptSegs=[{v:"100",c:"#8b5cf6"},{v:"150",c:"#06b6d4"},{v:"200",c:C.gold},{v:"250",c:"#ec4899"},{v:"300",c:"#10b981"},{v:"350",c:"#f97316"},{v:"400",c:"#6366f1"},{v:"500",c:"#84cc16"}];
+  // Slot order matches SPIN_PTS index: 0=500 … 6=3500, 7=20K (jackpot, gold)
+  const ptSegs=[{v:"500",c:"#8b5cf6"},{v:"1K",c:"#06b6d4"},{v:"1.5K",c:"#10b981"},{v:"2K",c:"#ec4899"},{v:"2.5K",c:"#f97316"},{v:"3K",c:"#6366f1"},{v:"3.5K",c:"#84cc16"},{v:"20K",c:"#FFD700"}];
   const udSegs=[{v:"$1",c:"#10b981"},{v:"$2",c:C.gold},{v:"$3",c:"#8b5cf6"},{v:"$1",c:"#06b6d4"},{v:"$2",c:"#ec4899"},{v:"$3",c:"#f97316"},{v:"$1",c:"#6366f1"},{v:"$2",c:"#84cc16"}];
   const segs=phase==="points"?ptSegs:udSegs;
   const n=8,r=88,cx=96,cy=96;
@@ -5161,18 +5165,42 @@ function MainApp({user,onLogout,lang,setLang}){
     if(totalSpins<=0){setSAP(true);return;}
     setSpin(true);setSR(null);
     // Pre-compute post-spin values now, while state is fresh.
-    // The setTimeout closure below is stale w.r.t. setState calls, so we
-    // must capture these values here and pass them through the closure.
     const newSnf=hasFree?now+24*60*60*1000:spinNextFree;
     const newEs=hasFree?extraSpins:extraSpins-1;
     if(hasFree) setSNF(newSnf);
     else        setES(newEs);
-    // Save spin consumption immediately so a refresh before the 4.2s animation
-    // completes doesn't restore the free spin from the DB.
+
+    // ── Jackpot milestone logic ──────────────────────────────────────────────
+    // __spin_attempts: total lifetime spins (persisted in tasksDone JSONB).
+    // __spin_milestone_at: the attempt number that triggers the 20K jackpot.
+    // Jackpot fires every 24–25 spins; after each jackpot the next threshold
+    // is set 24–25 spins ahead so the cycle continues indefinitely.
+    const prevAttempts  = tasksDone.__spin_attempts  || 0;
+    const milestoneAt   = tasksDone.__spin_milestone_at
+                          || (24 + Math.floor(Math.random() * 2));  // 24 or 25
+    const newAttempts   = prevAttempts + 1;
+    const isJackpot     = newAttempts >= milestoneAt;
+    const newMilestoneAt= isJackpot
+                          ? newAttempts + 24 + Math.floor(Math.random() * 2)
+                          : milestoneAt;
+
+    // Choose slot: jackpot → slot 7 (20 000 pts); otherwise random from 0–6.
+    const i = isJackpot
+      ? SPIN_JACKPOT_IDX
+      : Math.floor(Math.random() * SPIN_JACKPOT_IDX);   // 0 – 6 inclusive
+
+    if(isJackpot) console.log(`[Spin] 🎉 JACKPOT triggered on attempt #${newAttempts}`);
+
+    // Persist spin consumption + updated attempt counters immediately.
+    const newTD = {...tasksDone,
+      __spin_attempts:   newAttempts,
+      __spin_milestone_at: newMilestoneAt,
+    };
+    setTD(newTD);
     fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:u.id,email:u.email,spinNextFree:newSnf,extraSpins:newEs})
+      body:JSON.stringify({id:u.id,email:u.email,spinNextFree:newSnf,extraSpins:newEs,tasksDone:newTD})
     }).catch(()=>{});
-    const i=Math.floor(Math.random()*SPIN_PTS.length);
+
     const targetOffset=(337.5-i*45+720)%360;
     const currentMod=spinAngle%360;
     const diff=(targetOffset-currentMod+360)%360;
@@ -5185,13 +5213,12 @@ function MainApp({user,onLogout,lang,setLang}){
       const newPts=cu.pts+SPIN_PTS[i];
       const newUsd=+(cu.usd+SPIN_USD[i]*0.01).toFixed(2);
       addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);
-      setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});
+      setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01,isJackpot});
       setSpin(false);
-      // Persist immediately — don't rely on the 2s auto-save debounce which
-      // can be cancelled by a page refresh before it fires.
+      // Persist immediately — don't rely on the 2s auto-save debounce.
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:cu.id,email:cu.email,pts:newPts,usd:newUsd,
-          spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs})
+          spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs,tasksDone:newTD})
       })
       .then(r=>r.json())
       .then(d=>{ if(!d.success) console.error('[spin save]',d); })
@@ -5480,15 +5507,16 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{background:"rgba(139,92,246,.18)",borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:700,color:C.brandLt}}>{spinsLeft} spin{spinsLeft!==1?"s":""}</div>
           </div>
           <div style={{fontSize:12,color:hasFree?C.green:C.muted,marginBottom:4}}>{freeLabel}</div>
-          <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Win up to 500 pts & cash prizes!</div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Win 500–3,500 pts per spin · 🏆 20,000 pt jackpot every ~25 spins!</div>
           <div style={{display:"flex",justifyContent:"center",marginBottom:16,transform:"scale(1.15)",transformOrigin:"center top"}}>
             <SpinWheel angle={spinAngle} spinning={spinning} phase="points"/>
           </div>
           {spinResult&&!spinning&&(
-            <div style={{textAlign:"center",background:`linear-gradient(135deg,rgba(245,158,11,.2),rgba(139,92,246,.2))`,border:`1px solid ${C.gold}50`,borderRadius:12,padding:"12px 16px",marginBottom:12,animation:"popIn .4s ease"}}>
-              <div style={{fontSize:22,marginBottom:4}}>🎉</div>
-              <div style={{fontWeight:800,fontSize:16,color:C.gold}}>+{spinResult.pts} pts</div>
-              <div style={{fontSize:13,color:C.muted}}>& +${spinResult.usd.toFixed(2)} USD added!</div>
+            <div style={{textAlign:"center",background:spinResult.isJackpot?`linear-gradient(135deg,rgba(255,215,0,.25),rgba(245,158,11,.25))`:`linear-gradient(135deg,rgba(245,158,11,.2),rgba(139,92,246,.2))`,border:`2px solid ${spinResult.isJackpot?"#FFD700":C.gold+"50"}`,borderRadius:12,padding:"14px 16px",marginBottom:12,animation:"popIn .4s ease",boxShadow:spinResult.isJackpot?"0 0 30px rgba(255,215,0,.35)":"none"}}>
+              <div style={{fontSize:spinResult.isJackpot?36:22,marginBottom:4}}>{spinResult.isJackpot?"🏆🎉🏆":"🎉"}</div>
+              {spinResult.isJackpot&&<div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#FFD700",marginBottom:4}}>JACKPOT!</div>}
+              <div style={{fontWeight:800,fontSize:spinResult.isJackpot?22:16,color:spinResult.isJackpot?"#FFD700":C.gold}}>+{spinResult.pts.toLocaleString()} pts</div>
+              <div style={{fontSize:13,color:C.muted,marginTop:2}}>Added to your balance!</div>
             </div>
           )}
           <button onClick={doSpin} disabled={spinning||spinsLeft<=0}
