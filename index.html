@@ -5424,14 +5424,16 @@ function MainApp({user,onLogout,lang,setLang}){
     leaders:(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>TOP EARNERS</div>
-        {[...FAKE_LEADERS.slice(0,-1),{...FAKE_LEADERS[FAKE_LEADERS.length-1],name:u.name,pts:u.pts,country:u.country,isMe:true}].map((l,i)=>(
-          <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
-            <div style={{fontSize:22}}>{l.country}</div>
-            <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
-            <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
-          </div>
-        ))}
+        {[...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,country:u.country||"🌍",isMe:true}]
+          .sort((a,b)=>(b.pts||0)-(a.pts||0))
+          .map((l,i)=>(
+            <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
+              <div style={{fontSize:22}}>{l.country}</div>
+              <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
+              <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+            </div>
+          ))}
       </div>
     ),
     wallet:(
@@ -6074,34 +6076,39 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:18,fontWeight:800,color:C.white}}>🏆 Leaderboard</div>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
-            {/* Top 3 podium */}
-            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:12,marginBottom:20,padding:"12px 0"}}>
-              {[1,0,2].map(pos=>{
-                const l=FAKE_LEADERS[pos]||{name:"—",pts:0,country:"🌍"};
-                const heights=["60px","80px","48px"];
-                const colors=[`linear-gradient(135deg,${C.gold},#d97706)`,`linear-gradient(135deg,#9ca3af,#6b7280)`,`linear-gradient(135deg,#cd7c32,#92400e)`];
-                const medals=["🥇","🥈","🥉"];
-                const displayPos=[2,1,3];
-                return(
-                  <div key={pos} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
-                    <div style={{fontSize:20}}>{medals[pos]}</div>
-                    <div style={{width:44,height:44,borderRadius:"50%",background:colors[pos],display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",border:"2px solid rgba(255,255,255,.3)"}}>{l.country}</div>
-                    <div style={{fontSize:12,fontWeight:700,color:C.white,textAlign:"center",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.name}</div>
-                    <div style={{fontSize:11,color:C.gold,fontWeight:700}}>{l.pts.toLocaleString()}</div>
-                    <div style={{width:"100%",height:heights[pos],background:colors[pos],borderRadius:"8px 8px 0 0",opacity:.4}}/>
+            {(()=>{
+              const sortedLeaders=[...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,country:u.country||"🌍",isMe:true}]
+                .sort((a,b)=>(b.pts||0)-(a.pts||0));
+              const heights=["60px","80px","48px"];
+              const colors=[`linear-gradient(135deg,${C.gold},#d97706)`,`linear-gradient(135deg,#9ca3af,#6b7280)`,`linear-gradient(135deg,#cd7c32,#92400e)`];
+              const medals=["🥇","🥈","🥉"];
+              return(<>
+                {/* Top 3 podium */}
+                <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:12,marginBottom:20,padding:"12px 0"}}>
+                  {[1,0,2].map((pos,col)=>{
+                    const l=sortedLeaders[pos]||{name:"—",pts:0,country:"🌍"};
+                    return(
+                      <div key={pos} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
+                        <div style={{fontSize:20}}>{medals[col]}</div>
+                        <div style={{width:44,height:44,borderRadius:"50%",background:colors[col],display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",border:"2px solid rgba(255,255,255,.3)"}}>{l.country}</div>
+                        <div style={{fontSize:12,fontWeight:700,color:C.white,textAlign:"center",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.name}</div>
+                        <div style={{fontSize:11,color:C.gold,fontWeight:700}}>{l.pts.toLocaleString()}</div>
+                        <div style={{width:"100%",height:heights[col],background:colors[col],borderRadius:"8px 8px 0 0",opacity:.4}}/>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>ALL EARNERS</div>
+                {sortedLeaders.map((l,i)=>(
+                  <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12,transition:"all .2s"}}>
+                    <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
+                    <div style={{fontSize:22}}>{l.country}</div>
+                    <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
+                    <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
                   </div>
-                );
-              })}
-            </div>
-            <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>ALL EARNERS</div>
-            {[...FAKE_LEADERS.slice(0,-1),{...FAKE_LEADERS[FAKE_LEADERS.length-1],name:u.name,pts:u.pts,country:u.country,isMe:true}].map((l,i)=>(
-              <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12,transition:"all .2s"}}>
-                <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
-                <div style={{fontSize:22}}>{l.country}</div>
-                <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
-                <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
-              </div>
-            ))}
+                ))}
+              </>);
+            })()}
           </div>
         </div>
       )}
