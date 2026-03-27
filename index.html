@@ -455,6 +455,96 @@ const FAKE_LEADERS=[
 ];
 
 /* SVG Logos */
+/* ── Wish Logo — golden phoenix with cyan circuit ring ── */
+function WishLogo({size=40,style={},radius=22}){
+  return(
+    <svg width={size} height={size} viewBox="0 0 100 100" style={style} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="wlBg" cx="40%" cy="35%" r="80%">
+          <stop offset="0%" stopColor="#1e1260"/>
+          <stop offset="55%" stopColor="#0b0820"/>
+          <stop offset="100%" stopColor="#050510"/>
+        </radialGradient>
+        <linearGradient id="wlGold" x1="10%" y1="0%" x2="90%" y2="100%">
+          <stop offset="0%" stopColor="#fef3c7"/>
+          <stop offset="25%" stopColor="#fbbf24"/>
+          <stop offset="60%" stopColor="#d97706"/>
+          <stop offset="100%" stopColor="#f59e0b"/>
+        </linearGradient>
+        <linearGradient id="wlGold2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#fde68a"/>
+          <stop offset="50%" stopColor="#b45309"/>
+          <stop offset="100%" stopColor="#fbbf24"/>
+        </linearGradient>
+        <radialGradient id="wlPurple" cx="50%" cy="65%" r="55%">
+          <stop offset="0%" stopColor="rgba(109,40,217,0.55)"/>
+          <stop offset="70%" stopColor="rgba(79,20,150,0.2)"/>
+          <stop offset="100%" stopColor="transparent"/>
+        </radialGradient>
+        <radialGradient id="wlGlow" cx="50%" cy="45%" r="50%">
+          <stop offset="0%" stopColor="rgba(245,158,11,0.22)"/>
+          <stop offset="100%" stopColor="transparent"/>
+        </radialGradient>
+        <filter id="wlBlur"><feGaussianBlur stdDeviation="1"/></filter>
+      </defs>
+      {/* Background */}
+      <rect width="100" height="100" rx={radius} fill="url(#wlBg)"/>
+      {/* Purple nebula glow */}
+      <ellipse cx="50" cy="62" rx="46" ry="40" fill="url(#wlPurple)"/>
+      {/* Gold center glow */}
+      <ellipse cx="50" cy="50" rx="30" ry="28" fill="url(#wlGlow)" filter="url(#wlBlur)"/>
+      {/* Outer circuit ring */}
+      <circle cx="50" cy="53" r="38" fill="none" stroke="#00d4ff" strokeWidth="1.8" strokeDasharray="5 2.5" opacity="0.65"/>
+      {/* Inner ring */}
+      <circle cx="50" cy="53" r="34" fill="none" stroke="#38bdf8" strokeWidth="0.7" opacity="0.35"/>
+      {/* Circuit notch top */}
+      <rect x="47.5" y="13" width="5" height="8" rx="1.5" fill="#00d4ff" opacity="0.7"/>
+      {/* Circuit notch bottom */}
+      <rect x="47.5" y="79" width="5" height="8" rx="1.5" fill="#00d4ff" opacity="0.5"/>
+      {/* Circuit notch left */}
+      <rect x="10" y="50.5" width="8" height="4" rx="1.5" fill="#00d4ff" opacity="0.45"/>
+      {/* Circuit notch right */}
+      <rect x="82" y="50.5" width="8" height="4" rx="1.5" fill="#00d4ff" opacity="0.45"/>
+      {/* Circuit dots */}
+      <circle cx="23" cy="27" r="1.8" fill="#38bdf8" opacity="0.5"/>
+      <circle cx="77" cy="27" r="1.8" fill="#38bdf8" opacity="0.5"/>
+      <circle cx="23" cy="79" r="1.8" fill="#38bdf8" opacity="0.35"/>
+      <circle cx="77" cy="79" r="1.8" fill="#38bdf8" opacity="0.35"/>
+      {/* ── Phoenix wings ── */}
+      {/* Left upper wing */}
+      <path d="M49 54 C42 48 32 40 18 30 C20 37 26 43 34 49 C39 52 44 53 49 54Z" fill="url(#wlGold)"/>
+      {/* Left lower wing */}
+      <path d="M49 58 C38 56 25 52 13 44 C16 50 23 54 32 57 C38 59 44 59 49 58Z" fill="url(#wlGold2)" opacity="0.9"/>
+      {/* Left wing tip accent */}
+      <path d="M49 54 C38 47 28 38 15 27 C17 29 18 30 18 30 C32 40 42 48 49 54Z" fill="#fde68a" opacity="0.4"/>
+      {/* Right upper wing */}
+      <path d="M51 54 C58 48 68 40 82 30 C80 37 74 43 66 49 C61 52 56 53 51 54Z" fill="url(#wlGold)"/>
+      {/* Right lower wing */}
+      <path d="M51 58 C62 56 75 52 87 44 C84 50 77 54 68 57 C62 59 56 59 51 58Z" fill="url(#wlGold2)" opacity="0.9"/>
+      {/* Right wing tip accent */}
+      <path d="M51 54 C62 47 72 38 85 27 C83 29 82 30 82 30 C68 40 58 48 51 54Z" fill="#fde68a" opacity="0.4"/>
+      {/* ── Body ── */}
+      <ellipse cx="50" cy="61" rx="6" ry="9" fill="url(#wlGold)"/>
+      {/* Chest chevron / V pattern */}
+      <path d="M44 65 L50 74 L56 65" fill="none" stroke="url(#wlGold)" strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M46 68 L50 74 L54 68" fill="none" stroke="#fde68a" strokeWidth="1.2" strokeLinejoin="round" opacity="0.6"/>
+      {/* Bottom V lines (circuit pattern) */}
+      <path d="M43 73 L50 82 L57 73" fill="none" stroke="url(#wlGold)" strokeWidth="1.5" strokeLinejoin="round" opacity="0.6"/>
+      {/* ── Head ── */}
+      <ellipse cx="50" cy="50" rx="5.5" ry="6.5" fill="url(#wlGold)"/>
+      {/* Beak */}
+      <path d="M50 53.5 L54.5 55.5 L50 57" fill="#92400e" opacity="0.9"/>
+      {/* Eye */}
+      <circle cx="51.5" cy="49.5" r="1.5" fill="#0c0a1e"/>
+      <circle cx="52" cy="49" r="0.55" fill="#60a5fa"/>
+      {/* ── Flame above head ── */}
+      <path d="M50 42 C47 38 46.5 33 50 30 C53.5 33 53 38 50 42Z" fill="#f59e0b" opacity="0.95"/>
+      <path d="M50 41 C48.5 38 48 34 50 31 C52 34 51.5 38 50 41Z" fill="#93c5fd" opacity="0.85"/>
+      {/* Star on flame */}
+      <polygon points="50,28 51,30.5 53.5,30.5 51.5,32 52.2,34.5 50,33 47.8,34.5 48.5,32 46.5,30.5 49,30.5" fill="white" opacity="0.9" transform="scale(0.75) translate(16.7,-4)"/>
+    </svg>
+  );
+}
 const LOGOS={
   YouTube:(<svg viewBox="0 0 24 24" w="20" h="20" width="20" height="20"><path fill="#FF0000" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8z"/><path fill="#fff" d="M9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>),
   Facebook:(<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#1877F2" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3v-2.6c0-3 1.8-4.7 4.6-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>),
@@ -4785,7 +4875,7 @@ function WalletTab({ u, C, setU }) {
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 20px 14px'}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:40,height:40,borderRadius:12,overflow:'hidden',background:'linear-gradient(135deg,#f59e0b,#d97706)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,boxShadow:'0 4px 20px rgba(245,158,11,.5), 0 0 0 1px rgba(245,158,11,.2)',flexShrink:0}}>✨</div>
+            <div style={{width:40,height:40,borderRadius:12,overflow:'hidden',flexShrink:0,boxShadow:'0 4px 20px rgba(245,158,11,.5), 0 0 0 1px rgba(245,158,11,.2)'}}><WishLogo size={40} radius={12}/></div>
             <div>
               <div style={{fontSize:9,color:'rgba(255,255,255,.3)',letterSpacing:'2px',textTransform:'uppercase',fontWeight:500,marginBottom:1}}>Your Balance</div>
               <div style={{fontSize:17,fontWeight:700,background:'linear-gradient(90deg,#e2d9f3,#fbbf24)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Wish Wallet</div>
@@ -4809,8 +4899,8 @@ function WalletTab({ u, C, setU }) {
               <div style={{position:'relative',width:68,height:68,flexShrink:0}}>
                 <div style={{position:'absolute',top:-10,left:-10,right:-10,bottom:-10,borderRadius:'50%',background:'radial-gradient(circle,rgba(245,158,11,.45) 0%,transparent 70%)',animation:'wCoinGlow 2.5s ease-in-out infinite',pointerEvents:'none'}}/>
                 <div style={{position:'absolute',top:-4,left:-4,right:-4,bottom:-4,borderRadius:'50%',border:'1px solid rgba(245,158,11,.4)',animation:'wCoinGlow 2.5s ease-in-out infinite',animationDelay:'.5s',pointerEvents:'none'}}/>
-                <div style={{position:'relative',zIndex:1,width:68,height:68,borderRadius:'50%',background:'linear-gradient(135deg,#fde68a 0%,#f59e0b 40%,#b45309 80%,#f59e0b 100%)',boxShadow:'0 0 30px rgba(245,158,11,.6), 0 8px 24px rgba(0,0,0,.5), inset 0 2px 4px rgba(255,255,255,.3)',display:'flex',alignItems:'center',justifyContent:'center',animation:'wCoinFloat 3s ease-in-out infinite',overflow:'hidden'}}>
-                  <div style={{width:'100%',height:'100%',borderRadius:'50%',background:'linear-gradient(135deg,#f59e0b,#b45309)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:30}}>✨</div>
+                <div style={{position:'relative',zIndex:1,width:68,height:68,borderRadius:'50%',boxShadow:'0 0 30px rgba(245,158,11,.6), 0 8px 24px rgba(0,0,0,.5)',animation:'wCoinFloat 3s ease-in-out infinite',overflow:'hidden',flexShrink:0}}>
+                  <WishLogo size={68} radius={34}/>
                 </div>
               </div>
               {/* Balance block */}
@@ -4868,7 +4958,7 @@ function WalletTab({ u, C, setU }) {
             <div style={{borderRadius:18,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.07)',overflow:'hidden',position:'relative'}}>
               <div style={{position:'absolute',left:0,top:'15%',bottom:'15%',width:3,borderRadius:'0 3px 3px 0',background:'#f59e0b'}}/>
               <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 16px 16px 20px'}}>
-                <div style={{width:46,height:46,borderRadius:14,background:'rgba(245,158,11,.12)',border:'1px solid rgba(245,158,11,.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>✨</div>
+                <div style={{width:46,height:46,borderRadius:14,overflow:'hidden',flexShrink:0,border:'1px solid rgba(245,158,11,.3)'}}><WishLogo size={46} radius={13}/></div>
                 <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:'#fff'}}>Wish Coin</div></div>
                 <div style={{textAlign:'right'}}>
                   <div style={{fontSize:17,fontWeight:800,color:'#f59e0b'}}>{balLoading&&wishBal===null?<span style={{opacity:.4}}>…</span>:(fmt(wishBal)??'—')}</div>
@@ -5312,9 +5402,11 @@ function MainApp({user,onLogout,lang,setLang}){
         </div>
         {/* Stats Grid */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
-          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:"🪙"},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡"}].map(s=>(
+          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐",isLogo:false},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:null,isLogo:true},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡",isLogo:false}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
-              <div style={{fontSize:22}}>{s.icon}</div>
+              <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:28}}>
+                {s.isLogo ? <WishLogo size={28} radius={8}/> : <span style={{fontSize:22}}>{s.icon}</span>}
+              </div>
               <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
               <div style={{fontSize:11,color:C.muted,marginTop:1}}>{s.label}</div>
             </div>
