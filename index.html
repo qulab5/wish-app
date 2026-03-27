@@ -1634,7 +1634,7 @@ function AdminDashboard({users, adminUser}){
       <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:24}}>
         <StatCard icon="👥" label="Total Users"   value={totalUsers}  sub={`${activeUsers} active`} color={C.brandLt}/>
         <StatCard icon="⭐" label="Total Points"  value={totalPts.toLocaleString()} color={C.gold}/>
-        <StatCard icon="💵" label="Total USD"     value={`$${totalUsd}`} color={C.green}/>
+        <StatCard icon="🪙" label="Total Coins"    value={totalUsd} color={C.green}/>
         <StatCard icon="🛡️" label="Admin Staff"  value={admins}      color={C.cyan}/>
       </div>
 
@@ -2035,7 +2035,7 @@ function AdminTransactions({users}){
       <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:20}}>
         {[
           {icon:"⭐",label:"Total Points Issued",value:totalPts.toLocaleString(),color:C.gold},
-          {icon:"💵",label:"Total USD Balance",value:`$${totalUsd.toFixed(2)}`,color:C.green},
+          {icon:"🪙",label:"Total Coins",value:totalUsd.toFixed(2),color:C.green},
           {icon:"👥",label:"Users with Balance",value:realUsers.filter(u=>(u.pts||0)>0).length,color:C.brandLt},
         ].map(s=><StatCard key={s.label} icon={s.icon} label={s.label} value={s.value} color={s.color}/>)}
       </div>
@@ -2055,7 +2055,7 @@ function AdminTransactions({users}){
               </div>
             </div>
             <div style={{fontSize:13,fontWeight:700,color:C.gold,flexShrink:0}}>{(u.pts||0).toLocaleString()}</div>
-            <div style={{fontSize:11,color:C.green,flexShrink:0}}>${(u.usd||0).toFixed(2)}</div>
+            <div style={{fontSize:11,color:C.green,flexShrink:0}}>{(u.usd||0).toFixed(2)} 🪙</div>
           </div>
         ))}
       </div>
@@ -2078,7 +2078,7 @@ function AdminTransactions({users}){
           </div>
           <div style={{textAlign:"right",flexShrink:0}}>
             <div style={{fontSize:13,fontWeight:700,color:C.gold}}>{(u.pts||0).toLocaleString()} pts</div>
-            <div style={{fontSize:11,color:C.green}}>${(u.usd||0).toFixed(2)}</div>
+            <div style={{fontSize:11,color:C.green}}>{(u.usd||0).toFixed(2)} 🪙</div>
           </div>
           <div style={{width:60,textAlign:"right",flexShrink:0}}>
             <span style={{fontSize:10,padding:"2px 7px",borderRadius:99,background:u.active?"rgba(16,185,129,.12)":"rgba(239,68,68,.12)",color:u.active?C.green:C.red,border:`1px solid ${u.active?"rgba(16,185,129,.3)":"rgba(239,68,68,.3)"}`}}>
