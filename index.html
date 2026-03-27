@@ -246,6 +246,13 @@ const MINE_BOOST_PTS = 500;            // pts added per boost ad
 const MINE_MAX_BOOST = 5;              // max boosts per session
 const AD_COOLDOWN_S  = 5 * 60 * 60;
 
+// ─── Google AdMob TEST Ad Unit IDs ──────────────────────────────────────────
+// These are Google's official test IDs — no real ads will load, no revenue risk.
+// Replace with your real unit IDs only before production release.
+const ADMOB_TEST_MODE        = true;   // flip to false to use real IDs in prod
+const ADMOB_REWARDED_ID      = 'ca-app-pub-3940256099942544/5224354917';  // rewarded (mining start + boosts)
+const ADMOB_INTERSTITIAL_ID  = 'ca-app-pub-3940256099942544/1033173712';  // interstitial (spins)
+
 const DAILY_PTS_MAP = {
   1:80,2:55,3:70,4:45,5:90,6:60,7:120,8:50,9:75,10:65,
   11:85,12:55,13:95,14:40,15:110,16:70,17:60,18:80,19:50,20:100,
@@ -4959,6 +4966,10 @@ function MainApp({user,onLogout,lang,setLang}){
   const [mineReady,setMR]      = useState(false);
   const [mineStarted,setMS]    = useState(false);
   const [mineAdShow,setMAd]    = useState(false);
+  // Test ad modal state
+  const [testAdModal,setTestAdModal]         = useState(null);   // null | 'rewarded' | 'interstitial'
+  const [testAdCountdown,setTestAdCountdown] = useState(0);
+  const testAdCallbackRef                    = React.useRef(null);
   const [mineBoosts,setMineBoosts] = useState(0);
   const [convSuccess,setConvS] = useState(false);  // flash "Converted!" feedback
   const [langMenu,setLM]      = useState(false);
@@ -5204,7 +5215,7 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(e=>console.error('[convert save]',e));
   };
   const watchSpinAd=()=>{
-    showRewardedAd(()=>{
+    showInterstitialAd(()=>{
       const newEs=extraSpins+1;
       setES(newEs);setSAP(false);
       // Persist the new spin count immediately
@@ -5253,15 +5264,41 @@ function MainApp({user,onLogout,lang,setLang}){
   };
   const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
 
-  // ═══ AD INTEGRATION PLACEHOLDERS ═══════════════════════════════════════
-  // TODO: Replace showRewardedAd() with your actual ad network SDK call.
-  // e.g. AdMob: admob.showRewardedAd(adUnitId).then(onRewarded)
-  //      IronSource: ironSource.showRewardedVideo().then(onRewarded)
-  // onRewarded is called only after the user successfully watches the ad.
+  // ═══ AD INTEGRATION — Google AdMob Test Mode ════════════════════════════
+  // Uses Google's official test ad unit IDs. No real ads load, no revenue risk.
+  // The modal below simulates the ad experience with a countdown timer.
+  // When you're ready for production: set ADMOB_TEST_MODE=false and replace
+  // ADMOB_REWARDED_ID / ADMOB_INTERSTITIAL_ID with your real unit IDs.
+
+  const _launchTestAd = (type, adUnitId, duration, onRewarded) => {
+    console.log(`[AdMob TEST] Loading ${type} ad — unit ID: ${adUnitId}`);
+    if (ADMOB_TEST_MODE) {
+      console.log(`[AdMob TEST] ✅ Test mode active — using Google test ID: ${adUnitId}`);
+    }
+    testAdCallbackRef.current = onRewarded;
+    setTestAdCountdown(duration);
+    setTestAdModal(type);
+    let remaining = duration;
+    const tick = setInterval(() => {
+      remaining -= 1;
+      setTestAdCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(tick);
+        console.log(`[AdMob TEST] ✅ ${type} ad completed — reward granted`);
+        setTestAdModal(null);
+        if (testAdCallbackRef.current) testAdCallbackRef.current();
+      }
+    }, 1000);
+  };
+
+  // Rewarded ad — used for: mining start, each boost slot
   const showRewardedAd = (onRewarded) => {
-    // PLACEHOLDER — remove the line below and wire in your real ad SDK
-    console.log("[AD] showRewardedAd called — integrate your ad SDK here");
-    onRewarded(); // <-- remove this when real ad SDK is integrated
+    _launchTestAd('rewarded', ADMOB_REWARDED_ID, 5, onRewarded);
+  };
+
+  // Interstitial ad — used for: spin extra spin
+  const showInterstitialAd = (onComplete) => {
+    _launchTestAd('interstitial', ADMOB_INTERSTITIAL_ID, 3, onComplete);
   };
 
   // Start a 4-hour mining session (requires watching a rewarded ad).
@@ -6383,16 +6420,42 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
         </div>
       )}
-      {/* Mining Ad Modal */}
-      {mineAdShow&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
-          <div style={{background:C.s2,borderRadius:20,padding:28,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border2}`}}>
-            <div style={{fontSize:64,marginBottom:12}}>⛏️</div>
-            <div style={{fontSize:20,fontWeight:800,color:C.white,marginBottom:6}}>Activate Mining</div>
-            <div style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.6}}>Watch a short sponsored ad to start your 8-hour mining session and earn <span style={{color:C.gold,fontWeight:700}}>500 pts</span>!</div>
-            <div style={{background:"rgba(139,92,246,.1)",borderRadius:12,padding:"14px",marginBottom:16,fontSize:13,color:C.muted,border:`1px solid ${C.border}`}}>📢 Sponsored content — supports the platform</div>
-            <button onClick={startMiningAfterAd} style={{width:"100%",background:`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.3)"}}>⛏️ Start Mining Now</button>
-            <button onClick={()=>setMAd(false)} style={{marginTop:10,background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Maybe later</button>
+      {/* Google AdMob Test Ad Modal */}
+      {testAdModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
+          <div style={{background:"#1a1a2e",borderRadius:20,padding:28,maxWidth:340,width:"100%",textAlign:"center",border:"2px solid rgba(245,158,11,.4)",boxShadow:"0 0 40px rgba(245,158,11,.15)"}}>
+            {/* Test badge */}
+            <div style={{display:"inline-block",background:"rgba(16,185,129,.15)",border:"1px solid rgba(16,185,129,.4)",borderRadius:20,padding:"3px 12px",fontSize:10,color:"#10b981",letterSpacing:1,marginBottom:16,fontFamily:"monospace"}}>
+              ✅ ADMOB TEST MODE
+            </div>
+            {/* Ad type icon */}
+            <div style={{fontSize:52,marginBottom:8}}>
+              {testAdModal==='rewarded' ? '🎁' : '📺'}
+            </div>
+            <div style={{fontSize:18,fontWeight:800,color:"#fff",marginBottom:4}}>
+              {testAdModal==='rewarded' ? 'Rewarded Ad' : 'Interstitial Ad'}
+            </div>
+            {/* Unit ID for verification */}
+            <div style={{background:"rgba(0,0,0,.4)",borderRadius:8,padding:"8px 10px",marginBottom:16,fontFamily:"monospace",fontSize:9,color:"rgba(255,255,255,.45)",wordBreak:"break-all"}}>
+              {testAdModal==='rewarded' ? ADMOB_REWARDED_ID : ADMOB_INTERSTITIAL_ID}
+            </div>
+            {/* Simulated ad content */}
+            <div style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:12,padding:"20px 16px",marginBottom:20,color:"rgba(255,255,255,.35)",fontSize:13}}>
+              📢 Google Test Ad Placeholder
+            </div>
+            {/* Countdown */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:36,fontWeight:900,color:testAdCountdown>0?"#f59e0b":"#10b981",fontFamily:"monospace",lineHeight:1}}>
+                {testAdCountdown>0 ? testAdCountdown : '✓'}
+              </div>
+              <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:4}}>
+                {testAdCountdown>0 ? `Ad closes in ${testAdCountdown}s` : 'Reward granted!'}
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div style={{height:4,background:"rgba(255,255,255,.1)",borderRadius:2,overflow:"hidden",marginBottom:4}}>
+              <div style={{height:"100%",background:"linear-gradient(90deg,#f59e0b,#10b981)",borderRadius:2,transition:"width .9s linear",width:`${((testAdModal==='rewarded'?5:3)-testAdCountdown)/(testAdModal==='rewarded'?5:3)*100}%`}}/>
+            </div>
           </div>
         </div>
       )}
