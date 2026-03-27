@@ -7,7 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@200;300;400;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@200;300;400;600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -134,6 +134,12 @@
   .sp-nd.act{background:#FFD700;box-shadow:0 0 8px #FFD700;width:22px;border-radius:3px;}
   .sp-tap-ripple{position:fixed;border-radius:50%;pointer-events:none;z-index:50;border:2px solid rgba(255,215,0,0.9);animation:spTapOut 0.8s ease forwards;transform:translate(-50%,-50%) scale(0);}
   @keyframes spTapOut{to{transform:translate(-50%,-50%) scale(5);opacity:0;}}
+  /* ── Wallet screen ── */
+  @keyframes wSecurePulse{0%,100%{opacity:1;box-shadow:0 0 6px #10b981;}50%{opacity:.6;box-shadow:0 0 12px #10b981;}}
+  @keyframes wCoinFloat{0%,100%{transform:translateY(0px) rotate(0deg);}50%{transform:translateY(-6px) rotate(3deg);}}
+  @keyframes wCoinGlow{0%,100%{transform:scale(1);opacity:.6;}50%{transform:scale(1.12);opacity:1;}}
+  @keyframes wScanline{from{transform:translateY(-100%);}to{transform:translateY(500px);}}
+  @keyframes wGoldShimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
 </style>
 </head>
 <body>
@@ -4556,6 +4562,10 @@ function WalletTab({ u, C, setU }) {
   const [creating,  setCreating]  = useState(false);
   const [balLoading,setBalLoad]   = useState(false);
   const [txHistory,  setTxHistory] = useState([]);
+  const [walletTab,  setWalletTab] = useState('assets');
+  const [displayBal, setDisplayBal] = useState(0);
+  const auroraRef    = useRef(null);
+  const auroraRafRef = useRef(null);
 
   // ── Auto-create or restore wallet on mount ─────────────────────────────────
   useEffect(() => {
@@ -4578,6 +4588,51 @@ function WalletTab({ u, C, setU }) {
   useEffect(() => {
     if (!mintCfg) setWBal(u.tokens ?? 0);
   }, [u.tokens, mintCfg]);
+
+  // ── Count-up animation whenever wishBal changes ────────────────────────────
+  useEffect(() => {
+    const target = wishBal ?? 0;
+    const duration = 1200;
+    const start = Date.now();
+    const from = 0;
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      setDisplayBal(Math.round(from + (target - from) * ease));
+      if (progress < 1) auroraRafRef._countUp = requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(auroraRafRef._countUp);
+  }, [wishBal]);
+
+  // ── Aurora canvas animation ────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = auroraRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let t = 0;
+    const resize = () => { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; };
+    resize();
+    window.addEventListener('resize', resize);
+    const draw = () => {
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      const g1 = ctx.createRadialGradient(w*.3, h*.2+Math.sin(t*.4)*30, 0, w*.3, h*.2+Math.sin(t*.4)*30, w*.7);
+      g1.addColorStop(0,'rgba(245,158,11,.18)'); g1.addColorStop(1,'transparent');
+      ctx.fillStyle = g1; ctx.fillRect(0,0,w,h);
+      const g2 = ctx.createRadialGradient(w*.75, h*.1+Math.cos(t*.3)*35, 0, w*.75, h*.1+Math.cos(t*.3)*35, w*.6);
+      g2.addColorStop(0,'rgba(139,92,246,.22)'); g2.addColorStop(1,'transparent');
+      ctx.fillStyle = g2; ctx.fillRect(0,0,w,h);
+      const g3 = ctx.createRadialGradient(w*.6, h*.55+Math.sin(t*.5+1)*20, 0, w*.6, h*.55+Math.sin(t*.5+1)*20, w*.5);
+      g3.addColorStop(0,'rgba(6,182,212,.12)'); g3.addColorStop(1,'transparent');
+      ctx.fillStyle = g3; ctx.fillRect(0,0,w,h);
+      t += 0.015;
+      auroraRafRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => { cancelAnimationFrame(auroraRafRef.current); window.removeEventListener('resize', resize); };
+  }, []);
 
   // ── Balance fetch (server-side — avoids CORS on public Solana RPC) ─────────
   const loadBalances = async (addr) => {
@@ -4707,150 +4762,166 @@ function WalletTab({ u, C, setU }) {
 
   // ── Main screen ────────────────────────────────────────────────────────────
   return (
-    <div style={{paddingBottom:32,animation:'up .3s ease'}}>
+    <div style={{position:'relative',background:'#060612',minHeight:'100%',overflowX:'hidden',fontFamily:"'Outfit',sans-serif"}}>
 
-      {/* Hero balance card */}
-      <div style={{background:'linear-gradient(145deg,#1a0833 0%,#2d1060 50%,#0d1840 100%)',borderBottom:'1px solid rgba(139,92,246,.18)',padding:'28px 20px 22px',position:'relative',overflow:'hidden'}}>
-        {/* Ambient glow blobs */}
-        <div style={{position:'absolute',top:-50,right:-30,width:180,height:180,borderRadius:'50%',background:'radial-gradient(circle,rgba(245,158,11,.18),transparent 70%)',pointerEvents:'none'}}/>
-        <div style={{position:'absolute',bottom:-40,left:-20,width:140,height:140,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.22),transparent 70%)',pointerEvents:'none'}}/>
+      {/* Aurora canvas */}
+      <canvas ref={auroraRef} style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:0}}/>
 
-        {/* Header row */}
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
-          <div style={{fontSize:30,animation:'float 3s ease-in-out infinite',lineHeight:1}}>🪙</div>
-          <div>
-            <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:1.8,textTransform:'uppercase'}}>Wish Wallet</div>
-            <div style={{fontSize:12,color:'rgba(255,255,255,.2)',letterSpacing:.3}}>Wish Network</div>
-          </div>
-          {/* Refresh button */}
-          <button onClick={()=>loadBalances(wallet)} title="Refresh balances"
-            style={{marginLeft:'auto',width:32,height:32,borderRadius:8,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',color:'rgba(255,255,255,.4)',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:balLoading?'spin 1s linear infinite':'none'}}>
-            ↻
-          </button>
+      {/* Noise grain overlay */}
+      <svg style={{position:'absolute',top:0,left:0,width:'100%',height:'100%',pointerEvents:'none',zIndex:1,opacity:.025}} xmlns="http://www.w3.org/2000/svg">
+        <filter id="wNoise"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+        <rect width="100%" height="100%" filter="url(#wNoise)"/>
+      </svg>
+
+      {/* Scrollable content */}
+      <div style={{position:'relative',zIndex:2,paddingBottom:32,animation:'up .3s ease'}}>
+
+        {/* Status bar */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6,padding:'10px 20px 0'}}>
+          <div style={{width:6,height:6,borderRadius:'50%',background:'#10b981',animation:'wSecurePulse 2s ease-in-out infinite',flexShrink:0}}/>
+          <span style={{fontSize:10,color:'rgba(255,255,255,.3)',letterSpacing:'1.5px',textTransform:'uppercase',fontWeight:500}}>Secure Connection</span>
         </div>
 
-        {/* WISH balance — big hero number */}
-        <div style={{marginBottom:10}}>
-          <div style={{
-            fontSize:50,fontWeight:900,letterSpacing:-2,lineHeight:1,
-            background:'linear-gradient(135deg,#fde68a 0%,#f59e0b 40%,#f97316 100%)',
-            WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
-            filter:'drop-shadow(0 2px 16px rgba(245,158,11,.5))',
-          }}>
-            {balLoading && wishBal === null
-              ? <span style={{display:'inline-block',width:120,height:48,background:'rgba(255,255,255,.08)',borderRadius:10,animation:'shimmer 1.4s infinite',verticalAlign:'middle',backgroundSize:'600px 100%',backgroundImage:'linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.04) 75%)'}}/>
-              : (fmt(wishBal) ?? '—')}
-          </div>
-          <div style={{fontSize:12,color:'rgba(255,255,255,.3)',marginTop:3,letterSpacing:1.2,textTransform:'uppercase'}}>Wish Coins</div>
-        </div>
-
-        {/* SOL pill */}
-        <div style={{display:'inline-flex',alignItems:'center',gap:6,background:'rgba(255,255,255,.07)',borderRadius:20,padding:'5px 13px',marginBottom:24,border:'1px solid rgba(255,255,255,.06)'}}>
-          <span style={{fontSize:13,color:'rgba(255,255,255,.35)'}}>◎</span>
-          <span style={{fontSize:13,fontWeight:600,color:'rgba(255,255,255,.55)'}}>
-            {balLoading && solBal === null ? '…' : (solBal ?? '—')} SOL
-          </span>
-        </div>
-
-        {/* Action buttons */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          <button onClick={()=>{setScreen('send');setMsg('');}}
-            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(245,158,11,.22),rgba(249,115,22,.18))',border:'1px solid rgba(245,158,11,.35)',borderRadius:14,color:'#fbbf24',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
-            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
-            📤 Send
-          </button>
-          <button onClick={()=>setScreen('receive')}
-            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(124,58,237,.18))',border:'1px solid rgba(139,92,246,.35)',borderRadius:14,color:'#c4b5fd',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
-            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
-            📥 Receive
-          </button>
-        </div>
-      </div>
-
-      {/* Token row */}
-      <div style={{margin:'14px 16px 0',background:'rgba(245,158,11,.04)',border:'1px solid rgba(245,158,11,.1)',borderRadius:18,padding:'16px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 20px 14px'}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,boxShadow:'0 4px 14px rgba(245,158,11,.35)'}}>🪙</div>
+            <div style={{width:40,height:40,borderRadius:12,overflow:'hidden',background:'linear-gradient(135deg,#f59e0b,#d97706)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,boxShadow:'0 4px 20px rgba(245,158,11,.5), 0 0 0 1px rgba(245,158,11,.2)',flexShrink:0}}>✨</div>
             <div>
-              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>Wish Coin</div>
-              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>WISH</div>
+              <div style={{fontSize:9,color:'rgba(255,255,255,.3)',letterSpacing:'2px',textTransform:'uppercase',fontWeight:500,marginBottom:1}}>Your Balance</div>
+              <div style={{fontSize:17,fontWeight:700,background:'linear-gradient(90deg,#e2d9f3,#fbbf24)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Wish Wallet</div>
             </div>
           </div>
-          <div style={{textAlign:'right'}}>
-            <div style={{fontSize:18,fontWeight:800,color:'#f59e0b'}}>
-              {balLoading && wishBal === null ? <span style={{opacity:.4}}>…</span> : (fmt(wishBal) ?? '—')}
-            </div>
-            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>WISH</div>
-          </div>
+          <button onClick={()=>loadBalances(wallet)} title="Refresh"
+            style={{width:36,height:36,borderRadius:10,background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)',color:'rgba(255,255,255,.6)',fontSize:18,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:balLoading?'spin 1s linear infinite':'none',transition:'background .15s',fontFamily:'inherit'}}>↻</button>
         </div>
-      </div>
 
-      {/* SOL row */}
-      <div style={{margin:'10px 16px 0',background:'rgba(99,102,241,.04)',border:'1px solid rgba(99,102,241,.1)',borderRadius:18,padding:'16px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#9945FF,#14F195)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 4px 14px rgba(153,69,255,.25)'}}>◎</div>
-            <div>
-              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>SOL</div>
-              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>SOL · Balance</div>
-            </div>
-          </div>
-          <div style={{textAlign:'right'}}>
-            <div style={{fontSize:18,fontWeight:800,color:'#a78bfa'}}>
-              {balLoading && solBal === null ? <span style={{opacity:.4}}>…</span> : (solBal ?? '—')}
-            </div>
-            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>SOL</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Wallet address row */}
-      <div style={{margin:'10px 16px 0',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.07)',borderRadius:16,padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div>
-          <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:5}}>Wallet Address</div>
-          <div style={{fontSize:13,color:'rgba(255,255,255,.6)',fontFamily:'monospace',letterSpacing:.4}}>
-            {wallet.slice(0,6)}…{wallet.slice(-6)}
-          </div>
-        </div>
-        <button onClick={copyAddr}
-          style={{padding:'8px 14px',background:copied?'rgba(52,211,153,.12)':'rgba(255,255,255,.06)',border:`1px solid ${copied?'rgba(52,211,153,.35)':'rgba(255,255,255,.1)'}`,borderRadius:10,color:copied?'#34d399':'rgba(255,255,255,.45)',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .2s'}}>
-          {copied ? '✓ Copied' : '📋 Copy'}
-        </button>
-      </div>
-
-      {/* Transaction history */}
-      <div style={{margin:'18px 16px 0'}}>
-        <div style={{fontSize:12,color:'rgba(255,255,255,.3)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:10}}>Transaction History</div>
-        {txHistory.length === 0
-          ? <div style={{textAlign:'center',padding:'24px 0',color:'rgba(255,255,255,.2)',fontSize:13}}>No transactions yet</div>
-          : txHistory.map(tx => {
-              const isSent = tx.type === 'sent';
-              const addr   = tx.address || '';
-              const short  = addr.length > 10 ? addr.slice(0,5)+'…'+addr.slice(-5) : addr || '—';
-              const date   = new Date(tx.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-              return (
-                <div key={tx.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',borderRadius:14,marginBottom:8}}>
-                  <div style={{display:'flex',alignItems:'center',gap:12}}>
-                    <div style={{width:36,height:36,borderRadius:'50%',background:isSent?'rgba(248,113,113,.15)':'rgba(52,211,153,.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>
-                      {isSent ? '📤' : '📥'}
-                    </div>
-                    <div>
-                      <div style={{fontSize:13,fontWeight:700,color:C.white}}>{isSent ? 'Sent' : 'Received'}</div>
-                      <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{isSent ? 'To: ' : 'From: '}{short}</div>
-                      <div style={{fontSize:10,color:'rgba(255,255,255,.2)',marginTop:1}}>{date}</div>
-                    </div>
-                  </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontSize:15,fontWeight:800,color:isSent?'#f87171':'#34d399'}}>
-                      {isSent ? '−' : '+'}{tx.amount}
-                    </div>
-                    <div style={{fontSize:10,color:'rgba(255,255,255,.25)',marginTop:2}}>WISH</div>
-                  </div>
+        {/* Hero balance card */}
+        <div style={{margin:'0 16px',borderRadius:24,background:'linear-gradient(145deg,#12082e 0%,#0c1a3d 50%,#071e28 100%)',border:'1px solid rgba(255,255,255,.1)',boxShadow:'0 24px 60px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.05)',position:'relative',overflow:'hidden'}}>
+          {/* Top shimmer line */}
+          <div style={{position:'absolute',top:0,left:'10%',right:'10%',height:1,background:'linear-gradient(90deg,transparent,rgba(245,158,11,.7),rgba(139,92,246,.7),transparent)',zIndex:3,pointerEvents:'none'}}/>
+          {/* Scanline sweep */}
+          <div style={{position:'absolute',left:0,right:0,height:40,background:'linear-gradient(180deg,transparent,rgba(255,255,255,.025),transparent)',animation:'wScanline 4s linear infinite',zIndex:2,pointerEvents:'none'}}/>
+          {/* Main content */}
+          <div style={{position:'relative',zIndex:4,padding:'24px 22px 20px',background:'linear-gradient(180deg,rgba(255,255,255,.04) 0%,transparent 100%)'}}>
+            {/* Top: coin + balance */}
+            <div style={{display:'flex',alignItems:'flex-start',gap:18,marginBottom:20}}>
+              {/* Animated coin */}
+              <div style={{position:'relative',width:68,height:68,flexShrink:0}}>
+                <div style={{position:'absolute',top:-10,left:-10,right:-10,bottom:-10,borderRadius:'50%',background:'radial-gradient(circle,rgba(245,158,11,.45) 0%,transparent 70%)',animation:'wCoinGlow 2.5s ease-in-out infinite',pointerEvents:'none'}}/>
+                <div style={{position:'absolute',top:-4,left:-4,right:-4,bottom:-4,borderRadius:'50%',border:'1px solid rgba(245,158,11,.4)',animation:'wCoinGlow 2.5s ease-in-out infinite',animationDelay:'.5s',pointerEvents:'none'}}/>
+                <div style={{position:'relative',zIndex:1,width:68,height:68,borderRadius:'50%',background:'linear-gradient(135deg,#fde68a 0%,#f59e0b 40%,#b45309 80%,#f59e0b 100%)',boxShadow:'0 0 30px rgba(245,158,11,.6), 0 8px 24px rgba(0,0,0,.5), inset 0 2px 4px rgba(255,255,255,.3)',display:'flex',alignItems:'center',justifyContent:'center',animation:'wCoinFloat 3s ease-in-out infinite',overflow:'hidden'}}>
+                  <div style={{width:'100%',height:'100%',borderRadius:'50%',background:'linear-gradient(135deg,#f59e0b,#b45309)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:30}}>✨</div>
                 </div>
-              );
-            })
-        }
+              </div>
+              {/* Balance block */}
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:9,color:'rgba(255,255,255,.35)',letterSpacing:'2.5px',textTransform:'uppercase',fontWeight:600,marginBottom:4}}>WISH COINS</div>
+                <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+                  <div style={{fontSize:52,fontWeight:900,lineHeight:1,background:'linear-gradient(135deg,#fef3c7 0%,#fbbf24 40%,#f59e0b 70%,#d97706 100%)',backgroundSize:'200%',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',animation:'wGoldShimmer 3s linear infinite'}}>
+                    {displayBal.toLocaleString()}
+                  </div>
+                  <div style={{fontSize:13,fontWeight:600,color:'rgba(251,191,36,.5)',paddingBottom:6}}>WISH</div>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:4,marginTop:4}}>
+                  <span style={{fontSize:11,color:'#9945FF'}}>◎</span>
+                  <span style={{fontSize:12,color:'rgba(255,255,255,.3)'}}>
+                    {balLoading && solBal === null ? '…' : (solBal ?? '—')} SOL
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Address pill */}
+            <div style={{display:'flex',alignItems:'center',gap:8,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,padding:'10px 14px',marginBottom:16}}>
+              <span style={{fontSize:14,color:'rgba(139,92,246,.7)',flexShrink:0}}>◈</span>
+              <span style={{flex:1,fontFamily:"'JetBrains Mono','DM Mono',monospace",fontSize:12,color:'rgba(255,255,255,.5)',letterSpacing:'.5px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {wallet.slice(0,6)}…{wallet.slice(-6)}
+              </span>
+              <button onClick={copyAddr} style={{flexShrink:0,fontSize:11,fontWeight:600,padding:'3px 10px',background:copied?'rgba(16,185,129,.2)':'rgba(124,58,237,.2)',border:`1px solid ${copied?'rgba(16,185,129,.4)':'rgba(124,58,237,.4)'}`,borderRadius:8,color:copied?'#34d399':'#a78bfa',cursor:'pointer',transition:'all .2s',whiteSpace:'nowrap',fontFamily:'inherit'}}>
+                {copied ? '✓ Copied' : 'Copy'}
+              </button>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{display:'flex',background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',borderRadius:16,overflow:'hidden'}}>
+              <button onClick={()=>{setScreen('send');setMsg('');}} style={{flex:1,background:'linear-gradient(135deg,rgba(124,58,237,.5),rgba(109,40,217,.3))',border:'none',color:'#e2d9f3',padding:14,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>↑ Send</button>
+              <div style={{width:1,background:'rgba(255,255,255,.08)',flexShrink:0}}/>
+              <button onClick={()=>setScreen('receive')} style={{flex:1,background:'transparent',border:'none',color:'rgba(255,255,255,.6)',padding:14,fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>↓ Receive</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab switcher */}
+        <div style={{margin:'18px 16px 12px',display:'flex',background:'rgba(255,255,255,.04)',borderRadius:14,padding:4,border:'1px solid rgba(255,255,255,.06)'}}>
+          {['assets','activity'].map(t=>(
+            <button key={t} onClick={()=>setWalletTab(t)} style={{flex:1,padding:'9px 0',borderRadius:11,fontSize:13,fontWeight:600,letterSpacing:'.3px',border:'none',cursor:'pointer',position:'relative',transition:'all .2s',background:walletTab===t?'rgba(255,255,255,.09)':'transparent',color:walletTab===t?'#fff':'rgba(255,255,255,.35)',boxShadow:walletTab===t?'0 2px 12px rgba(0,0,0,.4)':'none',fontFamily:'inherit'}}>
+              {walletTab===t&&<div style={{position:'absolute',top:0,left:'50%',transform:'translateX(-50%)',width:20,height:2,borderRadius:2,background:'linear-gradient(90deg,#f59e0b,#8b5cf6)'}}/>}
+              {t.charAt(0).toUpperCase()+t.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Assets tab */}
+        {walletTab==='assets'&&(
+          <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:10}}>
+            {/* WISH */}
+            <div style={{borderRadius:18,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.07)',overflow:'hidden',position:'relative'}}>
+              <div style={{position:'absolute',left:0,top:'15%',bottom:'15%',width:3,borderRadius:'0 3px 3px 0',background:'#f59e0b'}}/>
+              <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 16px 16px 20px'}}>
+                <div style={{width:46,height:46,borderRadius:14,background:'rgba(245,158,11,.12)',border:'1px solid rgba(245,158,11,.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,flexShrink:0}}>✨</div>
+                <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:'#fff'}}>Wish Coin</div></div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:17,fontWeight:800,color:'#f59e0b'}}>{balLoading&&wishBal===null?<span style={{opacity:.4}}>…</span>:(fmt(wishBal)??'—')}</div>
+                  <div style={{fontSize:11,fontWeight:600,color:'#34d399',marginTop:2}}>▲ 0.00%</div>
+                </div>
+              </div>
+            </div>
+            {/* SOL */}
+            <div style={{borderRadius:18,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.07)',overflow:'hidden',position:'relative'}}>
+              <div style={{position:'absolute',left:0,top:'15%',bottom:'15%',width:3,borderRadius:'0 3px 3px 0',background:'#9945FF'}}/>
+              <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 16px 16px 20px'}}>
+                <div style={{width:46,height:46,borderRadius:14,background:'rgba(153,69,255,.12)',border:'1px solid rgba(153,69,255,.3)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:22,fontWeight:900,color:'#9945FF',flexShrink:0}}>◎</div>
+                <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:'#fff'}}>Solana</div></div>
+                <div style={{textAlign:'right'}}>
+                  <div style={{fontSize:17,fontWeight:800,color:'#9945FF'}}>{balLoading&&solBal===null?<span style={{opacity:.4}}>…</span>:(solBal??'—')}</div>
+                  <div style={{fontSize:11,fontWeight:600,color:'#34d399',marginTop:2}}>▲ 0.00%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Activity tab */}
+        {walletTab==='activity'&&(
+          <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:10}}>
+            {txHistory.length===0
+              ? <div style={{textAlign:'center',padding:'32px 0',color:'rgba(255,255,255,.2)',fontSize:13}}>No transactions yet</div>
+              : txHistory.map(tx=>{
+                  const isSent=tx.type==='sent';
+                  const addr=tx.address||'';
+                  const short=addr.length>10?addr.slice(0,5)+'…'+addr.slice(-5):addr||'—';
+                  const date=new Date(tx.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                  return(
+                    <div key={tx.id} style={{borderRadius:18,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.07)',overflow:'hidden'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:14,padding:'14px 16px'}}>
+                        <div style={{width:42,height:42,borderRadius:13,background:isSent?'rgba(244,67,54,.12)':'rgba(16,185,129,.12)',border:`1px solid ${isSent?'rgba(244,67,54,.3)':'rgba(16,185,129,.3)'}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0,color:isSent?'#f87171':'#34d399',fontWeight:700}}>
+                          {isSent?'↑':'↓'}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:600,color:'#fff'}}>{isSent?'Sent':'Received'}</div>
+                          <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{isSent?'To: ':'From: '}{short}</div>
+                        </div>
+                        <div style={{textAlign:'right',flexShrink:0}}>
+                          <div style={{fontSize:14,fontWeight:700,color:isSent?'#f87171':'#34d399'}}>{isSent?'−':'+'}{tx.amount}</div>
+                          <div style={{fontSize:11,color:'rgba(255,255,255,.25)',marginTop:1}}>{date}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+            }
+          </div>
+        )}
       </div>
     </div>
   );
