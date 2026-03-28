@@ -5474,7 +5474,6 @@ function MainApp({user,onLogout,lang,setLang}){
                 <span>⚡</span>
                 <span>Boost Mining</span>
                 <span style={{background:"rgba(0,0,0,.25)",borderRadius:20,padding:"2px 10px",fontSize:12,color:mineBoosts>=MINE_MAX_BOOST?C.muted:C.gold,fontWeight:800}}>{mineBoosts}/{MINE_MAX_BOOST}</span>
-                {mineBoosts<MINE_MAX_BOOST&&<span style={{fontSize:12,color:"rgba(255,255,255,.4)",marginLeft:2}}>(+{MINE_BOOST_PTS} pts, watch ad)</span>}
               </button>
             </div>
           )}
