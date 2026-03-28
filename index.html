@@ -429,24 +429,17 @@ function t$(lang,key){ return (TR[lang]||TR.en)[key] || (TR.en)[key] || key; }
 ═══════════════════════════════════════════════ */
 const TASK_SETS = [
   [
-    {id:"t2",platform:"Facebook", action:"Share a post",       type:"share",  pts:60},
     {id:"t3",platform:"Twitter",  action:"Retweet a post",     type:"share",  pts:50},
     {id:"t4",platform:"Instagram",action:"Comment on a photo", type:"comment",pts:55},
     {id:"tb",platform:"Telegram", action:"Share a message",    type:"share",  pts:45},
   ],
   [
-    {id:"t7",platform:"Facebook", action:"Like a page",        type:"like",   pts:35},
     {id:"t8",platform:"Twitter",  action:"Like & Reply",       type:"comment",pts:50},
     {id:"t4b",platform:"Instagram",action:"Like a photo",      type:"like",   pts:45},
-    {id:"tc",platform:"WhatsApp", action:"Share a status",     type:"share",  pts:40},
+    {id:"tb2",platform:"Telegram", action:"Forward a message", type:"share",  pts:45},
   ],
 ];
-const SOCIAL_JOINS = [
-  {id:"sj1",platform:"Telegram", pts:100},
-  {id:"sj2",platform:"WhatsApp", pts:80},
-  {id:"sj4",platform:"Facebook", pts:90},
-  {id:"sj5",platform:"Instagram",pts:95},
-];
+const SOCIAL_JOINS = [];
 const PL = {YouTube:"#FF0000",Facebook:"#1877F2",Twitter:"#111",Instagram:"#E1306C",TikTok:"#010101",LinkedIn:"#0A66C2",Telegram:"#2AABEE",WhatsApp:"#25D366"};
 const GENERIC_ADS=[{e:"🛒",c:"Shopping"},{e:"🎮",c:"Gaming"},{e:"🍔",c:"Food"},{e:"✈️",c:"Travel"},{e:"👗",c:"Fashion"},{e:"💻",c:"Tech"},{e:"🏋️",c:"Fitness"},{e:"📱",c:"Apps"}];
 function buildAdReward(type){
@@ -5649,20 +5642,6 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{textAlign:"right"}}>
               <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{t.pts}</div>
               <button onClick={()=>doneTask(t.id,t.pts)} disabled={!!tasksDone[t.id]} style={{marginTop:4,background:tasksDone[t.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:tasksDone[t.id]?"default":"pointer"}}>{tasksDone[t.id]?"✓ Done":"Do"}</button>
-            </div>
-          </div>
-        ))}
-        <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,marginTop:6,letterSpacing:1}}>JOIN & EARN</div>
-        {SOCIAL_JOINS.map(j=>(
-          <div key={j.id} style={{background:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:10,border:`1px solid ${joinsDone[j.id]?C.green:C.border}`,display:"flex",alignItems:"center",gap:12}}>
-            <div style={{width:40,height:40,borderRadius:12,background:(PL[j.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden"}}>{LOGOS[j.platform]||<span style={{fontSize:20}}>{PE[j.platform]}</span>}</div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:14,fontWeight:600,color:C.white}}>{j.platform}</div>
-              <div style={{fontSize:12,color:C.muted}}>Join our channel</div>
-            </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{j.pts}</div>
-              <button onClick={()=>doneJoin(j.id,j.pts)} disabled={!!joinsDone[j.id]} style={{marginTop:4,background:joinsDone[j.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:joinsDone[j.id]?"default":"pointer"}}>{joinsDone[j.id]?"✓ Joined":"Join"}</button>
             </div>
           </div>
         ))}
