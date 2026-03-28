@@ -470,7 +470,8 @@ const WISH_LOGO_SRC = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA
 function WishLogo({size=40,style={},radius=22}){
   return(
     <img src={WISH_LOGO_SRC} width={size} height={size}
-      style={{borderRadius:radius,objectFit:'cover',display:'block',...style}}
+      style={{borderRadius:radius,objectFit:'cover',display:'block',
+        transform:'scale(1.18)',transformOrigin:'center center',...style}}
       alt="Wish Logo"/>
   );
 }
