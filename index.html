@@ -5087,15 +5087,16 @@ function MainApp({user,onLogout,lang,setLang}){
           const msa = td.__mine_startedAt;
           const mb  = td.__mine_boosts || 0;
           if(msa){
+            const effSession = td.__mine_eff_session || MINE_SESSION_S;
             const elapsedS = Math.floor((Date.now() - msa) / 1000);
             setMSAt(msa);
             setMineBoosts(mb);
-            if(elapsedS >= MINE_SESSION_S){
+            if(elapsedS >= effSession){
               // Session finished while user was away — ready to claim
               setMineT(0); setMS(true); setMR(true);
             } else {
               // Session still running — resume from correct position
-              setMineT(MINE_SESSION_S - elapsedS); setMS(true); setMR(false);
+              setMineT(effSession - elapsedS); setMS(true); setMR(false);
             }
           }
         }
@@ -5157,30 +5158,38 @@ function MainApp({user,onLogout,lang,setLang}){
 
   const watchAd=()=>{
     if(adLeft<=0) return;
-    const isFirst=adLeft===5;
-    // Time deduction only makes sense while mining is actively running
-    const canGiveTime=mineStarted&&!mineReady;
-    const type=(isFirst&&canGiveTime)?'time'
-              :(Math.random()<0.5&&canGiveTime)?'time'
-              :'pts';
+    // First ad of the day: ALWAYS time deduction (unconditional).
+    // Remaining 4: fully random — pts or time with equal probability.
+    const type=adLeft===5?'time':(Math.random()<0.5?'pts':'time');
     const reward=buildAdReward(type);
-    // Play the test ad countdown first; reveal reward only after it completes
-    showRewardedAd(()=>{
-      setAD(reward);
-      setAS(true);
-    });
+    showRewardedAd(()=>{ setAD(reward); setAS(true); });
   };
   const claimAd=()=>{
     const newAL=adLeft-1;
     setAL(p=>p-1); setAS(false);
     if(adData.type==='time'){
       const deductSecs=adData.mins*60;
-      const newT=Math.max(0,mineT-deductSecs);
-      setMineT(newT);
-      if(newT<=0) setMR(true);
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString()})
-      }).catch(()=>{});
+      if(mineStarted&&!mineReady){
+        // Mining running — apply deduction directly to live countdown
+        const newT=Math.max(0,mineT-deductSecs);
+        setMineT(newT);
+        if(newT<=0) setMR(true);
+        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString()})
+        }).catch(()=>{});
+      } else if(!mineStarted){
+        // Mining not started — bank the seconds; applied when mining begins
+        const banked=(tasksDone.__pre_mine_deduct||0)+deductSecs;
+        const newTD={...tasksDone,__pre_mine_deduct:banked};
+        setTD(newTD);
+        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString(),tasksDone:newTD})
+        }).catch(()=>{});
+      } else {
+        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString()})
+        }).catch(()=>{});
+      }
     } else {
       const newPts=u.pts+adData.pts;
       const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
@@ -5298,7 +5307,7 @@ function MainApp({user,onLogout,lang,setLang}){
     addPts(earned, earned * USD_PER_POINT);
     setMSAt(0); setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
     // eslint-disable-next-line no-unused-vars
-    const {__mine_startedAt:_a, __mine_boosts:_b, ...cleanTD} = tasksDone;
+    const {__mine_startedAt:_a, __mine_boosts:_b, __mine_eff_session:_c, __pre_mine_deduct:_d, ...cleanTD} = tasksDone;
     setTD(cleanTD);
     // Save pts + usd + session reset immediately — do NOT rely on the 2s
     // auto-save debounce.  If the user refreshes or signs out right after
@@ -5371,9 +5380,20 @@ function MainApp({user,onLogout,lang,setLang}){
     if (mineStarted) return;
     showRewardedAd(() => {
       const now = Date.now();
+      const banked = tasksDone.__pre_mine_deduct || 0;
+      const effSession = Math.max(0, MINE_SESSION_S - banked);
       setMSAt(now);
-      setMS(true); setMineT(MINE_SESSION_S); setMineBoosts(0); setMR(false);
-      const newTD = {...tasksDone, __mine_startedAt: now, __mine_boosts: 0};
+      setMS(true);
+      setMineT(effSession);
+      setMineBoosts(0);
+      setMR(effSession <= 0);
+      const newTD = {
+        ...tasksDone,
+        __mine_startedAt: now,
+        __mine_boosts: 0,
+        __mine_eff_session: effSession,
+        __pre_mine_deduct: 0,
+      };
       setTD(newTD);
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
