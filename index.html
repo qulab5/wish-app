@@ -5159,23 +5159,40 @@ function MainApp({user,onLogout,lang,setLang}){
 
   const watchAd=()=>{
     if(adLeft<=0) return;
-    // First ad of each calendar day: ALWAYS time deduction.
-    // Tracked via tasksDone.__first_ad_date (persists across refreshes/sessions).
-    // Remaining ads that day: fully random — pts or time with equal probability.
-    const today=new Date().toDateString();
-    const firstAdDoneToday = tasksDone.__first_ad_date === today;
-    const type = firstAdDoneToday ? (Math.random()<0.5?'pts':'time') : 'time';
-    const reward=buildAdReward(type);
-    showRewardedAd(()=>{
-      // Mark first ad as given (only needs to happen once per day)
-      if(!firstAdDoneToday){
-        const newTD={...tasksDone,__first_ad_date:today};
-        setTD(newTD);
-        // Persist the flag so it survives a page refresh
-        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
-        }).catch(()=>{});
+    const today = new Date().toDateString();
+
+    // ── Build or restore today's 5-ad sequence ──────────────────────────────
+    // Sequence is ['time', …4 shuffled entries of 1×time + 3×pts]
+    // Generated once per day, stored in tasksDone so it survives refresh.
+    // adLeft counts DOWN: 5→4→3→2→1; index into seq = 5 - adLeft.
+    let seq;
+    if(tasksDone.__ad_seq_date === today &&
+       Array.isArray(tasksDone.__ad_seq) &&
+       tasksDone.__ad_seq.length === 5){
+      seq = tasksDone.__ad_seq;
+    } else {
+      // Generate fresh sequence — first slot is ALWAYS 'time'
+      const pool = ['time','pts','pts','pts'];
+      for(let i=pool.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [pool[i],pool[j]]=[pool[j],pool[i]];
       }
+      seq = ['time',...pool];
+      // Save sequence immediately (before the countdown starts)
+      const newTD = {...tasksDone, __ad_seq_date:today, __ad_seq:seq};
+      setTD(newTD);
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
+      }).catch(()=>{});
+    }
+
+    const idx   = 5 - adLeft;                // 0 = first, 4 = last
+    const type  = seq[idx] || 'pts';
+    const reward = buildAdReward(type);       // computed NOW, before countdown
+
+    // Store reward in ref so callback never has a stale-closure problem
+    testAdCallbackRef.current = null;         // reset before reuse
+    showRewardedAd(()=>{
       setAD(reward);
       setAS(true);
     });
