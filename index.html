@@ -449,7 +449,16 @@ const SOCIAL_JOINS = [
 ];
 const PL = {YouTube:"#FF0000",Facebook:"#1877F2",Twitter:"#111",Instagram:"#E1306C",TikTok:"#010101",LinkedIn:"#0A66C2",Telegram:"#2AABEE",WhatsApp:"#25D366"};
 const GENERIC_ADS=[{e:"🛒",c:"Shopping"},{e:"🎮",c:"Gaming"},{e:"🍔",c:"Food"},{e:"✈️",c:"Travel"},{e:"👗",c:"Fashion"},{e:"💻",c:"Tech"},{e:"🏋️",c:"Fitness"},{e:"📱",c:"Apps"}];
-function rndAd(){const a=GENERIC_ADS[Math.floor(Math.random()*GENERIC_ADS.length)];return{emoji:a.e,cat:a.c,pts:Math.floor(20+Math.random()*20),id:Date.now()};}
+function buildAdReward(type){
+  const a=GENERIC_ADS[Math.floor(Math.random()*GENERIC_ADS.length)];
+  if(type==='time'){
+    const mins=10+Math.floor(Math.random()*11); // 10–20 mins
+    return{emoji:a.e,cat:a.c,type:'time',mins,id:Date.now()};
+  }
+  const pts=1000+Math.floor(Math.random()*2301); // 1000–3300
+  return{emoji:a.e,cat:a.c,type:'pts',pts,id:Date.now()};
+}
+function shuffleArr(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 const SPIN_PTS=[500,1000,1500,2000,2500,3000,3500,20000];
 // SPIN_USD × 0.01 = USD credited. Scaled to match new point values.
 const SPIN_USD=[50,100,150,200,250,300,350,2000];
@@ -5147,15 +5156,46 @@ function MainApp({user,onLogout,lang,setLang}){
     ? Math.floor(mineElapsed * MINE_PTS_HOUR / 3600) + mineBoosts * MINE_BOOST_PTS
     : 0;
 
-  const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
+  const watchAd=()=>{
+    if(adLeft<=0) return;
+    // Build or reuse today's ad-type sequence: 3 pts rewards + 2 time rewards, shuffled.
+    const today=new Date().toDateString();
+    let seq=tasksDone.__ad_seq_date===today ? tasksDone.__ad_sequence : null;
+    if(!seq){
+      seq=shuffleArr(['pts','pts','pts','time','time']);
+      const newTD={...tasksDone,__ad_sequence:seq,__ad_seq_date:today};
+      setTD(newTD);
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
+      }).catch(()=>{});
+    }
+    const adIndex=5-adLeft; // 0–4 (first ad = index 0)
+    setAD(buildAdReward(seq[adIndex]));
+    setAS(true);
+  };
   const claimAd=()=>{
-    const newPts=u.pts+adData.pts;
-    const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
     const newAL=adLeft-1;
-    addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);
-    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:newAL,adDate:new Date().toDateString()})
-    }).catch(()=>{});
+    setAL(p=>p-1); setAS(false);
+    if(adData.type==='time'){
+      // Deduct mining time; if session reaches 0 mark it as ready to claim.
+      const deductSecs=adData.mins*60;
+      setMineT(prev=>{
+        const next=Math.max(0,prev-deductSecs);
+        if(mineStarted&&next<=0) setMR(true);
+        return next;
+      });
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString()})
+      }).catch(()=>{});
+    } else {
+      const newPts=u.pts+adData.pts;
+      const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
+      addPts(adData.pts);
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:newAL,adDate:new Date().toDateString()})
+      }).catch(()=>{});
+    }
+    setAD(null);
   };
   const doSpin=()=>{
     if(spinning) return;
@@ -6450,12 +6490,17 @@ function MainApp({user,onLogout,lang,setLang}){
       {/* Ad Modal */}
       {adShowing&&adData&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
-          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:60,marginBottom:8}}>{adData.emoji}</div>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${adData.type==='time'?C.gold:C.border}`}}>
+            <div style={{fontSize:60,marginBottom:8}}>{adData.type==='time'?'⛏️':adData.emoji}</div>
             <div style={{fontSize:18,fontWeight:700,color:C.white,marginBottom:4}}>{adData.cat} Ad</div>
-            <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to earn {adData.pts} pts</div>
+            {adData.type==='time'
+              ? <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to cut <span style={{color:C.gold,fontWeight:700}}>{adData.mins} minutes</span> off your mining timer!</div>
+              : <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to earn <span style={{color:C.brandLt,fontWeight:700}}>{adData.pts.toLocaleString()} pts</span> bonus!</div>
+            }
             <div style={{background:C.faint,borderRadius:12,padding:"16px",marginBottom:16,fontSize:13,color:C.muted}}>📢 Sponsored content</div>
-            <button onClick={claimAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>✓ Claim +{adData.pts} pts</button>
+            <button onClick={claimAd} style={{width:"100%",background:adData.type==='time'?`linear-gradient(135deg,${C.gold},#d97706)`:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>
+              {adData.type==='time' ? `✓ Claim -${adData.mins} min` : `✓ Claim +${adData.pts.toLocaleString()} pts`}
+            </button>
           </div>
         </div>
       )}
