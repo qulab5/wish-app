@@ -5158,11 +5158,26 @@ function MainApp({user,onLogout,lang,setLang}){
 
   const watchAd=()=>{
     if(adLeft<=0) return;
-    // First ad of the day: ALWAYS time deduction (unconditional).
-    // Remaining 4: fully random — pts or time with equal probability.
-    const type=adLeft===5?'time':(Math.random()<0.5?'pts':'time');
+    // First ad of each calendar day: ALWAYS time deduction.
+    // Tracked via tasksDone.__first_ad_date (persists across refreshes/sessions).
+    // Remaining ads that day: fully random — pts or time with equal probability.
+    const today=new Date().toDateString();
+    const firstAdDoneToday = tasksDone.__first_ad_date === today;
+    const type = firstAdDoneToday ? (Math.random()<0.5?'pts':'time') : 'time';
     const reward=buildAdReward(type);
-    showRewardedAd(()=>{ setAD(reward); setAS(true); });
+    showRewardedAd(()=>{
+      // Mark first ad as given (only needs to happen once per day)
+      if(!firstAdDoneToday){
+        const newTD={...tasksDone,__first_ad_date:today};
+        setTD(newTD);
+        // Persist the flag so it survives a page refresh
+        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
+        }).catch(()=>{});
+      }
+      setAD(reward);
+      setAS(true);
+    });
   };
   const claimAd=()=>{
     const newAL=adLeft-1;
@@ -6510,7 +6525,12 @@ function MainApp({user,onLogout,lang,setLang}){
             {adData.type==='time'
               ? <>
                   <div style={{fontSize:32,fontWeight:900,color:C.gold,marginBottom:6}}>−{adData.mins} min</div>
-                  <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.6}}>Deducted from your<br/>active mining timer!</div>
+                  <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.6}}>
+                    {mineStarted&&!mineReady
+                      ? <>Mining timer reduced by<br/><strong style={{color:C.gold}}>{adData.mins} minutes!</strong></>
+                      : <>Saved! Will reduce your<br/><strong style={{color:C.gold}}>next mining session</strong> by {adData.mins} min.</>
+                    }
+                  </div>
                 </>
               : <>
                   <div style={{fontSize:32,fontWeight:900,color:C.brandLt,marginBottom:6}}>+{adData.pts.toLocaleString()} pts</div>
