@@ -4983,6 +4983,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [testAdCountdown,setTestAdCountdown] = useState(0);
   const testAdCallbackRef                    = React.useRef(null);
   const [mineBoosts,setMineBoosts] = useState(0);
+  const [adToast,setAdToast]       = useState('');   // brief confirmation toast after ad claim
   const [convSuccess,setConvS] = useState(false);  // flash "Converted!" feedback
   const [langMenu,setLM]      = useState(false);
   const [avatarPick,setAP]    = useState(false);
@@ -5179,6 +5180,9 @@ function MainApp({user,onLogout,lang,setLang}){
       setAS(true);
     });
   };
+  // Helper: show a toast for 3 seconds then clear it
+  const showAdToast=(msg)=>{ setAdToast(msg); setTimeout(()=>setAdToast(''),3000); };
+
   const claimAd=()=>{
     const newAL=adLeft-1;
     setAL(p=>p-1); setAS(false);
@@ -5189,6 +5193,7 @@ function MainApp({user,onLogout,lang,setLang}){
         const newT=Math.max(0,mineT-deductSecs);
         setMineT(newT);
         if(newT<=0) setMR(true);
+        showAdToast(`⏱️ Mining timer reduced by ${adData.mins} min!`);
         fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString()})
         }).catch(()=>{});
@@ -5197,6 +5202,7 @@ function MainApp({user,onLogout,lang,setLang}){
         const banked=(tasksDone.__pre_mine_deduct||0)+deductSecs;
         const newTD={...tasksDone,__pre_mine_deduct:banked};
         setTD(newTD);
+        showAdToast(`⏱️ −${adData.mins} min saved! Applied when you start mining.`);
         fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString(),tasksDone:newTD})
         }).catch(()=>{});
@@ -5209,6 +5215,7 @@ function MainApp({user,onLogout,lang,setLang}){
       const newPts=u.pts+adData.pts;
       const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
       addPts(adData.pts);
+      showAdToast(`⭐ +${adData.pts.toLocaleString()} pts added to your balance!`);
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:newAL,adDate:new Date().toDateString()})
       }).catch(()=>{});
@@ -5402,6 +5409,9 @@ function MainApp({user,onLogout,lang,setLang}){
       setMineT(effSession);
       setMineBoosts(0);
       setMR(effSession <= 0);
+      if(banked > 0){
+        showAdToast(`⚡ Mining started! Timer reduced by ${Math.round(banked/60)} min from your rewards.`);
+      }
       const newTD = {
         ...tasksDone,
         __mine_startedAt: now,
@@ -5519,6 +5529,16 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:22,marginBottom:4}}>🎉</div>
               <div style={{fontSize:14,fontWeight:800,color:C.green}}>Mining Complete!</div>
               <div style={{fontSize:13,color:C.muted,marginTop:2}}>+{mineAccum.toLocaleString()} pts ready to claim</div>
+            </div>
+          )}
+          {/* Time credit badge — shown when deductions are banked and mining not started */}
+          {!mineStarted&&(tasksDone.__pre_mine_deduct||0)>0&&(
+            <div style={{marginBottom:10,background:"rgba(245,158,11,.12)",borderRadius:12,padding:"10px 14px",border:"1px solid rgba(245,158,11,.35)",display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>⏱️</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:800,color:C.gold}}>−{Math.round((tasksDone.__pre_mine_deduct||0)/60)} min time credit ready</div>
+                <div style={{fontSize:11,color:C.muted}}>Will be applied when you start mining</div>
+              </div>
             </div>
           )}
           {/* Primary action button */}
@@ -6514,6 +6534,12 @@ function MainApp({user,onLogout,lang,setLang}){
             </button>
             <button onClick={()=>setSAP(false)} style={{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Maybe later</button>
           </div>
+        </div>
+      )}
+      {/* Ad Claim Toast */}
+      {adToast&&(
+        <div style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"rgba(20,20,35,.96)",border:"1px solid rgba(245,158,11,.4)",borderRadius:14,padding:"12px 20px",fontSize:13,fontWeight:700,color:C.gold,zIndex:300,whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,.5)",animation:"popIn .25s ease"}}>
+          {adToast}
         </div>
       )}
       {/* Ad Reward Modal — shown after test ad countdown completes */}
