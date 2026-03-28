@@ -429,14 +429,9 @@ function t$(lang,key){ return (TR[lang]||TR.en)[key] || (TR.en)[key] || key; }
 ═══════════════════════════════════════════════ */
 const TASK_SETS = [
   [
-    {id:"t3",platform:"Twitter",  action:"Retweet a post",     type:"share",  pts:50},
-    {id:"t4",platform:"Instagram",action:"Comment on a photo", type:"comment",pts:55},
-    {id:"tb",platform:"Telegram", action:"Share a message",    type:"share",  pts:45},
-  ],
-  [
-    {id:"t8",platform:"Twitter",  action:"Like & Reply",       type:"comment",pts:50},
-    {id:"t4b",platform:"Instagram",action:"Like a photo",      type:"like",   pts:45},
-    {id:"tb2",platform:"Telegram", action:"Forward a message", type:"share",  pts:45},
+    {id:"t3",platform:"Twitter",  action:"Follow on X",         type:"follow", pts:50},
+    {id:"t4",platform:"Instagram",action:"Follow on Instagram",  type:"follow", pts:55},
+    {id:"tb",platform:"Telegram", action:"Follow on Telegram",   type:"follow", pts:45},
   ],
 ];
 const SOCIAL_JOINS = [];
