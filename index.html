@@ -5075,7 +5075,7 @@ function MainApp({user,onLogout,lang,setLang}){
           walletAddress: dbWa     ||p.walletAddress||null,
         }));
         const today=new Date().toDateString();
-        if(al!=null) setAL(adDate===today?al:5);
+        if(al!=null) setAL(al);
         if(sa!=null) setSA(sa);
         // Take max(DB, local) — prevents a stale DB 0 from overwriting a valid local cooldown.
         setSNF(p=>Math.max(snf??0, p));
@@ -5346,13 +5346,16 @@ function MainApp({user,onLogout,lang,setLang}){
     addPts(earned, earned * USD_PER_POINT);
     setMSAt(0); setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
     // eslint-disable-next-line no-unused-vars
-    const {__mine_startedAt:_a, __mine_boosts:_b, __mine_eff_session:_c, __pre_mine_deduct:_d, ...cleanTD} = tasksDone;
+    const {__mine_startedAt:_a, __mine_boosts:_b, __mine_eff_session:_c, __pre_mine_deduct:_d,
+           __ad_seq:_e, __ad_seq_date:_f, ...cleanTD} = tasksDone;
     setTD(cleanTD);
+    // Reset boosts for the new session
+    setAL(5);
     // Save pts + usd + session reset immediately — do NOT rely on the 2s
     // auto-save debounce.  If the user refreshes or signs out right after
     // claiming, the DB must already have the new balance.
     fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,tasksDone:cleanTD})
+      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:5,tasksDone:cleanTD})
     }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[mine claim save]',d);})
       .catch(e=>console.error('[mine claim save]',e));
     // ── Give referrer 10% of this mining claim ────────────────────────────
@@ -5577,7 +5580,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <button onClick={watchAd} disabled={adLeft<=0}
               style={{width:"100%",background:adLeft<=0?"rgba(255,255,255,.04)":`linear-gradient(135deg,rgba(139,92,246,.25),rgba(245,158,11,.15))`,border:`1px solid ${adLeft<=0?"rgba(255,255,255,.08)":"rgba(139,92,246,.4)"}`,borderRadius:14,padding:"13px 16px",color:adLeft<=0?C.muted:C.brandLt,fontWeight:700,fontSize:14,cursor:adLeft<=0?"not-allowed":"pointer",transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               <span>⚡</span>
-              <span>{adLeft<=0?"No Boosts Left Today":"Boost Mining"}</span>
+              <span>{adLeft<=0?"No Boosts Left This Session":"Boost Mining"}</span>
               <span style={{background:"rgba(0,0,0,.25)",borderRadius:20,padding:"2px 10px",fontSize:12,color:adLeft<=0?C.muted:C.gold,fontWeight:800}}>{adLeft}/5</span>
             </button>
           </div>
