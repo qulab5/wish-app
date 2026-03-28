@@ -5466,24 +5466,16 @@ function MainApp({user,onLogout,lang,setLang}){
               ⛏️ Mining in Progress…
             </div>
           )}
-          {/* Boost buttons — only available during active session */}
+          {/* Boost button — only available during active session */}
           {mineStarted&&!mineReady&&(
             <div style={{marginTop:14}}>
-              <div style={{fontSize:11,color:C.muted,marginBottom:8,textTransform:"uppercase",letterSpacing:.08,display:"flex",alignItems:"center",gap:6}}>
-                <span>⚡ Boost Mining</span>
-                <span style={{color:C.gold}}>(+{MINE_BOOST_PTS} pts each, watch ad)</span>
-              </div>
-              <div style={{display:"flex",gap:6}}>
-                {[0,1,2,3,4].map(i=>{
-                  const used = i < mineBoosts;
-                  const next = i === mineBoosts;
-                  return(
-                    <button key={i} onClick={()=>next&&boostMining()} disabled={used||!next} style={{flex:1,background:used?"rgba(16,185,129,.2)":next?"rgba(139,92,246,.2)":"rgba(255,255,255,.04)",border:`1px solid ${used?"rgba(16,185,129,.4)":next?"rgba(139,92,246,.4)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"9px 0",color:used?C.green:next?C.brandLt:C.muted,fontSize:13,fontWeight:700,cursor:next?"pointer":"default",transition:"all .2s"}}>
-                      {used?"✓":"⚡"}<br/><span style={{fontSize:9,letterSpacing:.5}}>+500</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <button onClick={boostMining} disabled={mineBoosts>=MINE_MAX_BOOST}
+                style={{width:"100%",background:mineBoosts>=MINE_MAX_BOOST?"rgba(255,255,255,.04)":`linear-gradient(135deg,rgba(139,92,246,.25),rgba(245,158,11,.15))`,border:`1px solid ${mineBoosts>=MINE_MAX_BOOST?"rgba(255,255,255,.08)":"rgba(139,92,246,.4)"}`,borderRadius:14,padding:"13px 16px",color:mineBoosts>=MINE_MAX_BOOST?C.muted:C.brandLt,fontWeight:700,fontSize:14,cursor:mineBoosts>=MINE_MAX_BOOST?"not-allowed":"pointer",transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span>⚡</span>
+                <span>Boost Mining</span>
+                <span style={{background:"rgba(0,0,0,.25)",borderRadius:20,padding:"2px 10px",fontSize:12,color:mineBoosts>=MINE_MAX_BOOST?C.muted:C.gold,fontWeight:800}}>{mineBoosts}/{MINE_MAX_BOOST}</span>
+                {mineBoosts<MINE_MAX_BOOST&&<span style={{fontSize:12,color:"rgba(255,255,255,.4)",marginLeft:2}}>(+{MINE_BOOST_PTS} pts, watch ad)</span>}
+              </button>
             </div>
           )}
         </div>
