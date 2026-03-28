@@ -429,9 +429,9 @@ function t$(lang,key){ return (TR[lang]||TR.en)[key] || (TR.en)[key] || key; }
 ═══════════════════════════════════════════════ */
 const TASK_SETS = [
   [
-    {id:"t3",platform:"Twitter",  action:"Follow on X",         type:"follow", pts:50},
-    {id:"t4",platform:"Instagram",action:"Follow on Instagram",  type:"follow", pts:55},
-    {id:"tb",platform:"Telegram", action:"Follow on Telegram",   type:"follow", pts:45},
+    {id:"t3",platform:"Twitter",  action:"Follow on X",         type:"follow", coins:2},
+    {id:"t4",platform:"Instagram",action:"Follow on Instagram",  type:"follow", coins:2},
+    {id:"tb",platform:"Telegram", action:"Follow on Telegram",   type:"follow", coins:2},
   ],
 ];
 const SOCIAL_JOINS = [];
@@ -5312,7 +5312,7 @@ function MainApp({user,onLogout,lang,setLang}){
       }).catch(()=>{});
     });
   };
-  const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
+  const doneTask=(id,coins)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));setU(p=>({...p,tokens:(p.tokens??0)+coins}));};
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
   const claimMining=()=>{
     if(!mineReady)return;
@@ -5624,8 +5624,8 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:12,color:C.muted}}>{t.action}</div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{t.pts}</div>
-              <button onClick={()=>doneTask(t.id,t.pts)} disabled={!!tasksDone[t.id]} style={{marginTop:4,background:tasksDone[t.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:tasksDone[t.id]?"default":"pointer"}}>{tasksDone[t.id]?"✓ Done":"Do"}</button>
+              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{t.coins} WISH</div>
+              <button onClick={()=>doneTask(t.id,t.coins)} disabled={!!tasksDone[t.id]} style={{marginTop:4,background:tasksDone[t.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:tasksDone[t.id]?"default":"pointer"}}>{tasksDone[t.id]?"✓ Done":"Do"}</button>
             </div>
           </div>
         ))}
