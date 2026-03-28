@@ -458,7 +458,6 @@ function buildAdReward(type){
   const pts=1000+Math.floor(Math.random()*2301); // 1000–3300
   return{emoji:a.e,cat:a.c,type:'pts',pts,id:Date.now()};
 }
-function shuffleArr(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 const SPIN_PTS=[500,1000,1500,2000,2500,3000,3500,20000];
 // SPIN_USD × 0.01 = USD credited. Scaled to match new point values.
 const SPIN_USD=[50,100,150,200,250,300,350,2000];
@@ -5158,19 +5157,11 @@ function MainApp({user,onLogout,lang,setLang}){
 
   const watchAd=()=>{
     if(adLeft<=0) return;
-    // Build or reuse today's ad-type sequence: 3 pts rewards + 2 time rewards, shuffled.
-    const today=new Date().toDateString();
-    let seq=tasksDone.__ad_seq_date===today ? tasksDone.__ad_sequence : null;
-    if(!seq){
-      seq=shuffleArr(['pts','pts','pts','time','time']);
-      const newTD={...tasksDone,__ad_sequence:seq,__ad_seq_date:today};
-      setTD(newTD);
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
-      }).catch(()=>{});
-    }
-    const adIndex=5-adLeft; // 0–4 (first ad = index 0)
-    setAD(buildAdReward(seq[adIndex]));
+    // First ad of the day (adLeft===5) is always a time deduction.
+    // The remaining 4 are fully random — pts or time with equal chance.
+    const isFirst=adLeft===5;
+    const type=isFirst?'time':(Math.random()<0.5?'pts':'time');
+    setAD(buildAdReward(type));
     setAS(true);
   };
   const claimAd=()=>{
