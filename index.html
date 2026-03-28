@@ -5390,7 +5390,7 @@ function MainApp({user,onLogout,lang,setLang}){
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
           {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐",isLogo:false},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:null,isLogo:true},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡",isLogo:false}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
-              <div style={{display:"flex",justifyContent:"center",alignItems:"center",width:28,height:28,margin:"0 auto",padding:0}}>
+              <div style={{display:"flex",justifyContent:"center",alignItems:"center",width:28,height:28,margin:"0 auto",padding:0,overflow:"hidden",borderRadius:8}}>
                 {s.isLogo ? <WishLogo size={28} radius={8}/> : <span style={{fontSize:22}}>{s.icon}</span>}
               </div>
               <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
@@ -5621,7 +5621,10 @@ function MainApp({user,onLogout,lang,setLang}){
               lineHeight:1.1}}>
               {tokens.toLocaleString()}
             </div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,.35)",marginTop:6}}>🪙 Wish Tokens in your vault</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:"rgba(255,255,255,.35)",marginTop:6}}>
+              <span style={{width:14,height:14,borderRadius:4,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}><WishLogo size={14} radius={4}/></span>
+              Wish Tokens in your vault
+            </div>
           </div>
         </div>
 
@@ -5652,15 +5655,20 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:28,fontWeight:900,letterSpacing:-1,
                 background:`linear-gradient(135deg,${C.goldLt},${C.gold})`,
                 WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{canMint.toLocaleString()}</div>
-              <div style={{fontSize:11,color:"rgba(245,158,11,.6)",marginTop:3}}>🪙 Tokens</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:3}}>
+                <div style={{width:14,height:14,borderRadius:4,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}><WishLogo size={14} radius={4}/></div>
+                <span style={{fontSize:11,color:"rgba(245,158,11,.6)"}}>Tokens</span>
+              </div>
             </div>
           </div>
 
           {/* rate pill */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:16}}>
             <div style={{height:1,flex:1,background:C.border}}/>
-            <div style={{fontSize:11,color:C.muted,background:C.s3,borderRadius:99,padding:"3px 10px",border:`1px solid ${C.border}`,whiteSpace:"nowrap"}}>
-              {PTS_PER_TOKEN.toLocaleString()} pts = 1 🪙 Wish Token
+            <div style={{fontSize:11,color:C.muted,background:C.s3,borderRadius:99,padding:"3px 10px",border:`1px solid ${C.border}`,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+              {PTS_PER_TOKEN.toLocaleString()} pts = 1
+              <span style={{width:14,height:14,borderRadius:4,overflow:"hidden",flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",padding:0,verticalAlign:"middle"}}><WishLogo size={14} radius={4}/></span>
+              Wish Token
             </div>
             <div style={{height:1,flex:1,background:C.border}}/>
           </div>
@@ -5703,7 +5711,12 @@ function MainApp({user,onLogout,lang,setLang}){
                 : "none"
           }}
         >
-          {convSuccess ? "✅  Tokens Added to Vault!" : canMint>0 ? "🪙  "+L("convBtn") : "⭐  "+L("convNone")}
+          {convSuccess ? "✅  Tokens Added to Vault!" : canMint>0
+            ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                <span style={{width:22,height:22,borderRadius:6,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}><WishLogo size={22} radius={6}/></span>
+                {L("convBtn")}
+              </span>
+            : "⭐  "+L("convNone")}
         </button>
         {canMint>0&&!convSuccess&&(
           <div style={{textAlign:"center",fontSize:11,color:C.muted,marginTop:8}}>
@@ -5714,12 +5727,14 @@ function MainApp({user,onLogout,lang,setLang}){
         {/* ── Stats strip ── */}
         <div style={{display:"flex",gap:10,marginTop:18}}>
           {[
-            {label:"Points Balance",val:u.pts.toLocaleString(),icon:"⭐",col:C.brandLt},
-            {label:"Tokens Owned",val:tokens.toLocaleString(),icon:"🪙",col:C.gold},
+            {label:"Points Balance",val:u.pts.toLocaleString(),icon:"⭐",isLogo:false,col:C.brandLt},
+            {label:"Tokens Owned",val:tokens.toLocaleString(),icon:null,isLogo:true,col:C.gold},
           ].map(s=>(
             <div key={s.label} style={{flex:1,background:C.s2,borderRadius:14,padding:"14px 12px",
               border:`1px solid ${C.border}`,textAlign:"center"}}>
-              <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,margin:"0 auto 4px",padding:0,overflow:"hidden",borderRadius:8}}>
+                {s.isLogo ? <WishLogo size={28} radius={8}/> : <span style={{fontSize:20}}>{s.icon}</span>}
+              </div>
               <div style={{fontSize:18,fontWeight:800,color:s.col}}>{s.val}</div>
               <div style={{fontSize:10,color:C.muted,marginTop:2}}>{s.label}</div>
             </div>
