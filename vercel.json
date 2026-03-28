@@ -46,6 +46,14 @@
       "dest": "/api/walletTx.js"
     },
     {
+      "src": "/manifest.json",
+      "dest": "/manifest.json"
+    },
+    {
+      "src": "/logo.jpg",
+      "dest": "/logo.jpg"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
