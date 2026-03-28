@@ -4805,7 +4805,7 @@ function WalletTab({ u, C, setU }) {
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 20px 14px'}}>
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:40,height:40,borderRadius:12,overflow:'hidden',flexShrink:0,boxShadow:'0 4px 20px rgba(245,158,11,.5), 0 0 0 1px rgba(245,158,11,.2)'}}><WishLogo size={40} radius={12}/></div>
+            <div style={{width:40,height:40,borderRadius:12,overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',padding:0,boxShadow:'0 4px 20px rgba(245,158,11,.5), 0 0 0 1px rgba(245,158,11,.2)'}}><WishLogo size={40} radius={12}/></div>
             <div>
               <div style={{fontSize:9,color:'rgba(255,255,255,.3)',letterSpacing:'2px',textTransform:'uppercase',fontWeight:500,marginBottom:1}}>Your Balance</div>
               <div style={{fontSize:17,fontWeight:700,background:'linear-gradient(90deg,#e2d9f3,#fbbf24)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Wish Wallet</div>
@@ -4829,7 +4829,7 @@ function WalletTab({ u, C, setU }) {
               <div style={{position:'relative',width:68,height:68,flexShrink:0}}>
                 <div style={{position:'absolute',top:-10,left:-10,right:-10,bottom:-10,borderRadius:'50%',background:'radial-gradient(circle,rgba(245,158,11,.45) 0%,transparent 70%)',animation:'wCoinGlow 2.5s ease-in-out infinite',pointerEvents:'none'}}/>
                 <div style={{position:'absolute',top:-4,left:-4,right:-4,bottom:-4,borderRadius:'50%',border:'1px solid rgba(245,158,11,.4)',animation:'wCoinGlow 2.5s ease-in-out infinite',animationDelay:'.5s',pointerEvents:'none'}}/>
-                <div style={{position:'relative',zIndex:1,width:68,height:68,borderRadius:'50%',boxShadow:'0 0 30px rgba(245,158,11,.6), 0 8px 24px rgba(0,0,0,.5)',animation:'wCoinFloat 3s ease-in-out infinite',overflow:'hidden',flexShrink:0}}>
+                <div style={{position:'relative',zIndex:1,width:68,height:68,borderRadius:'50%',boxShadow:'0 0 30px rgba(245,158,11,.6), 0 8px 24px rgba(0,0,0,.5)',animation:'wCoinFloat 3s ease-in-out infinite',overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',padding:0}}>
                   <WishLogo size={68} radius={34}/>
                 </div>
               </div>
@@ -4888,7 +4888,7 @@ function WalletTab({ u, C, setU }) {
             <div style={{borderRadius:18,background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.07)',overflow:'hidden',position:'relative'}}>
               <div style={{position:'absolute',left:0,top:'15%',bottom:'15%',width:3,borderRadius:'0 3px 3px 0',background:'#f59e0b'}}/>
               <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 16px 16px 20px'}}>
-                <div style={{width:46,height:46,borderRadius:14,overflow:'hidden',flexShrink:0,border:'1px solid rgba(245,158,11,.3)'}}><WishLogo size={46} radius={13}/></div>
+                <div style={{width:46,height:46,borderRadius:14,overflow:'hidden',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',padding:0,border:'1px solid rgba(245,158,11,.3)'}}><WishLogo size={46} radius={13}/></div>
                 <div style={{flex:1}}><div style={{fontSize:15,fontWeight:700,color:'#fff'}}>Wish Coin</div></div>
                 <div style={{textAlign:'right'}}>
                   <div style={{fontSize:17,fontWeight:800,color:'#f59e0b'}}>{balLoading&&wishBal===null?<span style={{opacity:.4}}>…</span>:(fmt(wishBal)??'—')}</div>
@@ -5389,7 +5389,7 @@ function MainApp({user,onLogout,lang,setLang}){
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
           {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐",isLogo:false},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:null,isLogo:true},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡",isLogo:false}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
-              <div style={{display:"flex",justifyContent:"center",alignItems:"center",height:28}}>
+              <div style={{display:"flex",justifyContent:"center",alignItems:"center",width:28,height:28,margin:"0 auto",padding:0}}>
                 {s.isLogo ? <WishLogo size={28} radius={8}/> : <span style={{fontSize:22}}>{s.icon}</span>}
               </div>
               <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
@@ -5607,9 +5607,12 @@ function MainApp({user,onLogout,lang,setLang}){
           <div style={{position:"absolute",bottom:-30,right:-30,width:130,height:130,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.2),transparent 70%)",pointerEvents:"none"}}/>
           <div style={{padding:"28px 20px 24px",textAlign:"center",position:"relative"}}>
             {/* animated coin */}
-            <div style={{fontSize:56,lineHeight:1,marginBottom:10,
+            <div style={{width:64,height:64,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',padding:0,margin:"0 auto 10px",flexShrink:0,
               animation:convSuccess?"coin-drop .5s ease":"float 3s ease infinite",
-              filter:convSuccess?`drop-shadow(0 0 18px ${C.gold})`:`drop-shadow(0 0 10px rgba(245,158,11,.5))`}}>🪙</div>
+              filter:convSuccess?`drop-shadow(0 0 18px ${C.gold})`:`drop-shadow(0 0 10px rgba(245,158,11,.5))`,
+              boxShadow:'0 0 24px rgba(245,158,11,.4)'}}>
+              <WishLogo size={64} radius={32}/>
+            </div>
             <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.55)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:4}}>Total Wish Tokens</div>
             <div style={{fontSize:44,fontWeight:900,letterSpacing:-2,
               background:`linear-gradient(135deg,${C.goldLt},${C.gold})`,
