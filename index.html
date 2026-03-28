@@ -5157,24 +5157,27 @@ function MainApp({user,onLogout,lang,setLang}){
 
   const watchAd=()=>{
     if(adLeft<=0) return;
-    // First ad of the day (adLeft===5) is always a time deduction.
-    // The remaining 4 are fully random — pts or time with equal chance.
     const isFirst=adLeft===5;
-    const type=isFirst?'time':(Math.random()<0.5?'pts':'time');
-    setAD(buildAdReward(type));
-    setAS(true);
+    // Time deduction only makes sense while mining is actively running
+    const canGiveTime=mineStarted&&!mineReady;
+    const type=(isFirst&&canGiveTime)?'time'
+              :(Math.random()<0.5&&canGiveTime)?'time'
+              :'pts';
+    const reward=buildAdReward(type);
+    // Play the test ad countdown first; reveal reward only after it completes
+    showRewardedAd(()=>{
+      setAD(reward);
+      setAS(true);
+    });
   };
   const claimAd=()=>{
     const newAL=adLeft-1;
     setAL(p=>p-1); setAS(false);
     if(adData.type==='time'){
-      // Deduct mining time; if session reaches 0 mark it as ready to claim.
       const deductSecs=adData.mins*60;
-      setMineT(prev=>{
-        const next=Math.max(0,prev-deductSecs);
-        if(mineStarted&&next<=0) setMR(true);
-        return next;
-      });
+      const newT=Math.max(0,mineT-deductSecs);
+      setMineT(newT);
+      if(newT<=0) setMR(true);
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString()})
       }).catch(()=>{});
@@ -6478,19 +6481,24 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
         </div>
       )}
-      {/* Ad Modal */}
+      {/* Ad Reward Modal — shown after test ad countdown completes */}
       {adShowing&&adData&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
-          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${adData.type==='time'?C.gold:C.border}`}}>
-            <div style={{fontSize:60,marginBottom:8}}>{adData.type==='time'?'⛏️':adData.emoji}</div>
-            <div style={{fontSize:18,fontWeight:700,color:C.white,marginBottom:4}}>{adData.cat} Ad</div>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:28,maxWidth:340,width:"100%",textAlign:"center",border:`2px solid ${adData.type==='time'?C.gold:C.brand}`,boxShadow:`0 0 40px ${adData.type==='time'?'rgba(245,158,11,.25)':'rgba(139,92,246,.25)'}`,animation:"popIn .3s ease"}}>
+            <div style={{fontSize:52,marginBottom:10}}>{adData.type==='time'?'⛏️':'⭐'}</div>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:adData.type==='time'?C.gold:C.brandLt,marginBottom:8,textTransform:"uppercase"}}>Reward Earned!</div>
             {adData.type==='time'
-              ? <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to cut <span style={{color:C.gold,fontWeight:700}}>{adData.mins} minutes</span> off your mining timer!</div>
-              : <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to earn <span style={{color:C.brandLt,fontWeight:700}}>{adData.pts.toLocaleString()} pts</span> bonus!</div>
+              ? <>
+                  <div style={{fontSize:32,fontWeight:900,color:C.gold,marginBottom:6}}>−{adData.mins} min</div>
+                  <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.6}}>Deducted from your<br/>active mining timer!</div>
+                </>
+              : <>
+                  <div style={{fontSize:32,fontWeight:900,color:C.brandLt,marginBottom:6}}>+{adData.pts.toLocaleString()} pts</div>
+                  <div style={{fontSize:13,color:C.muted,marginBottom:24,lineHeight:1.6}}>Added to your<br/>points balance!</div>
+                </>
             }
-            <div style={{background:C.faint,borderRadius:12,padding:"16px",marginBottom:16,fontSize:13,color:C.muted}}>📢 Sponsored content</div>
-            <button onClick={claimAd} style={{width:"100%",background:adData.type==='time'?`linear-gradient(135deg,${C.gold},#d97706)`:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>
-              {adData.type==='time' ? `✓ Claim -${adData.mins} min` : `✓ Claim +${adData.pts.toLocaleString()} pts`}
+            <button onClick={claimAd} style={{width:"100%",background:adData.type==='time'?`linear-gradient(135deg,${C.gold},#d97706)`:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer"}}>
+              ✓ Collect
             </button>
           </div>
         </div>
