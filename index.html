@@ -5523,9 +5523,9 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:10,color:C.muted}}>{mineStarted?`≈${(MINE_PTS_HOUR/3600).toFixed(2)} pts/sec`:"base earnings"}</div>
             </div>
             <div style={{background:"rgba(245,158,11,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(245,158,11,.18)"}}>
-              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Boost Bonus</div>
-              <div style={{fontSize:20,fontWeight:800,color:C.gold}}>{(mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts</div>
-              <div style={{fontSize:10,color:C.muted}}>{mineBoosts}/{MINE_MAX_BOOST} boosts used</div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Boosts Left</div>
+              <div style={{fontSize:20,fontWeight:800,color:C.gold}}>{adLeft}/5</div>
+              <div style={{fontSize:10,color:C.muted}}>this session</div>
             </div>
           </div>
           {/* Timer (active, not ready) */}
