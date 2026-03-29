@@ -6868,12 +6868,15 @@ function SplashScreen({ onDone }) {
             animation:'splPulse 2.5s ease-in-out infinite alternate',
           }}/>
           {/* Coin logo */}
-          <img src={WISH_LOGO_SRC} width={150} height={150}
-            style={{borderRadius:26,objectFit:'cover',display:'block',position:'relative',
-              transform:'scale(1.18)',transformOrigin:'center center',
-              filter:'drop-shadow(0 0 18px rgba(80,150,255,0.55))',
-              animation:'splFloat 3s ease-in-out infinite alternate',
-            }} alt="Wish"/>
+          <div style={{width:150,height:150,borderRadius:26,overflow:'hidden',position:'relative',flexShrink:0,
+            filter:'drop-shadow(0 0 18px rgba(80,150,255,0.55))',
+            animation:'splFloat 3s ease-in-out infinite alternate',
+          }}>
+            <img src={WISH_LOGO_SRC} width={150} height={150}
+              style={{objectFit:'cover',display:'block',
+                transform:'scale(1.18)',transformOrigin:'center center',
+              }} alt="Wish"/>
+          </div>
         </div>
       </div>
 
