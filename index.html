@@ -1159,7 +1159,7 @@ function AuthScreen({onLogin,lang}){
 
       <div style={{textAlign:"center",marginBottom:48,animation:"up .5s ease"}}>
         <div style={{width:90,height:90,borderRadius:26,background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 22px",boxShadow:`0 8px 32px rgba(139,92,246,.4)`,animation:"float 3s ease infinite",overflow:"hidden"}}>
-          <img src={WISH_LOGO_SRC} width={90} height={90} style={{objectFit:"cover",display:"block",borderRadius:26}} alt="Wish"/>
+          <img src={WISH_LOGO_SRC} width={90} height={90} style={{objectFit:"cover",display:"block",borderRadius:26,transform:"scale(1.18)",transformOrigin:"center center"}} alt="Wish"/>
         </div>
         <div style={{fontSize:42,fontWeight:900,letterSpacing:-1,background:`linear-gradient(135deg,${C.white},${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:8}}>{APP_NAME}</div>
         <div style={{fontSize:16,color:C.muted,fontWeight:500}}>{APP_TAGLINE}</div>
@@ -6870,6 +6870,7 @@ function SplashScreen({ onDone }) {
           {/* Coin logo */}
           <img src={WISH_LOGO_SRC} width={150} height={150}
             style={{borderRadius:26,objectFit:'cover',display:'block',position:'relative',
+              transform:'scale(1.18)',transformOrigin:'center center',
               filter:'drop-shadow(0 0 18px rgba(80,150,255,0.55))',
               animation:'splFloat 3s ease-in-out infinite alternate',
             }} alt="Wish"/>
