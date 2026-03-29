@@ -46,8 +46,8 @@
       "dest": "/api/walletTx.js"
     },
     {
-      "src": "/api/splash",
-      "dest": "/api/splash.js"
+      "src": "/splash.png",
+      "dest": "/splash.png"
     },
     {
       "src": "/manifest.json",
