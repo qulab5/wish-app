@@ -1168,7 +1168,7 @@ function AuthScreen({onLogin,lang}){
 
       <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:12}}>
         <Btn label={`${L("signIn")}`} onClick={()=>setMode("login")} full variant="brand" style={{padding:16,fontSize:15,borderRadius:15}} animate/>
-        <Btn label={`🚀 ${L("signUp")}`} onClick={()=>setMode("register")} full variant="ghost" style={{padding:16,fontSize:15,borderRadius:15}}/>
+        <Btn label={L("signUp")} onClick={()=>setMode("register")} full variant="ghost" style={{padding:16,fontSize:15,borderRadius:15}}/>
       </div>
 
       <div style={{marginTop:32,display:"flex",gap:16,flexWrap:"wrap",justifyContent:"center"}}>
