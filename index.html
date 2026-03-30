@@ -1167,7 +1167,7 @@ function AuthScreen({onLogin,lang}){
       </div>
 
       <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:12}}>
-        <Btn label={`✨ ${L("signIn")}`} onClick={()=>setMode("login")} full variant="brand" style={{padding:16,fontSize:15,borderRadius:15}} animate/>
+        <Btn label={`${L("signIn")}`} onClick={()=>setMode("login")} full variant="brand" style={{padding:16,fontSize:15,borderRadius:15}} animate/>
         <Btn label={`🚀 ${L("signUp")}`} onClick={()=>setMode("register")} full variant="ghost" style={{padding:16,fontSize:15,borderRadius:15}}/>
       </div>
 
@@ -1221,7 +1221,7 @@ function AuthScreen({onLogin,lang}){
         {mode==="register"&&<Inp label="Referral Code (optional)" val={form.refCode} onChange={f("refCode")} placeholder="Enter a friend's referral code" icon="🔗"/>}
       </div>
 
-      <Btn label={loading?"⏳ Please wait…":(mode==="login"?`🔓 ${L("signIn")}`:`🚀 ${L("signUp")}`)} onClick={submit} full variant="brand" disabled={loading} style={{marginTop:8,padding:16,fontSize:15,borderRadius:15}}/>
+      <Btn label={loading?"Please wait…":(mode==="login"?L("signIn"):L("signUp"))} onClick={submit} full variant="brand" disabled={loading} style={{marginTop:8,padding:16,fontSize:15,borderRadius:15}}/>
     </div>
   );
 }
