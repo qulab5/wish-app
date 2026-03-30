@@ -59,7 +59,7 @@
     },
     {
       "src": "/whitepaper.html",
-      "dest": "/public/whitepaper.html"
+      "dest": "/whitepaper.html"
     },
     {
       "src": "/(.*)",
