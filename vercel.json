@@ -46,7 +46,7 @@
       "dest": "/api/walletTx.js"
     },
     {
-      "src": "/(sp-[0-9]+x[0-9]+\\.png|splash\\.png|icon-192\\.png)",
+      "src": "/(sp-[0-9]+x[0-9]+\\.png|splash\\.png|icon-192\\.png|icon-512\\.png)",
       "dest": "/$1"
     },
     {
