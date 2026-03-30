@@ -5802,10 +5802,11 @@ function MainApp({user,onLogout,lang,setLang}){
                   {icon:"👥",label:"Referral Team"},
                   {icon:"📢",label:"Announcement",badge:unread},
                   {icon:"📄",label:"White Paper"},
-                  {icon:"🎧",label:"Support Portal"},
+                  {icon:"🎧",label:"Support Portal",comingSoon:true},
                   {icon:"🔐",label:"Security"},
                 ].map(item=>(
-                  <button key={item.label} className="menu-item" onClick={()=>{
+                  <button key={item.label} className="menu-item" style={item.comingSoon?{opacity:0.6,cursor:"default"}:{}} onClick={()=>{
+                    if(item.comingSoon){return;}
                     if(item.label==="Profile"){setSO(false);setSV("profile");}
                     else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
                     else if(item.label==="Security"){setSO(false);setSV("security");}
@@ -5826,7 +5827,10 @@ function MainApp({user,onLogout,lang,setLang}){
                         {item.badge}
                       </span>
                     )}
-                    <span style={{color:C.muted,fontSize:18}}>›</span>
+                    {item.comingSoon
+                      ? <span style={{background:"rgba(139,92,246,.25)",color:"#a78bfa",fontSize:10,fontWeight:700,borderRadius:99,padding:"3px 8px",marginRight:6,letterSpacing:"0.04em",textTransform:"uppercase"}}>Soon</span>
+                      : <span style={{color:C.muted,fontSize:18}}>›</span>
+                    }
                   </button>
                 ));
               })()}
