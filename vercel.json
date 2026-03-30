@@ -58,6 +58,10 @@
       "dest": "/logo.jpg"
     },
     {
+      "src": "/whitepaper.html",
+      "dest": "/public/whitepaper.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
