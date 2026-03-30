@@ -2,14 +2,14 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-<title>Wish — Earn & Reward Platform</title>
+<title>Wish Network — Earn & Reward Platform</title>
 <link rel="icon" href="/icon-192.png" type="image/png"/>
 <link rel="apple-touch-icon" href="/icon-192.png"/>
 <link rel="manifest" href="/manifest.json"/>
 <meta name="theme-color" content="#000000"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Wish"/>
+<meta name="apple-mobile-web-app-title" content="Wish Network"/>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -239,7 +239,7 @@ const C = {
 /* ═══════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════ */
-const APP_NAME       = "Wish";
+const APP_NAME       = "Wish Network";
 const APP_TAGLINE    = "Earn & Reward Platform";
 const USD_PER_POINT  = 0.001;
 const PTS_PER_TOKEN  = 1000;   // 1000 pts = 1 Wish Token
@@ -380,7 +380,7 @@ const TR = {
        password:"Password", name:"Full Name", loginWith:"Login with", orLogin:"Or login with",
        noAcc:"Don't have an account?", haveAcc:"Already have an account?",
        signUp:"Create Account", signIn:"Sign In", continue:"Continue",
-       welcomeBack:"Welcome Back!", joinWish:"Join Wish Today",
+       welcomeBack:"Welcome Back!", joinWish:"Join Wish Network Today",
        home:"Home", earn:"Earn", tasks:"Tasks", leaders:"Leaders", mining:"Mining", wallet:"Wallet", convert:"Convert",
        convertTitle:"Convert Points", convertSub:"Turn points into Wish Tokens",
        convRate:"Conversion Rate", convBalance:"Your Points Balance", convTokens:"Wish Tokens",
@@ -406,7 +406,7 @@ const TR = {
        password:"پاس ورڈ", name:"پورا نام", loginWith:"سے لاگ ان", orLogin:"یا لاگ ان کریں",
        noAcc:"اکاؤنٹ نہیں ہے؟", haveAcc:"پہلے سے اکاؤنٹ ہے؟",
        signUp:"اکاؤنٹ بنائیں", signIn:"لاگ ان کریں", continue:"جاری رکھیں",
-       welcomeBack:"خوش آمدید!", joinWish:"Wish میں شامل ہوں",
+       welcomeBack:"خوش آمدید!", joinWish:"Wish Network میں شامل ہوں",
        home:"ہوم", earn:"کمائیں", tasks:"کام", leaders:"رہنما", mining:"مائننگ", wallet:"والٹ", convert:"کنورٹ",
        convertTitle:"پوائنٹس کنورٹ", convertSub:"پوائنٹس کو وِش ٹوکن میں بدلیں",
        convRate:"تبادلہ شرح", convBalance:"آپ کے پوائنٹس", convTokens:"وِش ٹوکن",
@@ -1322,7 +1322,7 @@ const EMAIL_PREVIEW_VALUES = {
   "{{email}}":          "ahmad@wish.com",
   "{{otp}}":            "483 921",
   "{{expiry_minutes}}": "10",
-  "{{app_name}}":       "Wish",
+  "{{app_name}}":       "Wish Network",
   "{{login_url}}":      "https://wish.app/login",
   "{{points}}":         "500",
   "{{total_points}}":   "48,700",
@@ -2002,7 +2002,7 @@ function AdminRoles({users, setUsers, adminUser}){
 function AdminSettings(){
   const [saved,setSaved] = useState(false);
   const [cfg,setCfg] = useState({
-    appName:"Wish",
+    appName:"Wish Network",
     dailyAdLimit:15,
     sundayAdLimit:20,
     miningCycleHours:8,
@@ -5943,7 +5943,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
             <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
           </button>
-          <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+          <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{APP_NAME}</div>
         </div>
       </div>
       {/* Content */}
@@ -6025,7 +6025,7 @@ function MainApp({user,onLogout,lang,setLang}){
           <div className="menu-drawer" style={{animation:"slideL .25s ease both"}}>
             {/* Sidebar Header */}
             <div style={{padding:"20px 24px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid rgba(139,92,246,.15)`}}>
-              <div style={{fontSize:18,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+              <div style={{fontSize:18,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{APP_NAME}</div>
               <button onClick={()=>setSO(false)} style={{background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer",lineHeight:1,padding:4}}>✕</button>
             </div>
             {/* User info */}
@@ -6952,7 +6952,7 @@ function SlideToOpen({ onUnlock }) {
         <div style={{fontSize:34,fontWeight:900,letterSpacing:-1,
           background:'linear-gradient(100deg,#c4b5fd,#a78bfa,#ec4899)',
           WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
-          Welcome to Wish
+          Welcome to Wish Network
         </div>
         <div style={{fontSize:14,color:'rgba(255,255,255,.38)',fontWeight:500,lineHeight:1.6}}>
           Your earning journey starts here
