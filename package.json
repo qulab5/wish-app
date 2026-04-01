@@ -4,10 +4,6 @@
   "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0",
-<<<<<<< HEAD
-    "jimp": "^0.16.13",
-=======
->>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     "resend": "^2.0.0"
   }
 }
