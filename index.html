@@ -2,6 +2,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<<<<<<< HEAD
 <title>Wish Network - Mine Your Way to Your Wish</title>
 <link rel="icon" href="/icon-192.png" type="image/png"/>
 <link rel="apple-touch-icon" href="/icon-192.png"/>
@@ -16,6 +17,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@200;300;400;600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+=======
+<title>Wish — Earn & Reward Platform</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;background:#0d0b1e;font-family:'Plus Jakarta Sans',sans-serif;}
@@ -111,6 +119,7 @@
     color: white;
     padding: 10px;
   }
+<<<<<<< HEAD
   /* ── Splash screen ── */
   .sp-logo-block{text-align:center;opacity:0;transform:translateY(40px);animation:spRiseIn 1.2s cubic-bezier(0.22,1,0.36,1) 1.4s forwards;}
   @keyframes spRiseIn{to{opacity:1;transform:translateY(0);}}
@@ -147,6 +156,8 @@
   @keyframes wCoinGlow{0%,100%{transform:scale(1);opacity:.6;}50%{transform:scale(1.12);opacity:1;}}
   @keyframes wScanline{from{transform:translateY(-100%);}to{transform:translateY(500px);}}
   @keyframes wGoldShimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 </style>
 </head>
 <body>
@@ -239,8 +250,13 @@ const C = {
 /* ═══════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════ */
+<<<<<<< HEAD
 const APP_NAME       = "Wish Network";
 const APP_TAGLINE    = "Mine Your Way to Your Wish ✦";
+=======
+const APP_NAME       = "Wish";
+const APP_TAGLINE    = "Earn & Reward Platform";
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 const USD_PER_POINT  = 0.001;
 const PTS_PER_TOKEN  = 1000;   // 1000 pts = 1 Wish Token
 const REF_SIGNUP_BONUS = 2000;   // pts given to referrer on new sign-up
@@ -253,6 +269,7 @@ const MINE_BOOST_PTS = 500;            // pts added per boost ad
 const MINE_MAX_BOOST = 5;              // max boosts per session
 const AD_COOLDOWN_S  = 5 * 60 * 60;
 
+<<<<<<< HEAD
 // ─── Google AdMob TEST Ad Unit IDs ──────────────────────────────────────────
 // These are Google's official test IDs — no real ads will load, no revenue risk.
 // Replace with your real unit IDs only before production release.
@@ -260,6 +277,8 @@ const ADMOB_TEST_MODE        = true;   // flip to false to use real IDs in prod
 const ADMOB_REWARDED_ID      = 'ca-app-pub-3940256099942544/5224354917';  // rewarded (mining start + boosts)
 const ADMOB_INTERSTITIAL_ID  = 'ca-app-pub-3940256099942544/1033173712';  // interstitial (spins)
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 const DAILY_PTS_MAP = {
   1:80,2:55,3:70,4:45,5:90,6:60,7:120,8:50,9:75,10:65,
   11:85,12:55,13:95,14:40,15:110,16:70,17:60,18:80,19:50,20:100,
@@ -298,9 +317,13 @@ const PERMISSIONS = {
   super_admin: [
     "view_dashboard",
     "view_users",
+<<<<<<< HEAD
     "create_users",
     "edit_users",
     "edit_user_balance",
+=======
+    "edit_users",
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     "delete_users",
     "toggle_user_active",
     "view_analytics",
@@ -314,17 +337,23 @@ const PERMISSIONS = {
     "manage_rate_limits",
     "manage_backups",
     "send_broadcasts",
+<<<<<<< HEAD
     "view_transactions",
     "view_audit_log",
     "export_data",
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   ],
   moderator: [
     "view_dashboard",
     "view_users",
     "toggle_user_active",
     "view_analytics",
+<<<<<<< HEAD
     "view_transactions",
     "view_audit_log",
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   ],
   user: [],
 };
@@ -334,6 +363,7 @@ function can(user, permission){
   return (PERMISSIONS[role] || []).includes(permission);
 }
 
+<<<<<<< HEAD
 function logAudit(adminEmail, action, detail){
   try {
     const log = JSON.parse(localStorage.getItem('wish_audit_log')||'[]');
@@ -342,6 +372,8 @@ function logAudit(adminEmail, action, detail){
   } catch {}
 }
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 /* ═══════════════════════════════════════════════
    AD NETWORKS CONFIG  (default)
 ═══════════════════════════════════════════════ */
@@ -373,14 +405,29 @@ const DEFAULT_AD_CONFIG = {
    MULTILINGUAL
 ═══════════════════════════════════════════════ */
 const LANGS = {
+<<<<<<< HEAD
   en:{ name:"English", flag:"🇬🇧", dir:"ltr" },
+=======
+  en:{ name:"English",   flag:"🇬🇧", dir:"ltr" },
+  ur:{ name:"اردو",      flag:"🇵🇰", dir:"rtl" },
+  ar:{ name:"العربية",   flag:"🇸🇦", dir:"rtl" },
+  hi:{ name:"हिंदी",     flag:"🇮🇳", dir:"ltr" },
+  bn:{ name:"বাংলা",     flag:"🇧🇩", dir:"ltr" },
+  tr:{ name:"Türkçe",    flag:"🇹🇷", dir:"ltr" },
+  fr:{ name:"Français",  flag:"🇫🇷", dir:"ltr" },
+  id:{ name:"Indonesia", flag:"🇮🇩", dir:"ltr" },
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 };
 const TR = {
   en:{ login:"Login", register:"Register", email:"Email Address", phone:"Phone Number",
        password:"Password", name:"Full Name", loginWith:"Login with", orLogin:"Or login with",
        noAcc:"Don't have an account?", haveAcc:"Already have an account?",
        signUp:"Create Account", signIn:"Sign In", continue:"Continue",
+<<<<<<< HEAD
        welcomeBack:"Welcome Back!", joinWish:"Join Wish Network Today",
+=======
+       welcomeBack:"Welcome Back!", joinWish:"Join Wish Today",
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
        home:"Home", earn:"Earn", tasks:"Tasks", leaders:"Leaders", mining:"Mining", wallet:"Wallet", convert:"Convert",
        convertTitle:"Convert Points", convertSub:"Turn points into Wish Tokens",
        convRate:"Conversion Rate", convBalance:"Your Points Balance", convTokens:"Wish Tokens",
@@ -406,7 +453,11 @@ const TR = {
        password:"پاس ورڈ", name:"پورا نام", loginWith:"سے لاگ ان", orLogin:"یا لاگ ان کریں",
        noAcc:"اکاؤنٹ نہیں ہے؟", haveAcc:"پہلے سے اکاؤنٹ ہے؟",
        signUp:"اکاؤنٹ بنائیں", signIn:"لاگ ان کریں", continue:"جاری رکھیں",
+<<<<<<< HEAD
        welcomeBack:"خوش آمدید!", joinWish:"Wish Network میں شامل ہوں",
+=======
+       welcomeBack:"خوش آمدید!", joinWish:"Wish میں شامل ہوں",
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
        home:"ہوم", earn:"کمائیں", tasks:"کام", leaders:"رہنما", mining:"مائننگ", wallet:"والٹ", convert:"کنورٹ",
        convertTitle:"پوائنٹس کنورٹ", convertSub:"پوائنٹس کو وِش ٹوکن میں بدلیں",
        convRate:"تبادلہ شرح", convBalance:"آپ کے پوائنٹس", convTokens:"وِش ٹوکن",
@@ -436,6 +487,7 @@ function t$(lang,key){ return (TR[lang]||TR.en)[key] || (TR.en)[key] || key; }
 ═══════════════════════════════════════════════ */
 const TASK_SETS = [
   [
+<<<<<<< HEAD
     {id:"t3",platform:"Twitter",  action:"Follow on X",         type:"follow", coins:2},
     {id:"t4",platform:"Instagram",action:"Follow on Instagram",  type:"follow", coins:2},
     {id:"tb",platform:"Telegram", action:"Follow on Telegram",   type:"follow", coins:2},
@@ -458,6 +510,31 @@ const SPIN_PTS=[500,1000,1500,2000,2500,3000,3500,20000];
 const SPIN_USD=[50,100,150,200,250,300,350,2000];
 // Index of the jackpot slot (20,000 pts) — must match SPIN_PTS above.
 const SPIN_JACKPOT_IDX=7;
+=======
+    {id:"t2",platform:"Facebook", action:"Share a post",       type:"share",  pts:60},
+    {id:"t3",platform:"Twitter",  action:"Retweet a post",     type:"share",  pts:50},
+    {id:"t4",platform:"Instagram",action:"Comment on a photo", type:"comment",pts:55},
+    {id:"tb",platform:"Telegram", action:"Share a message",    type:"share",  pts:45},
+  ],
+  [
+    {id:"t7",platform:"Facebook", action:"Like a page",        type:"like",   pts:35},
+    {id:"t8",platform:"Twitter",  action:"Like & Reply",       type:"comment",pts:50},
+    {id:"t4b",platform:"Instagram",action:"Like a photo",      type:"like",   pts:45},
+    {id:"tc",platform:"WhatsApp", action:"Share a status",     type:"share",  pts:40},
+  ],
+];
+const SOCIAL_JOINS = [
+  {id:"sj1",platform:"Telegram", pts:100},
+  {id:"sj2",platform:"WhatsApp", pts:80},
+  {id:"sj4",platform:"Facebook", pts:90},
+  {id:"sj5",platform:"Instagram",pts:95},
+];
+const PL = {YouTube:"#FF0000",Facebook:"#1877F2",Twitter:"#111",Instagram:"#E1306C",TikTok:"#010101",LinkedIn:"#0A66C2",Telegram:"#2AABEE",WhatsApp:"#25D366"};
+const GENERIC_ADS=[{e:"🛒",c:"Shopping"},{e:"🎮",c:"Gaming"},{e:"🍔",c:"Food"},{e:"✈️",c:"Travel"},{e:"👗",c:"Fashion"},{e:"💻",c:"Tech"},{e:"🏋️",c:"Fitness"},{e:"📱",c:"Apps"}];
+function rndAd(){const a=GENERIC_ADS[Math.floor(Math.random()*GENERIC_ADS.length)];return{emoji:a.e,cat:a.c,pts:Math.floor(20+Math.random()*20),id:Date.now()};}
+const SPIN_PTS=[100,150,200,250,300,350,400,500];
+const SPIN_USD=[1,2,3,1,2,3,2,1];
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 const CURRENT_TASKS=TASK_SETS[Math.floor(Date.now()/(10*24*60*60*1000))%TASK_SETS.length];
 const FAKE_LEADERS=[
   {name:"Ahmad_786",pts:48200,country:"🇵🇰"},{name:"Sara_Wins",pts:41500,country:"🇮🇳"},
@@ -467,6 +544,7 @@ const FAKE_LEADERS=[
   {name:"DailyGrind",pts:22100,country:"🇧🇩"},{name:"You",pts:1250,country:"🇵🇰",isMe:true},
 ];
 
+<<<<<<< HEAD
 const WISH_LOGO_SRC = "data:image/jpeg;base64,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";
 /* SVG Logos */
 /* ── Wish Logo — golden phoenix with cyan circuit ring ── */
@@ -478,6 +556,9 @@ function WishLogo({size=40,style={},radius=22}){
       alt="Wish Logo"/>
   );
 }
+=======
+/* SVG Logos */
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 const LOGOS={
   YouTube:(<svg viewBox="0 0 24 24" w="20" h="20" width="20" height="20"><path fill="#FF0000" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8z"/><path fill="#fff" d="M9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>),
   Facebook:(<svg viewBox="0 0 24 24" width="20" height="20"><path fill="#1877F2" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3v-2.6c0-3 1.8-4.7 4.6-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>),
@@ -660,8 +741,12 @@ function Ring({val,max=5}){
 }
 
 function SpinWheel({angle,spinning,phase}){
+<<<<<<< HEAD
   // Slot order matches SPIN_PTS index: 0=500 … 6=3500, 7=20K (jackpot, gold)
   const ptSegs=[{v:"500",c:"#8b5cf6"},{v:"1K",c:"#06b6d4"},{v:"1.5K",c:"#10b981"},{v:"2K",c:"#ec4899"},{v:"2.5K",c:"#f97316"},{v:"3K",c:"#6366f1"},{v:"3.5K",c:"#84cc16"},{v:"20K",c:"#FFD700"}];
+=======
+  const ptSegs=[{v:"100",c:"#8b5cf6"},{v:"150",c:"#06b6d4"},{v:"200",c:C.gold},{v:"250",c:"#ec4899"},{v:"300",c:"#10b981"},{v:"350",c:"#f97316"},{v:"400",c:"#6366f1"},{v:"500",c:"#84cc16"}];
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   const udSegs=[{v:"$1",c:"#10b981"},{v:"$2",c:C.gold},{v:"$3",c:"#8b5cf6"},{v:"$1",c:"#06b6d4"},{v:"$2",c:"#ec4899"},{v:"$3",c:"#f97316"},{v:"$1",c:"#6366f1"},{v:"$2",c:"#84cc16"}];
   const segs=phase==="points"?ptSegs:udSegs;
   const n=8,r=88,cx=96,cy=96;
@@ -795,7 +880,11 @@ body{background:#0d0b1e;}
 function AuthScreen({onLogin,lang}){
   const [mode,setMode]      = useState("welcome");
   const [method,setMethod]  = useState("email");
+<<<<<<< HEAD
   const [form,setForm]      = useState({name:"", username:"", email:"", phone:"", countryCode:"+1", pass:"", conf:"", refCode:"", country:""});
+=======
+  const [form,setForm]      = useState({name:"", email:"", phone:"", countryCode:"+1", pass:"", conf:"", refCode:""});
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   const [errs,setErrs]      = useState({});
   const [loading,setLoading]= useState(false);
   const [users,setUsers]    = useState(INITIAL_USERS);
@@ -1012,9 +1101,17 @@ function AuthScreen({onLogin,lang}){
   const validate=()=>{
     const e={};
     if(mode==="register"&&!form.name.trim()) e.name=L("required");
+<<<<<<< HEAD
     if(mode==="register"&&!form.username.trim()) e.username="Username is required";
     if(mode==="register"&&!form.country) e.country="Please select your country";
     if(!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email=L("invalidEmail");
+=======
+    if(method==="email"){
+      if(!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email=L("invalidEmail");
+    } else {
+      if(!form.phone.trim()) e.phone=L("invalidPhone");
+    }
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     if(form.pass.length<6) e.pass="Min 6 characters";
     if(mode==="register"&&form.pass!==form.conf) e.conf="Passwords don't match";
     setErrs(e);
@@ -1027,11 +1124,24 @@ function AuthScreen({onLogin,lang}){
     if(mode==="login"){
       let foundUser=null;
       // Check demo/admin users first (in-memory) for credentials
+<<<<<<< HEAD
       foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
       // Always fetch the DB record so we get the latest pts/usd/state.
       // For in-memory/demo users this merges their saved progress on top of the
       // hardcoded seed values; for real registered users it IS the source of truth.
       if(foundUser&&!foundUser.isAdmin){
+=======
+      if(method==="email"){
+        foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
+      } else {
+        const fp=form.countryCode+form.phone;
+        foundUser=users.find(u=>u.phone===fp&&u.pass===form.pass)||null;
+      }
+      // Always fetch the DB record so we get the latest pts/usd/state.
+      // For in-memory/demo users this merges their saved progress on top of the
+      // hardcoded seed values; for real registered users it IS the source of truth.
+      if(foundUser&&!foundUser.isAdmin&&method==="email"){
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         try{
           const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
           const d=await r.json();
@@ -1059,8 +1169,13 @@ function AuthScreen({onLogin,lang}){
       }catch(e){}
       const fullPhone=form.countryCode+form.phone;
       const _uid="u"+Date.now();
+<<<<<<< HEAD
       const _rc=form.username.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+String(Math.floor(Math.random()*90)+10);
       const nu={id:_uid,name:form.name,username:form.username,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:form.country||"🌍",isAdmin:false,active:true,
+=======
+      const _rc=form.name.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+_uid.slice(-4);
+      const nu={id:_uid,name:form.name,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:"🌍",isAdmin:false,active:true,
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         refCode:_rc,refBy:form.refCode.trim().toLowerCase()||null,refPts:0,refs:[]};
       setLoading(false);
       sendOtp(nu);
@@ -1159,20 +1274,33 @@ function AuthScreen({onLogin,lang}){
       <div style={{position:"absolute",width:300,height:300,borderRadius:"50%",background:"radial-gradient(circle,rgba(236,72,153,.08),transparent 70%)",bottom:60,right:-80,pointerEvents:"none",animation:"float 4s ease infinite reverse"}}/>
 
       <div style={{textAlign:"center",marginBottom:48,animation:"up .5s ease"}}>
+<<<<<<< HEAD
         <div style={{width:90,height:90,borderRadius:26,background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 22px",boxShadow:`0 8px 32px rgba(139,92,246,.4)`,animation:"float 3s ease infinite",overflow:"hidden"}}>
           <img src={WISH_LOGO_SRC} width={90} height={90} style={{objectFit:"cover",display:"block",borderRadius:26,transform:"scale(1.18)",transformOrigin:"center center"}} alt="Wish"/>
         </div>
+=======
+        <div style={{width:90,height:90,borderRadius:26,background:`linear-gradient(135deg,${C.brand},${C.pink})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,margin:"0 auto 22px",boxShadow:`0 8px 32px rgba(139,92,246,.4)`,animation:"float 3s ease infinite"}}>✨</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         <div style={{fontSize:42,fontWeight:900,letterSpacing:-1,background:`linear-gradient(135deg,${C.white},${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:8}}>{APP_NAME}</div>
         <div style={{fontSize:16,color:C.muted,fontWeight:500}}>{APP_TAGLINE}</div>
       </div>
 
       <div style={{width:"100%",maxWidth:360,display:"flex",flexDirection:"column",gap:12}}>
+<<<<<<< HEAD
         <Btn label={`${L("signIn")}`} onClick={()=>setMode("login")} full variant="brand" style={{padding:16,fontSize:15,borderRadius:15}} animate/>
         <Btn label={L("signUp")} onClick={()=>setMode("register")} full variant="ghost" style={{padding:16,fontSize:15,borderRadius:15}}/>
       </div>
 
       <div style={{marginTop:32,display:"flex",gap:16,flexWrap:"wrap",justifyContent:"center"}}>
         {["🌍 International","🔒 Secure","📱 Mobile"].map((f,i)=>(
+=======
+        <Btn label={`✨ ${L("signIn")}`} onClick={()=>setMode("login")} full variant="brand" style={{padding:16,fontSize:15,borderRadius:15}} animate/>
+        <Btn label={`🚀 ${L("signUp")}`} onClick={()=>setMode("register")} full variant="ghost" style={{padding:16,fontSize:15,borderRadius:15}}/>
+      </div>
+
+      <div style={{marginTop:32,display:"flex",gap:16,flexWrap:"wrap",justifyContent:"center"}}>
+        {["🌍 International","🔒 Secure","💵 Real Rewards","📱 Mobile"].map((f,i)=>(
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           <span key={i} style={{fontSize:11,color:C.muted,display:"flex",alignItems:"center",gap:4}}>{f}</span>
         ))}
       </div>
@@ -1180,7 +1308,11 @@ function AuthScreen({onLogin,lang}){
   );
 
   return(
+<<<<<<< HEAD
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",display:"flex",flexDirection:"column",padding:24,paddingTop:60,position:"relative",overflowX:"hidden",overflowY:"auto"}}>
+=======
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Plus Jakarta Sans',sans-serif",display:"flex",flexDirection:"column",padding:24,paddingTop:60,position:"relative",overflow:"hidden"}}>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       <style>{CSS}</style>
       <div style={{position:"absolute",width:350,height:350,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.12),transparent 70%)",top:-120,right:-80,pointerEvents:"none",animation:"float 5s ease infinite"}}/>
 
@@ -1193,6 +1325,7 @@ function AuthScreen({onLogin,lang}){
         <div style={{fontSize:14,color:C.muted}}>{mode==="login"?L("noAcc"):L("haveAcc")} <span onClick={()=>{setMode(mode==="login"?"register":"login");setErrs({});}} style={{color:C.brandLt,cursor:"pointer",fontWeight:700}}>{mode==="login"?L("signUp"):L("signIn")}</span></div>
       </div>
 
+<<<<<<< HEAD
       <div style={{animation:"up .3s ease .05s both"}}>
         {mode==="register"&&<Inp label={L("name")} val={form.name} onChange={f("name")} err={errs.name} placeholder="Your full name" icon="👤"/>}
         {mode==="register"&&<Inp label="Username" val={form.username} onChange={f("username")} err={errs.username} placeholder="Choose a username" icon="🏷️"/>}
@@ -1215,13 +1348,43 @@ function AuthScreen({onLogin,lang}){
           </div>
         )}
         <Inp label={L("email")} type="email" val={form.email} onChange={f("email")} err={errs.email} placeholder="you@example.com" icon="📧"/>
+=======
+      <div style={{display:"flex",background:"rgba(139,92,246,.08)",borderRadius:12,padding:4,marginBottom:22}}>
+        {["email","phone"].map(m=>(
+          <div key={m} onClick={()=>{setMethod(m);setErrs({});}} style={{flex:1,textAlign:"center",padding:"10px",borderRadius:10,cursor:"pointer",background:method===m?`linear-gradient(135deg,${C.brand},${C.brandDk})`:"transparent",color:method===m?C.white:C.muted,fontWeight:600,fontSize:13,transition:"all .2s"}}>
+            {m==="email"?"📧 Email":"📱 Phone"}
+          </div>
+        ))}
+      </div>
+
+      <div style={{animation:"up .3s ease .05s both"}}>
+        {mode==="register"&&<Inp label={L("name")} val={form.name} onChange={f("name")} err={errs.name} placeholder="Your full name" icon="👤"/>}
+        
+        {method==="email"
+          ?<Inp label={L("email")} type="email" val={form.email} onChange={f("email")} err={errs.email} placeholder="you@example.com" icon="📧"/>
+          :<Inp 
+              type="phone-with-code"
+              label={L("phone")}
+              val={form.phone}
+              onChange={(e)=>f("phone")(e.target.value)}
+              onCountryChange={(e)=>f("countryCode")(e.target.value)}
+              selectedCountry={form.countryCode}
+              err={errs.phone}
+              placeholder="123 456 7890"
+              icon="📱"
+            />}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         
         <Inp label={L("password")} type="password" val={form.pass} onChange={f("pass")} err={errs.pass} placeholder="••••••••" icon="🔒"/>
         {mode==="register"&&<Inp label="Confirm Password" type="password" val={form.conf} onChange={f("conf")} err={errs.conf} placeholder="••••••••" icon="🔑"/>}
         {mode==="register"&&<Inp label="Referral Code (optional)" val={form.refCode} onChange={f("refCode")} placeholder="Enter a friend's referral code" icon="🔗"/>}
       </div>
 
+<<<<<<< HEAD
       <Btn label={loading?"Please wait…":(mode==="login"?L("signIn"):L("signUp"))} onClick={submit} full variant="brand" disabled={loading} style={{marginTop:8,padding:16,fontSize:15,borderRadius:15}}/>
+=======
+      <Btn label={loading?"⏳ Please wait…":(mode==="login"?`🔓 ${L("signIn")}`:`🚀 ${L("signUp")}`)} onClick={submit} full variant="brand" disabled={loading} style={{marginTop:8,padding:16,fontSize:15,borderRadius:15}}/>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     </div>
   );
 }
@@ -1322,7 +1485,11 @@ const EMAIL_PREVIEW_VALUES = {
   "{{email}}":          "ahmad@wish.com",
   "{{otp}}":            "483 921",
   "{{expiry_minutes}}": "10",
+<<<<<<< HEAD
   "{{app_name}}":       "Wish Network",
+=======
+  "{{app_name}}":       "Wish",
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   "{{login_url}}":      "https://wish.app/login",
   "{{points}}":         "500",
   "{{total_points}}":   "48,700",
@@ -1666,7 +1833,11 @@ function AdminDashboard({users, adminUser}){
       <div style={{display:"flex",flexWrap:"wrap",gap:12,marginBottom:24}}>
         <StatCard icon="👥" label="Total Users"   value={totalUsers}  sub={`${activeUsers} active`} color={C.brandLt}/>
         <StatCard icon="⭐" label="Total Points"  value={totalPts.toLocaleString()} color={C.gold}/>
+<<<<<<< HEAD
         <StatCard icon="🪙" label="Total Coins"    value={totalUsd} color={C.green}/>
+=======
+        <StatCard icon="💵" label="Total USD"     value={`$${totalUsd}`} color={C.green}/>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         <StatCard icon="🛡️" label="Admin Staff"  value={admins}      color={C.cyan}/>
       </div>
 
@@ -1686,6 +1857,7 @@ function AdminDashboard({users, adminUser}){
 
 /* ── Users Tab ─────────────────────────────────── */
 function AdminUsers({users, setUsers, adminUser}){
+<<<<<<< HEAD
   const [search,setSearch]   = useState("");
   const [confirm,setConfirm] = useState(null);
   const [modal,setModal]     = useState(null); // "create"|"edit"
@@ -1785,17 +1957,66 @@ function AdminUsers({users, setUsers, adminUser}){
             + New User
           </button>
         )}
+=======
+  const [search,setSearch] = useState("");
+  const [confirm,setConfirm] = useState(null); // {type,userId}
+
+  const regularUsers = users.filter(u=>u.role==="user"||(!u.isAdmin&&!u.role));
+  const filtered = regularUsers.filter(u=>
+    u.name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggleActive = (id) => {
+    setUsers(prev=>prev.map(u=>u.id===id?{...u,active:!u.active}:u));
+    setConfirm(null);
+  };
+  const deleteUser = (id) => {
+    setUsers(prev=>prev.filter(u=>u.id!==id));
+    setConfirm(null);
+  };
+
+  const canDelete = can(adminUser,"delete_users");
+  const canToggle = can(adminUser,"toggle_user_active");
+  const canEdit   = can(adminUser,"edit_users");
+
+  return (
+    <div>
+      <div style={{position:"relative",marginBottom:16}}>
+        <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>🔍</span>
+        <input
+          className="inp-base"
+          placeholder="Search users by name or email…"
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          style={{paddingLeft:38}}
+        />
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       </div>
 
       <div style={{fontSize:12,color:"rgba(255,255,255,.35)",marginBottom:12}}>
         {filtered.length} user{filtered.length!==1?"s":""} found
+<<<<<<< HEAD
+=======
+        {!canDelete&&<span style={{marginLeft:8,color:C.cyan}}>· view &amp; toggle only</span>}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       </div>
 
       {filtered.map(u=>(
         <div key={u.id} className="user-row">
+<<<<<<< HEAD
           <div style={{width:38,height:38,borderRadius:"50%",flexShrink:0,background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:C.white}}>
             {(u.name||"?").charAt(0).toUpperCase()}
           </div>
+=======
+          <div style={{
+            width:38,height:38,borderRadius:"50%",flexShrink:0,
+            background:`linear-gradient(135deg,${C.brand},${C.brandDk})`,
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:16,fontWeight:700,color:C.white,
+          }}>{u.name.charAt(0).toUpperCase()}</div>
+
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,color:C.white,fontSize:14,display:"flex",alignItems:"center",gap:6}}>
               {u.name}
@@ -1803,6 +2024,7 @@ function AdminUsers({users, setUsers, adminUser}){
             </div>
             <div style={{fontSize:11,color:"rgba(255,255,255,.4)",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.email}</div>
             <div style={{fontSize:11,color:"rgba(255,255,255,.3)",marginTop:1}}>
+<<<<<<< HEAD
               {u.country} · <span style={{color:C.gold}}>{(u.pts||0).toLocaleString()} pts</span> · ${(u.usd||0).toFixed(2)}
             </div>
           </div>
@@ -1811,10 +2033,40 @@ function AdminUsers({users, setUsers, adminUser}){
             {canBalance&&<button onClick={()=>setConfirm({type:"reset",userId:u.id,userName:u.name,user:u})} title="Reset balance" style={{background:"rgba(245,158,11,.1)",border:"1px solid rgba(245,158,11,.3)",color:C.gold,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>🔄</button>}
             {canToggle&&<button onClick={()=>setConfirm({type:"toggle",userId:u.id,userName:u.name,active:u.active})} style={{background:u.active?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",border:`1px solid ${u.active?"rgba(239,68,68,.3)":"rgba(16,185,129,.3)"}`,color:u.active?C.red:C.green,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>{u.active?"🚫":"✅"}</button>}
             {canDelete&&<button onClick={()=>setConfirm({type:"delete",userId:u.id,userName:u.name})} style={{background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer"}}>🗑</button>}
+=======
+              {u.country} · {u.pts?.toLocaleString()||0} pts · Joined {u.joined}
+            </div>
+          </div>
+
+          <div style={{display:"flex",gap:8,flexShrink:0}}>
+            {canToggle&&(
+              <button
+                onClick={()=>setConfirm({type:"toggle",userId:u.id,userName:u.name,active:u.active})}
+                title={u.active?"Deactivate":"Activate"}
+                style={{
+                  background:u.active?"rgba(239,68,68,.15)":"rgba(16,185,129,.15)",
+                  border:`1px solid ${u.active?"rgba(239,68,68,.3)":"rgba(16,185,129,.3)"}`,
+                  color:u.active?C.red:C.green,
+                  borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
+                }}
+              >{u.active?"🚫 Ban":"✅ Activate"}</button>
+            )}
+            {canDelete&&(
+              <button
+                onClick={()=>setConfirm({type:"delete",userId:u.id,userName:u.name})}
+                title="Delete user"
+                style={{
+                  background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.25)",
+                  color:C.red,borderRadius:8,padding:"6px 10px",fontSize:12,fontWeight:600,cursor:"pointer",
+                }}
+              >🗑</button>
+            )}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
         </div>
       ))}
 
+<<<<<<< HEAD
       {/* Create / Edit modal */}
       {modal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
@@ -1858,11 +2110,14 @@ function AdminUsers({users, setUsers, adminUser}){
         </div>
       )}
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       {/* Confirmation dialog */}
       {confirm&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:16}}>
           <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:300,width:"100%",border:`1px solid ${C.border}`}}>
             <div style={{fontSize:32,textAlign:"center",marginBottom:12}}>
+<<<<<<< HEAD
               {confirm.type==="delete"?"🗑️":confirm.type==="reset"?"🔄":"⚠️"}
             </div>
             <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>
@@ -1874,13 +2129,34 @@ function AdminUsers({users, setUsers, adminUser}){
               {confirm.type==="delete"?"This cannot be undone."
               :confirm.type==="reset"?"Points and USD balance will be set to 0."
               :confirm.active?"User will lose access.":"User will regain access."}
+=======
+              {confirm.type==="delete"?"🗑️":"⚠️"}
+            </div>
+            <div style={{fontWeight:700,color:C.white,fontSize:15,textAlign:"center",marginBottom:8}}>
+              {confirm.type==="delete"
+                ? `Delete "${confirm.userName}"?`
+                : `${confirm.active?"Deactivate":"Activate"} "${confirm.userName}"?`}
+            </div>
+            <div style={{fontSize:12,color:"rgba(255,255,255,.45)",textAlign:"center",marginBottom:20}}>
+              {confirm.type==="delete"
+                ? "This action cannot be undone."
+                : confirm.active
+                  ? "The user will lose access to the app."
+                  : "The user will regain access to the app."}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
               <button onClick={()=>setConfirm(null)} style={{background:C.s3,border:`1px solid ${C.border}`,borderRadius:12,padding:11,color:C.white,fontWeight:600,cursor:"pointer"}}>Cancel</button>
               <button
+<<<<<<< HEAD
                 onClick={()=>confirm.type==="delete"?deleteUser(confirm.userId):confirm.type==="reset"?resetPoints(confirm.user):toggleActive(confirm.userId)}
                 style={{background:confirm.type==="reset"?`linear-gradient(135deg,${C.gold},#b45309)`:confirm.type==="delete"||confirm.active?`linear-gradient(135deg,${C.red},#b91c1c)`:`linear-gradient(135deg,${C.green},#047857)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
               >{confirm.type==="delete"?"Delete":confirm.type==="reset"?"Reset Balance":confirm.active?"Deactivate":"Activate"}</button>
+=======
+                onClick={()=>confirm.type==="delete"?deleteUser(confirm.userId):toggleActive(confirm.userId)}
+                style={{background:confirm.type==="delete"||confirm.active?`linear-gradient(135deg,${C.red},#b91c1c)`:`linear-gradient(135deg,${C.green},#047857)`,border:"none",borderRadius:12,padding:11,color:"#fff",fontWeight:700,cursor:"pointer"}}
+              >{confirm.type==="delete"?"Delete":confirm.active?"Deactivate":"Activate"}</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </div>
           </div>
         </div>
@@ -2002,7 +2278,11 @@ function AdminRoles({users, setUsers, adminUser}){
 function AdminSettings(){
   const [saved,setSaved] = useState(false);
   const [cfg,setCfg] = useState({
+<<<<<<< HEAD
     appName:"Wish Network",
+=======
+    appName:"Wish",
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     dailyAdLimit:15,
     sundayAdLimit:20,
     miningCycleHours:8,
@@ -2049,6 +2329,7 @@ function AdminSettings(){
   );
 }
 
+<<<<<<< HEAD
 /* ── Transactions Tab ──────────────────────────── */
 function AdminTransactions({users}){
   const [search,setSearch] = useState("");
@@ -2351,6 +2632,8 @@ function AdminExport({users}){
   );
 }
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 /* ── ScopeCheckboxes helper ────────────────────── */
 function ScopeGrid({items, selected, onChange, color=C.brand}){
   const groups = [...new Set(items.map(i=>i.group))];
@@ -4034,6 +4317,20 @@ function AdminBroadcast({ users, adminUser }) {
       };
       setHistory(h => [entry, ...h]);
       setSR({ ok: true, sent: json.sent, failed: json.failed, note: json.note, source: "live" });
+<<<<<<< HEAD
+=======
+      // Write every broadcast to the in-app announcements store so users see it
+      try {
+        const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
+        const ti = BROADCAST_TYPES.find(t=>t.id===type);
+        localStorage.setItem('wish_announcements', JSON.stringify([
+          { id: entry.id, type, icon: ti?.icon||"📢",
+            title: subject.trim(), body: body.trim(),
+            sentAt: new Date().toISOString(), color: ti?.color||C.brand },
+          ...prev
+        ]));
+      } catch {}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       setSubject(""); setBody("");
     } catch (err) {
       // Demo fallback ONLY when the endpoint doesn't exist yet (local dev without API routes).
@@ -4056,6 +4353,20 @@ function AdminBroadcast({ users, adminUser }) {
         };
         setHistory(h => [entry, ...h]);
         setSR({ ok: true, sent, failed, source: "demo" });
+<<<<<<< HEAD
+=======
+        // Write every broadcast to the in-app announcements store so users see it
+        try {
+          const prev = JSON.parse(localStorage.getItem('wish_announcements') || '[]');
+          const ti = BROADCAST_TYPES.find(t=>t.id===type);
+          localStorage.setItem('wish_announcements', JSON.stringify([
+            { id: entry.id, type, icon: ti?.icon||"📢",
+              title: subject.trim(), body: body.trim(),
+              sentAt: new Date().toISOString(), color: ti?.color||C.brand },
+            ...prev
+          ]));
+        } catch {}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         setSubject(""); setBody("");
       } else {
         setSR({ ok: false, error: err.message });
@@ -4365,7 +4676,11 @@ function AdminBroadcast({ users, adminUser }) {
           </div>
           {sendResult.ok && (
             <div style={{ fontSize:13, color:"rgba(255,255,255,.6)" }}>
+<<<<<<< HEAD
               <strong style={{ color:C.white }}>{sendResult.sent}</strong> {channel==="in_app"?"users will see this in Announcements":"delivered"}
+=======
+              <strong style={{ color:C.white }}>{sendResult.sent}</strong> delivered
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
               {sendResult.failed > 0 && <span style={{ color:C.red }}> · {sendResult.failed} failed</span>}
               {sendResult.note  && <div style={{ fontSize:11, color:"rgba(255,255,255,.35)", marginTop:4 }}>ℹ {sendResult.note}</div>}
             </div>
@@ -4489,6 +4804,7 @@ function AdminPanel({user, onExit, lang}){
   },[]);
 
   const tabs = [
+<<<<<<< HEAD
     { id:"dashboard",    label:"Dashboard",   icon:"📊", perm:"view_dashboard" },
     { id:"users",        label:"Users",       icon:"👥", perm:"view_users" },
     { id:"transactions", label:"Transactions",icon:"💳", perm:"view_transactions" },
@@ -4503,6 +4819,18 @@ function AdminPanel({user, onExit, lang}){
     { id:"backup",       label:"Backup",      icon:"💾", perm:"manage_backups" },
     { id:"broadcast",    label:"Broadcast",   icon:"📢", perm:"send_broadcasts" },
     { id:"settings",     label:"Settings",    icon:"⚙️", perm:"view_settings" },
+=======
+    { id:"dashboard", label:"Dashboard", icon:"📊", perm:"view_dashboard" },
+    { id:"users",     label:"Users",     icon:"👥", perm:"view_users" },
+    { id:"roles",     label:"Roles",     icon:"🛡️", perm:"manage_roles" },
+    { id:"apikeys",   label:"API Keys",  icon:"🔑", perm:"manage_api_keys" },
+    { id:"webhooks",  label:"Webhooks",  icon:"🔗", perm:"manage_webhooks" },
+    { id:"emails",     label:"Emails",      icon:"✉️", perm:"manage_email_templates" },
+    { id:"ratelimits", label:"Rate Limits", icon:"🛡️", perm:"manage_rate_limits" },
+    { id:"backup",     label:"Backup",      icon:"💾", perm:"manage_backups" },
+    { id:"broadcast",  label:"Broadcast",   icon:"📢", perm:"send_broadcasts" },
+    { id:"settings",   label:"Settings",   icon:"⚙️", perm:"view_settings" },
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   ].filter(t=>can(user,t.perm));
 
   // Ensure current tab is accessible; fall back to first allowed tab
@@ -4551,6 +4879,7 @@ function AdminPanel({user, onExit, lang}){
 
       {/* Content */}
       <div style={{flex:1,overflowY:"auto",padding:20}}>
+<<<<<<< HEAD
         {activeTab==="dashboard"    && <AdminDashboard users={users} adminUser={user}/>}
         {activeTab==="users"        && <AdminUsers users={users} setUsers={setUsers} adminUser={user}/>}
         {activeTab==="transactions" && <AdminTransactions users={users}/>}
@@ -4565,6 +4894,18 @@ function AdminPanel({user, onExit, lang}){
         {activeTab==="backup"       && <AdminBackup users={users} setUsers={setUsers} adminUser={user}/>}
         {activeTab==="broadcast"    && <AdminBroadcast users={users} adminUser={user}/>}
         {activeTab==="settings"     && <AdminSettings/>}
+=======
+        {activeTab==="dashboard" && <AdminDashboard users={users} adminUser={user}/>}
+        {activeTab==="users"     && <AdminUsers users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="roles"     && <AdminRoles users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="apikeys"   && <AdminApiKeys/>}
+        {activeTab==="webhooks"  && <AdminWebhooks/>}
+        {activeTab==="emails"      && <AdminEmailTemplates/>}
+        {activeTab==="ratelimits" && <AdminRateLimits/>}
+        {activeTab==="backup"     && <AdminBackup users={users} setUsers={setUsers} adminUser={user}/>}
+        {activeTab==="broadcast"  && <AdminBroadcast users={users} adminUser={user}/>}
+        {activeTab==="settings"   && <AdminSettings/>}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       </div>
     </div>
   );
@@ -4588,10 +4929,13 @@ function WalletTab({ u, C, setU }) {
   const [creating,  setCreating]  = useState(false);
   const [balLoading,setBalLoad]   = useState(false);
   const [txHistory,  setTxHistory] = useState([]);
+<<<<<<< HEAD
   const [walletTab,  setWalletTab] = useState('assets');
   const [displayBal, setDisplayBal] = useState(0);
   const auroraRef    = useRef(null);
   const auroraRafRef = useRef(null);
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 
   // ── Auto-create or restore wallet on mount ─────────────────────────────────
   useEffect(() => {
@@ -4615,6 +4959,7 @@ function WalletTab({ u, C, setU }) {
     if (!mintCfg) setWBal(u.tokens ?? 0);
   }, [u.tokens, mintCfg]);
 
+<<<<<<< HEAD
   // ── Count-up animation whenever wishBal changes ────────────────────────────
   useEffect(() => {
     const target = wishBal ?? 0;
@@ -4660,6 +5005,8 @@ function WalletTab({ u, C, setU }) {
     return () => { cancelAnimationFrame(auroraRafRef.current); window.removeEventListener('resize', resize); };
   }, []);
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   // ── Balance fetch (server-side — avoids CORS on public Solana RPC) ─────────
   const loadBalances = async (addr) => {
     setBalLoad(true);
@@ -4770,6 +5117,10 @@ function WalletTab({ u, C, setU }) {
         <div style={{fontSize:17,fontWeight:800,color:C.white}}>Receive</div>
       </div>
       <div style={{background:'linear-gradient(145deg,#1a0833,#120f2e)',border:'1px solid rgba(139,92,246,.2)',borderRadius:22,padding:'24px 20px',textAlign:'center'}}>
+<<<<<<< HEAD
+=======
+        <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:1.5,textTransform:'uppercase',marginBottom:18}}>Send SOL or WISH to this address</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         <div style={{display:'inline-block',padding:10,background:'#fff',borderRadius:18,marginBottom:20,boxShadow:'0 0 50px rgba(139,92,246,.35)'}}>
           <img src={`https://api.qrserver.com/v1/create-qr-code/?data=${wallet}&size=180x180&bgcolor=ffffff&color=1a0833&margin=8`}
             alt="QR" style={{display:'block',borderRadius:10,width:180,height:180}}/>
@@ -4787,6 +5138,7 @@ function WalletTab({ u, C, setU }) {
 
   // ── Main screen ────────────────────────────────────────────────────────────
   return (
+<<<<<<< HEAD
     <div style={{position:'relative',background:'#060612',minHeight:'100%',overflowX:'hidden',fontFamily:"'Outfit',sans-serif"}}>
 
       {/* Aurora canvas */}
@@ -4936,6 +5288,152 @@ function WalletTab({ u, C, setU }) {
             }
           </div>
         )}
+=======
+    <div style={{paddingBottom:32,animation:'up .3s ease'}}>
+
+      {/* Hero balance card */}
+      <div style={{background:'linear-gradient(145deg,#1a0833 0%,#2d1060 50%,#0d1840 100%)',borderBottom:'1px solid rgba(139,92,246,.18)',padding:'28px 20px 22px',position:'relative',overflow:'hidden'}}>
+        {/* Ambient glow blobs */}
+        <div style={{position:'absolute',top:-50,right:-30,width:180,height:180,borderRadius:'50%',background:'radial-gradient(circle,rgba(245,158,11,.18),transparent 70%)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:-40,left:-20,width:140,height:140,borderRadius:'50%',background:'radial-gradient(circle,rgba(139,92,246,.22),transparent 70%)',pointerEvents:'none'}}/>
+
+        {/* Header row */}
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+          <div style={{fontSize:30,animation:'float 3s ease-in-out infinite',lineHeight:1}}>🪙</div>
+          <div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.35)',letterSpacing:1.8,textTransform:'uppercase'}}>Wish Wallet</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,.2)',letterSpacing:.3}}>Solana Network</div>
+          </div>
+          {/* Refresh button */}
+          <button onClick={()=>loadBalances(wallet)} title="Refresh balances"
+            style={{marginLeft:'auto',width:32,height:32,borderRadius:8,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.08)',color:'rgba(255,255,255,.4)',fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',animation:balLoading?'spin 1s linear infinite':'none'}}>
+            ↻
+          </button>
+        </div>
+
+        {/* WISH balance — big hero number */}
+        <div style={{marginBottom:10}}>
+          <div style={{
+            fontSize:50,fontWeight:900,letterSpacing:-2,lineHeight:1,
+            background:'linear-gradient(135deg,#fde68a 0%,#f59e0b 40%,#f97316 100%)',
+            WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+            filter:'drop-shadow(0 2px 16px rgba(245,158,11,.5))',
+          }}>
+            {balLoading && wishBal === null
+              ? <span style={{display:'inline-block',width:120,height:48,background:'rgba(255,255,255,.08)',borderRadius:10,animation:'shimmer 1.4s infinite',verticalAlign:'middle',backgroundSize:'600px 100%',backgroundImage:'linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.1) 50%,rgba(255,255,255,.04) 75%)'}}/>
+              : (fmt(wishBal) ?? '—')}
+          </div>
+          <div style={{fontSize:12,color:'rgba(255,255,255,.3)',marginTop:3,letterSpacing:1.2,textTransform:'uppercase'}}>Wish Coins</div>
+        </div>
+
+        {/* SOL pill */}
+        <div style={{display:'inline-flex',alignItems:'center',gap:6,background:'rgba(255,255,255,.07)',borderRadius:20,padding:'5px 13px',marginBottom:24,border:'1px solid rgba(255,255,255,.06)'}}>
+          <span style={{fontSize:13,color:'rgba(255,255,255,.35)'}}>◎</span>
+          <span style={{fontSize:13,fontWeight:600,color:'rgba(255,255,255,.55)'}}>
+            {balLoading && solBal === null ? '…' : (solBal ?? '—')} SOL
+          </span>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <button onClick={()=>{setScreen('send');setMsg('');}}
+            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(245,158,11,.22),rgba(249,115,22,.18))',border:'1px solid rgba(245,158,11,.35)',borderRadius:14,color:'#fbbf24',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
+            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+            📤 Send
+          </button>
+          <button onClick={()=>setScreen('receive')}
+            style={{padding:'14px 0',background:'linear-gradient(135deg,rgba(139,92,246,.22),rgba(124,58,237,.18))',border:'1px solid rgba(139,92,246,.35)',borderRadius:14,color:'#c4b5fd',fontWeight:700,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6,transition:'opacity .15s'}}
+            onMouseOver={e=>e.currentTarget.style.opacity='.8'} onMouseOut={e=>e.currentTarget.style.opacity='1'}>
+            📥 Receive
+          </button>
+        </div>
+      </div>
+
+      {/* Token row */}
+      <div style={{margin:'14px 16px 0',background:'rgba(245,158,11,.04)',border:'1px solid rgba(245,158,11,.1)',borderRadius:18,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,boxShadow:'0 4px 14px rgba(245,158,11,.35)'}}>🪙</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>Wish Coin</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>WISH · Solana</div>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:18,fontWeight:800,color:'#f59e0b'}}>
+              {balLoading && wishBal === null ? <span style={{opacity:.4}}>…</span> : (fmt(wishBal) ?? '—')}
+            </div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>WISH</div>
+          </div>
+        </div>
+      </div>
+
+      {/* SOL row */}
+      <div style={{margin:'10px 16px 0',background:'rgba(99,102,241,.04)',border:'1px solid rgba(99,102,241,.1)',borderRadius:18,padding:'16px'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:42,height:42,borderRadius:'50%',background:'linear-gradient(135deg,#9945FF,#14F195)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:'0 4px 14px rgba(153,69,255,.25)'}}>◎</div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.white,lineHeight:1.2}}>Solana</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2}}>SOL · Native</div>
+            </div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:18,fontWeight:800,color:'#a78bfa'}}>
+              {balLoading && solBal === null ? <span style={{opacity:.4}}>…</span> : (solBal ?? '—')}
+            </div>
+            <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:.5,marginTop:2}}>SOL</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Wallet address row */}
+      <div style={{margin:'10px 16px 0',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.07)',borderRadius:16,padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:10,color:'rgba(255,255,255,.25)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:5}}>Wallet Address</div>
+          <div style={{fontSize:13,color:'rgba(255,255,255,.6)',fontFamily:'monospace',letterSpacing:.4}}>
+            {wallet.slice(0,6)}…{wallet.slice(-6)}
+          </div>
+        </div>
+        <button onClick={copyAddr}
+          style={{padding:'8px 14px',background:copied?'rgba(52,211,153,.12)':'rgba(255,255,255,.06)',border:`1px solid ${copied?'rgba(52,211,153,.35)':'rgba(255,255,255,.1)'}`,borderRadius:10,color:copied?'#34d399':'rgba(255,255,255,.45)',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .2s'}}>
+          {copied ? '✓ Copied' : '📋 Copy'}
+        </button>
+      </div>
+
+      {/* Transaction history */}
+      <div style={{margin:'18px 16px 0'}}>
+        <div style={{fontSize:12,color:'rgba(255,255,255,.3)',letterSpacing:1.4,textTransform:'uppercase',marginBottom:10}}>Transaction History</div>
+        {txHistory.length === 0
+          ? <div style={{textAlign:'center',padding:'24px 0',color:'rgba(255,255,255,.2)',fontSize:13}}>No transactions yet</div>
+          : txHistory.map(tx => {
+              const isSent = tx.type === 'sent';
+              const addr   = tx.address || '';
+              const short  = addr.length > 10 ? addr.slice(0,5)+'…'+addr.slice(-5) : addr || '—';
+              const date   = new Date(tx.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+              return (
+                <div key={tx.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.06)',borderRadius:14,marginBottom:8}}>
+                  <div style={{display:'flex',alignItems:'center',gap:12}}>
+                    <div style={{width:36,height:36,borderRadius:'50%',background:isSent?'rgba(248,113,113,.15)':'rgba(52,211,153,.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>
+                      {isSent ? '📤' : '📥'}
+                    </div>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:C.white}}>{isSent ? 'Sent' : 'Received'}</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,.3)',marginTop:2,fontFamily:'monospace'}}>{isSent ? 'To: ' : 'From: '}{short}</div>
+                      <div style={{fontSize:10,color:'rgba(255,255,255,.2)',marginTop:1}}>{date}</div>
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontSize:15,fontWeight:800,color:isSent?'#f87171':'#34d399'}}>
+                      {isSent ? '−' : '+'}{tx.amount}
+                    </div>
+                    <div style={{fontSize:10,color:'rgba(255,255,255,.25)',marginTop:2}}>WISH</div>
+                  </div>
+                </div>
+              );
+            })
+        }
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       </div>
     </div>
   );
@@ -4964,12 +5462,16 @@ function MainApp({user,onLogout,lang,setLang}){
   const [mineReady,setMR]      = useState(false);
   const [mineStarted,setMS]    = useState(false);
   const [mineAdShow,setMAd]    = useState(false);
+<<<<<<< HEAD
   // Test ad modal state
   const [testAdModal,setTestAdModal]         = useState(null);   // null | 'rewarded' | 'interstitial'
   const [testAdCountdown,setTestAdCountdown] = useState(0);
   const testAdCallbackRef                    = React.useRef(null);
   const [mineBoosts,setMineBoosts] = useState(0);
   const [adToast,setAdToast]       = useState('');   // brief confirmation toast after ad claim
+=======
+  const [mineBoosts,setMineBoosts] = useState(0);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   const [convSuccess,setConvS] = useState(false);  // flash "Converted!" feedback
   const [langMenu,setLM]      = useState(false);
   const [avatarPick,setAP]    = useState(false);
@@ -4977,6 +5479,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [picCapture,setPC]    = useState(false);
   const [editName,setEN]      = useState(user.name);
   const [editEmail,setEE]     = useState(user.email);
+<<<<<<< HEAD
   const [ecStep,setECS]       = useState(0);   // 0=idle 1=confirm current 2=new email 3=otp
   const [ecCurrent,setECC]    = useState("");
   const [ecNew,setECN]        = useState("");
@@ -4986,13 +5489,19 @@ function MainApp({user,onLogout,lang,setLang}){
   const [ecErr,setECE]        = useState("");
   const [editPass,setEP]      = useState("");
   const [editCurrPass,setECP] = useState("");
+=======
+  const [editPass,setEP]      = useState("");
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   const [profileMsg,setPMsg]  = useState("");
   const [sidebarOpen, setSO]  = useState(false);
   const [sidebarView, setSV]  = useState(null);
   const [refCopied,  setRefCopied] = useState("");
+<<<<<<< HEAD
   const [annList, setAnnList]     = useState([]);
   const [annToast, setAnnToast]   = useState(null);
   const annToastShown = React.useRef(false);
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   const [editingField, setEF] = useState(null);
   // Guard: auto-save must not fire until the initial DB load has finished.
   // Without this, the stale localStorage user (saved at login time) would be
@@ -5012,6 +5521,7 @@ function MainApp({user,onLogout,lang,setLang}){
     return()=>clearInterval(iv);
   },[mineStarted,mineReady]);
 
+<<<<<<< HEAD
   // Fetch announcements from server and show toast for new ones
   useEffect(()=>{
     function loadAnns(){
@@ -5035,6 +5545,8 @@ function MainApp({user,onLogout,lang,setLang}){
     return ()=>clearInterval(iv);
   },[]);
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   // Load saved progress from MongoDB on first mount
   useEffect(()=>{
     fetch(`/api/user?email=${encodeURIComponent(user.email)}`)
@@ -5045,7 +5557,11 @@ function MainApp({user,onLogout,lang,setLang}){
         // are permanently blocked for those accounts.
         dbLoaded.current = true;
         if(!d.user) return;
+<<<<<<< HEAD
         const {pts,usd,avatar,name,pass:dbPass,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
+=======
+        const {pts,usd,avatar,name,tasksDone:td,adLeft:al,adDate,spinAngle:sa,
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                spinNextFree:snf,extraSpins:es,lang:dbLang,tokens:dbTokens,
                refCode:dbRefCode,refBy:dbRefBy,refPts:dbRefPts,refs:dbRefs,
                walletAddress:dbWa}=d.user;
@@ -5060,7 +5576,10 @@ function MainApp({user,onLogout,lang,setLang}){
           tokens: dbTokens ?? p.tokens ?? 0,
           avatar:avatar||p.avatar,
           name:name||p.name,
+<<<<<<< HEAD
           pass:dbPass||p.pass,
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           refCode:       dbRefCode||p.refCode||null,
           refBy:         dbRefBy  ||p.refBy  ||null,
           refPts:        Math.max(dbRefPts??0, p.refPts??0),
@@ -5068,7 +5587,11 @@ function MainApp({user,onLogout,lang,setLang}){
           walletAddress: dbWa     ||p.walletAddress||null,
         }));
         const today=new Date().toDateString();
+<<<<<<< HEAD
         if(al!=null) setAL(al);
+=======
+        if(al!=null) setAL(adDate===today?al:5);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         if(sa!=null) setSA(sa);
         // Take max(DB, local) — prevents a stale DB 0 from overwriting a valid local cooldown.
         setSNF(p=>Math.max(snf??0, p));
@@ -5081,16 +5604,27 @@ function MainApp({user,onLogout,lang,setLang}){
           const msa = td.__mine_startedAt;
           const mb  = td.__mine_boosts || 0;
           if(msa){
+<<<<<<< HEAD
             const effSession = td.__mine_eff_session || MINE_SESSION_S;
             const elapsedS = Math.floor((Date.now() - msa) / 1000);
             setMSAt(msa);
             setMineBoosts(mb);
             if(elapsedS >= effSession){
+=======
+            const elapsedS = Math.floor((Date.now() - msa) / 1000);
+            setMSAt(msa);
+            setMineBoosts(mb);
+            if(elapsedS >= MINE_SESSION_S){
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
               // Session finished while user was away — ready to claim
               setMineT(0); setMS(true); setMR(true);
             } else {
               // Session still running — resume from correct position
+<<<<<<< HEAD
               setMineT(effSession - elapsedS); setMS(true); setMR(false);
+=======
+              setMineT(MINE_SESSION_S - elapsedS); setMS(true); setMR(false);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             }
           }
         }
@@ -5098,11 +5632,22 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(()=>{ dbLoaded.current = true; });  // unlock even on network error
   },[]);
 
+<<<<<<< HEAD
   // Keep last_user in localStorage in sync so page refreshes restore the session.
   useEffect(()=>{
     if(!dbLoaded.current) return;
     Security.save('last_user', {...u});
   },[u.pts,u.usd,u.name,u.avatar,u.pass]);
+=======
+  // Keep last_user in localStorage in sync with the live pts/usd so that a
+  // page refresh renders the correct value immediately (no 0-flash while the
+  // DB load is still in-flight).  Only runs after dbLoaded so the stale
+  // login-snapshot is never promoted back on top of a DB load.
+  useEffect(()=>{
+    if(!dbLoaded.current) return;
+    Security.save('last_user',{...u});
+  },[u.pts,u.usd]);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 
   // Persist spinNextFree to localStorage immediately on change so it survives
   // a page refresh even if the DB save hasn't completed yet.
@@ -5120,18 +5665,27 @@ function MainApp({user,onLogout,lang,setLang}){
     if(!dbLoaded.current) return;
     const t=setTimeout(()=>{
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+<<<<<<< HEAD
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pass:u.pass,pts:u.pts,usd:u.usd,
           avatar:u.avatar,
+=======
+        body:JSON.stringify({id:u.id,email:u.email,name:u.name,pts:u.pts,usd:u.usd,
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins,
           refCode:u.refCode||null,refPts:u.refPts??0,refs:u.refs??[]})
       }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[auto-save]',d);}).catch(e=>console.error('[auto-save]',e));
     },2000);
     return()=>clearTimeout(t);
+<<<<<<< HEAD
   },[u.pts,u.usd,u.name,u.avatar,u.pass,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
+=======
+  },[u.pts,u.usd,u.name,u.refPts,tasksDone,adLeft,spinAngle,spinNextFree,extraSpins]);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 
   const fmtTime=s=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;};
   const addPts=(pts,usd=0)=>setU(p=>({...p,pts:p.pts+pts,usd:+(p.usd+usd).toFixed(2)}));
 
+<<<<<<< HEAD
   // Immediately save specific profile fields to DB + localStorage.
   // Used for name/password changes so a quick refresh doesn't revert them
   // (the 2s auto-save debounce is too slow for interactive saves).
@@ -5143,6 +5697,8 @@ function MainApp({user,onLogout,lang,setLang}){
     }).catch(()=>{});
   };
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   // Pts accumulated in the current mining session (updates every second as mineT ticks).
   // elapsed-time pts + boost pts — transferred to balance only on Claim.
   const mineElapsed = MINE_SESSION_S - mineT;
@@ -5150,6 +5706,7 @@ function MainApp({user,onLogout,lang,setLang}){
     ? Math.floor(mineElapsed * MINE_PTS_HOUR / 3600) + mineBoosts * MINE_BOOST_PTS
     : 0;
 
+<<<<<<< HEAD
   const watchAd=()=>{
     if(adLeft<=0) return;
     const today = new Date().toDateString();
@@ -5231,6 +5788,17 @@ function MainApp({user,onLogout,lang,setLang}){
       }).catch(()=>{});
     }
     setAD(null);
+=======
+  const watchAd=()=>{if(adLeft<=0)return;setAD(rndAd());setAS(true);};
+  const claimAd=()=>{
+    const newPts=u.pts+adData.pts;
+    const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
+    const newAL=adLeft-1;
+    addPts(adData.pts);setAL(p=>p-1);setAS(false);setAD(null);
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:newAL,adDate:new Date().toDateString()})
+    }).catch(()=>{});
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   };
   const doSpin=()=>{
     if(spinning) return;
@@ -5240,10 +5808,16 @@ function MainApp({user,onLogout,lang,setLang}){
     if(totalSpins<=0){setSAP(true);return;}
     setSpin(true);setSR(null);
     // Pre-compute post-spin values now, while state is fresh.
+<<<<<<< HEAD
+=======
+    // The setTimeout closure below is stale w.r.t. setState calls, so we
+    // must capture these values here and pass them through the closure.
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     const newSnf=hasFree?now+24*60*60*1000:spinNextFree;
     const newEs=hasFree?extraSpins:extraSpins-1;
     if(hasFree) setSNF(newSnf);
     else        setES(newEs);
+<<<<<<< HEAD
 
     // ── Jackpot milestone logic ──────────────────────────────────────────────
     // __spin_attempts: total lifetime spins (persisted in tasksDone JSONB).
@@ -5276,6 +5850,14 @@ function MainApp({user,onLogout,lang,setLang}){
       body:JSON.stringify({id:u.id,email:u.email,spinNextFree:newSnf,extraSpins:newEs,tasksDone:newTD})
     }).catch(()=>{});
 
+=======
+    // Save spin consumption immediately so a refresh before the 4.2s animation
+    // completes doesn't restore the free spin from the DB.
+    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:u.id,email:u.email,spinNextFree:newSnf,extraSpins:newEs})
+    }).catch(()=>{});
+    const i=Math.floor(Math.random()*SPIN_PTS.length);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     const targetOffset=(337.5-i*45+720)%360;
     const currentMod=spinAngle%360;
     const diff=(targetOffset-currentMod+360)%360;
@@ -5288,19 +5870,33 @@ function MainApp({user,onLogout,lang,setLang}){
       const newPts=cu.pts+SPIN_PTS[i];
       const newUsd=+(cu.usd+SPIN_USD[i]*0.01).toFixed(2);
       addPts(SPIN_PTS[i],SPIN_USD[i]*0.01);
+<<<<<<< HEAD
       setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01,isJackpot});
       setSpin(false);
       // Persist immediately — don't rely on the 2s auto-save debounce.
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:cu.id,email:cu.email,pts:newPts,usd:newUsd,
           spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs,tasksDone:newTD})
+=======
+      setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01});
+      setSpin(false);
+      // Persist immediately — don't rely on the 2s auto-save debounce which
+      // can be cancelled by a page refresh before it fires.
+      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:cu.id,email:cu.email,pts:newPts,usd:newUsd,
+          spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs})
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       })
       .then(r=>r.json())
       .then(d=>{ if(!d.success) console.error('[spin save]',d); })
       .catch(e=>console.error('[spin save network]',e));
+<<<<<<< HEAD
       // NOTE: Do NOT show spinAdPopup here — user must see their reward first.
       // The inline "Watch Ad → Get 1 Spin" button appears below the wheel
       // automatically when spinsLeft===0, after the result banner is visible.
+=======
+      if(newEs<=0) setSAP(true);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     },4200);
   };
   const doConvert=()=>{
@@ -5319,7 +5915,11 @@ function MainApp({user,onLogout,lang,setLang}){
       .catch(e=>console.error('[convert save]',e));
   };
   const watchSpinAd=()=>{
+<<<<<<< HEAD
     showInterstitialAd(()=>{
+=======
+    showRewardedAd(()=>{
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       const newEs=extraSpins+1;
       setES(newEs);setSAP(false);
       // Persist the new spin count immediately
@@ -5328,7 +5928,11 @@ function MainApp({user,onLogout,lang,setLang}){
       }).catch(()=>{});
     });
   };
+<<<<<<< HEAD
   const doneTask=(id,coins)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));setU(p=>({...p,tokens:(p.tokens??0)+coins}));};
+=======
+  const doneTask=(id,pts)=>{if(tasksDone[id])return;setTD(p=>({...p,[id]:true}));addPts(pts);};
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   const doneJoin=(id,pts)=>{if(joinsDone[id])return;setJD(p=>({...p,[id]:true}));addPts(pts);};
   const claimMining=()=>{
     if(!mineReady)return;
@@ -5339,16 +5943,25 @@ function MainApp({user,onLogout,lang,setLang}){
     addPts(earned, earned * USD_PER_POINT);
     setMSAt(0); setMineT(MINE_SESSION_S); setMR(false); setMS(false); setMineBoosts(0);
     // eslint-disable-next-line no-unused-vars
+<<<<<<< HEAD
     const {__mine_startedAt:_a, __mine_boosts:_b, __mine_eff_session:_c, __pre_mine_deduct:_d,
            __ad_seq:_e, __ad_seq_date:_f, ...cleanTD} = tasksDone;
     setTD(cleanTD);
     // Reset boosts for the new session
     setAL(5);
+=======
+    const {__mine_startedAt:_a, __mine_boosts:_b, ...cleanTD} = tasksDone;
+    setTD(cleanTD);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     // Save pts + usd + session reset immediately — do NOT rely on the 2s
     // auto-save debounce.  If the user refreshes or signs out right after
     // claiming, the DB must already have the new balance.
     fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+<<<<<<< HEAD
       body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:5,tasksDone:cleanTD})
+=======
+      body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,tasksDone:cleanTD})
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[mine claim save]',d);})
       .catch(e=>console.error('[mine claim save]',e));
     // ── Give referrer 10% of this mining claim ────────────────────────────
@@ -5371,6 +5984,7 @@ function MainApp({user,onLogout,lang,setLang}){
   };
   const startMiningAfterAd=()=>{setMAd(false);setMS(true);};
 
+<<<<<<< HEAD
   // ═══ AD INTEGRATION — Google AdMob Test Mode ════════════════════════════
   // Uses Google's official test ad unit IDs. No real ads load, no revenue risk.
   // The modal below simulates the ad experience with a countdown timer.
@@ -5406,6 +6020,17 @@ function MainApp({user,onLogout,lang,setLang}){
   // Interstitial ad — used for: spin extra spin
   const showInterstitialAd = (onComplete) => {
     _launchTestAd('interstitial', ADMOB_INTERSTITIAL_ID, 3, onComplete);
+=======
+  // ═══ AD INTEGRATION PLACEHOLDERS ═══════════════════════════════════════
+  // TODO: Replace showRewardedAd() with your actual ad network SDK call.
+  // e.g. AdMob: admob.showRewardedAd(adUnitId).then(onRewarded)
+  //      IronSource: ironSource.showRewardedVideo().then(onRewarded)
+  // onRewarded is called only after the user successfully watches the ad.
+  const showRewardedAd = (onRewarded) => {
+    // PLACEHOLDER — remove the line below and wire in your real ad SDK
+    console.log("[AD] showRewardedAd called — integrate your ad SDK here");
+    onRewarded(); // <-- remove this when real ad SDK is integrated
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   };
 
   // Start a 4-hour mining session (requires watching a rewarded ad).
@@ -5415,6 +6040,7 @@ function MainApp({user,onLogout,lang,setLang}){
     if (mineStarted) return;
     showRewardedAd(() => {
       const now = Date.now();
+<<<<<<< HEAD
       const banked = tasksDone.__pre_mine_deduct || 0;
       const effSession = Math.max(0, MINE_SESSION_S - banked);
       setMSAt(now);
@@ -5432,6 +6058,11 @@ function MainApp({user,onLogout,lang,setLang}){
         __mine_eff_session: effSession,
         __pre_mine_deduct: 0,
       };
+=======
+      setMSAt(now);
+      setMS(true); setMineT(MINE_SESSION_S); setMineBoosts(0); setMR(false);
+      const newTD = {...tasksDone, __mine_startedAt: now, __mine_boosts: 0};
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       setTD(newTD);
       fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
@@ -5479,11 +6110,17 @@ function MainApp({user,onLogout,lang,setLang}){
         </div>
         {/* Stats Grid */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+<<<<<<< HEAD
           {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐",isLogo:false},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:null,isLogo:true},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡",isLogo:false}].map(s=>(
             <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
               <div style={{display:"flex",justifyContent:"center",alignItems:"center",width:28,height:28,margin:"0 auto",padding:0,overflow:"hidden",borderRadius:8}}>
                 {s.isLogo ? <WishLogo size={28} radius={8}/> : <span style={{fontSize:22}}>{s.icon}</span>}
               </div>
+=======
+          {[{label:L("totalPts"),val:u.pts.toLocaleString(),icon:"⭐"},{label:L("usdBal"),val:(u.tokens??0).toLocaleString(),icon:"🪙"},{label:"Spins Left",val:(Date.now()>=spinNextFree?1:0)+extraSpins,icon:"🎡"}].map(s=>(
+            <div key={s.label} style={{background:C.s2,borderRadius:14,padding:"12px 10px",textAlign:"center",border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:22}}>{s.icon}</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
               <div style={{fontSize:16,fontWeight:800,color:C.brandLt,marginTop:2}}>{s.val}</div>
               <div style={{fontSize:11,color:C.muted,marginTop:1}}>{s.label}</div>
             </div>
@@ -5516,9 +6153,15 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:10,color:C.muted}}>{mineStarted?`≈${(MINE_PTS_HOUR/3600).toFixed(2)} pts/sec`:"base earnings"}</div>
             </div>
             <div style={{background:"rgba(245,158,11,.1)",borderRadius:12,padding:"11px 13px",border:"1px solid rgba(245,158,11,.18)"}}>
+<<<<<<< HEAD
               <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Boosts Left</div>
               <div style={{fontSize:20,fontWeight:800,color:C.gold}}>{adLeft}/5</div>
               <div style={{fontSize:10,color:C.muted}}>this session</div>
+=======
+              <div style={{fontSize:11,color:C.muted,marginBottom:3}}>Boost Bonus</div>
+              <div style={{fontSize:20,fontWeight:800,color:C.gold}}>{(mineBoosts*MINE_BOOST_PTS).toLocaleString()} pts</div>
+              <div style={{fontSize:10,color:C.muted}}>{mineBoosts}/{MINE_MAX_BOOST} boosts used</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </div>
           </div>
           {/* Timer (active, not ready) */}
@@ -5544,6 +6187,7 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:13,color:C.muted,marginTop:2}}>+{mineAccum.toLocaleString()} pts ready to claim</div>
             </div>
           )}
+<<<<<<< HEAD
           {/* Time credit badge — shown when deductions are banked and mining not started */}
           {!mineStarted&&(tasksDone.__pre_mine_deduct||0)>0&&(
             <div style={{marginBottom:10,background:"rgba(245,158,11,.12)",borderRadius:12,padding:"10px 14px",border:"1px solid rgba(245,158,11,.35)",display:"flex",alignItems:"center",gap:8}}>
@@ -5554,6 +6198,8 @@ function MainApp({user,onLogout,lang,setLang}){
               </div>
             </div>
           )}
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           {/* Primary action button */}
           {!mineStarted ? (
             <button onClick={startMiningWithAd} style={{width:"100%",background:"linear-gradient(135deg,#f59e0b,#d97706)",border:"none",borderRadius:14,padding:"15px",color:"#000",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 6px 24px rgba(245,158,11,.45)",display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all .2s"}}>
@@ -5568,6 +6214,7 @@ function MainApp({user,onLogout,lang,setLang}){
               ⛏️ Mining in Progress…
             </div>
           )}
+<<<<<<< HEAD
           {/* Boost button — always visible, calls watchAd for pts/time reward */}
           <div style={{marginTop:14}}>
             <button onClick={watchAd} disabled={adLeft<=0}
@@ -5577,6 +6224,28 @@ function MainApp({user,onLogout,lang,setLang}){
               <span style={{background:"rgba(0,0,0,.25)",borderRadius:20,padding:"2px 10px",fontSize:12,color:adLeft<=0?C.muted:C.gold,fontWeight:800}}>{adLeft}/5</span>
             </button>
           </div>
+=======
+          {/* Boost buttons — only available during active session */}
+          {mineStarted&&!mineReady&&(
+            <div style={{marginTop:14}}>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8,textTransform:"uppercase",letterSpacing:.08,display:"flex",alignItems:"center",gap:6}}>
+                <span>⚡ Boost Mining</span>
+                <span style={{color:C.gold}}>(+{MINE_BOOST_PTS} pts each, watch ad)</span>
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                {[0,1,2,3,4].map(i=>{
+                  const used = i < mineBoosts;
+                  const next = i === mineBoosts;
+                  return(
+                    <button key={i} onClick={()=>next&&boostMining()} disabled={used||!next} style={{flex:1,background:used?"rgba(16,185,129,.2)":next?"rgba(139,92,246,.2)":"rgba(255,255,255,.04)",border:`1px solid ${used?"rgba(16,185,129,.4)":next?"rgba(139,92,246,.4)":"rgba(255,255,255,.08)"}`,borderRadius:10,padding:"9px 0",color:used?C.green:next?C.brandLt:C.muted,fontSize:13,fontWeight:700,cursor:next?"pointer":"default",transition:"all .2s"}}>
+                      {used?"✓":"⚡"}<br/><span style={{fontSize:9,letterSpacing:.5}}>+500</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         </div>
       </div>
     ),
@@ -5587,8 +6256,13 @@ function MainApp({user,onLogout,lang,setLang}){
       const msLeft=spinNextFree-now;
       const hLeft=Math.floor(msLeft/3600000);
       const mLeft=Math.floor((msLeft%3600000)/60000);
+<<<<<<< HEAD
       const freeLabel=hasFree?"Free spin ready!":
         `Next free spin in ${hLeft}h ${mLeft}m`;
+=======
+      const freeLabel=hasFree?"🟢 Free spin ready!":
+        `🕐 Next free spin in ${hLeft}h ${mLeft}m`;
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       return(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{background:`linear-gradient(160deg,${C.s2},${C.s3})`,borderRadius:20,padding:20,border:`1px solid ${C.border}`,overflow:"hidden",position:"relative"}}>
@@ -5598,16 +6272,27 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{background:"rgba(139,92,246,.18)",borderRadius:20,padding:"3px 10px",fontSize:12,fontWeight:700,color:C.brandLt}}>{spinsLeft} spin{spinsLeft!==1?"s":""}</div>
           </div>
           <div style={{fontSize:12,color:hasFree?C.green:C.muted,marginBottom:4}}>{freeLabel}</div>
+<<<<<<< HEAD
           <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Win 500 – 20,000 pts per spin!</div>
+=======
+          <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Win up to 500 pts & cash prizes!</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           <div style={{display:"flex",justifyContent:"center",marginBottom:16,transform:"scale(1.15)",transformOrigin:"center top"}}>
             <SpinWheel angle={spinAngle} spinning={spinning} phase="points"/>
           </div>
           {spinResult&&!spinning&&(
+<<<<<<< HEAD
             <div style={{textAlign:"center",background:spinResult.isJackpot?`linear-gradient(135deg,rgba(255,215,0,.25),rgba(245,158,11,.25))`:`linear-gradient(135deg,rgba(245,158,11,.2),rgba(139,92,246,.2))`,border:`2px solid ${spinResult.isJackpot?"#FFD700":C.gold+"50"}`,borderRadius:12,padding:"14px 16px",marginBottom:12,animation:"popIn .4s ease",boxShadow:spinResult.isJackpot?"0 0 30px rgba(255,215,0,.35)":"none"}}>
               {spinResult.isJackpot&&<div style={{fontSize:36,marginBottom:4}}>🏆</div>}
               {spinResult.isJackpot&&<div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#FFD700",marginBottom:4}}>JACKPOT!</div>}
               <div style={{fontWeight:800,fontSize:spinResult.isJackpot?22:16,color:spinResult.isJackpot?"#FFD700":C.gold}}>+{spinResult.pts.toLocaleString()} pts</div>
               <div style={{fontSize:13,color:C.muted,marginTop:2}}>Added to your balance!</div>
+=======
+            <div style={{textAlign:"center",background:`linear-gradient(135deg,rgba(245,158,11,.2),rgba(139,92,246,.2))`,border:`1px solid ${C.gold}50`,borderRadius:12,padding:"12px 16px",marginBottom:12,animation:"popIn .4s ease"}}>
+              <div style={{fontSize:22,marginBottom:4}}>🎉</div>
+              <div style={{fontWeight:800,fontSize:16,color:C.gold}}>+{spinResult.pts} pts</div>
+              <div style={{fontSize:13,color:C.muted}}>& +${spinResult.usd.toFixed(2)} USD added!</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </div>
           )}
           <button onClick={doSpin} disabled={spinning||spinsLeft<=0}
@@ -5617,6 +6302,7 @@ function MainApp({user,onLogout,lang,setLang}){
               boxShadow:spinning||spinsLeft<=0?"none":`0 4px 20px rgba(245,158,11,.35)`,
               opacity:spinsLeft<=0&&!spinning?.5:1,
             }}>
+<<<<<<< HEAD
             {spinning?"Spinning…":spinsLeft>0?"Spin Now!":"No Spins — Watch Ad to Play"}
           </button>
           {!hasFree&&spinsLeft===0&&!spinning&&(
@@ -5624,6 +6310,14 @@ function MainApp({user,onLogout,lang,setLang}){
               style={{marginTop:10,width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"13px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",boxShadow:`0 3px 14px rgba(139,92,246,.28)`,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
               Watch Ad → Get 1 Spin
+=======
+            {spinning?"⏳ Spinning…":spinsLeft>0?"🎰 Spin Now!":"No Spins — Watch Ad to Play"}
+          </button>
+          {!hasFree&&spinsLeft===0&&!spinning&&(
+            <button onClick={watchSpinAd}
+              style={{marginTop:10,width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"13px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",boxShadow:`0 3px 14px rgba(139,92,246,.28)`}}>
+              📺 Watch Ad → Get 1 Spin
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </button>
           )}
         </div>
@@ -5641,8 +6335,27 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:12,color:C.muted}}>{t.action}</div>
             </div>
             <div style={{textAlign:"right"}}>
+<<<<<<< HEAD
               <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{t.coins} WISH</div>
               <button onClick={()=>doneTask(t.id,t.coins)} disabled={!!tasksDone[t.id]} style={{marginTop:4,background:tasksDone[t.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:tasksDone[t.id]?"default":"pointer"}}>{tasksDone[t.id]?"✓ Done":"Do"}</button>
+=======
+              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{t.pts}</div>
+              <button onClick={()=>doneTask(t.id,t.pts)} disabled={!!tasksDone[t.id]} style={{marginTop:4,background:tasksDone[t.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:tasksDone[t.id]?"default":"pointer"}}>{tasksDone[t.id]?"✓ Done":"Do"}</button>
+            </div>
+          </div>
+        ))}
+        <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,marginTop:6,letterSpacing:1}}>JOIN & EARN</div>
+        {SOCIAL_JOINS.map(j=>(
+          <div key={j.id} style={{background:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:10,border:`1px solid ${joinsDone[j.id]?C.green:C.border}`,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:40,height:40,borderRadius:12,background:(PL[j.platform]||C.brand)+"22",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,overflow:"hidden"}}>{LOGOS[j.platform]||<span style={{fontSize:20}}>{PE[j.platform]}</span>}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:600,color:C.white}}>{j.platform}</div>
+              <div style={{fontSize:12,color:C.muted}}>Join our channel</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.gold}}>+{j.pts}</div>
+              <button onClick={()=>doneJoin(j.id,j.pts)} disabled={!!joinsDone[j.id]} style={{marginTop:4,background:joinsDone[j.id]?C.green:C.brand,border:"none",borderRadius:8,padding:"4px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:joinsDone[j.id]?"default":"pointer"}}>{joinsDone[j.id]?"✓ Joined":"Join"}</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </div>
           </div>
         ))}
@@ -5651,6 +6364,7 @@ function MainApp({user,onLogout,lang,setLang}){
     leaders:(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>TOP EARNERS</div>
+<<<<<<< HEAD
         {[...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,country:u.country||"🌍",isMe:true}]
           .sort((a,b)=>(b.pts||0)-(a.pts||0))
           .map((l,i)=>(
@@ -5661,6 +6375,16 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
             </div>
           ))}
+=======
+        {[...FAKE_LEADERS.slice(0,-1),{...FAKE_LEADERS[FAKE_LEADERS.length-1],name:u.name,pts:u.pts,country:u.country,isMe:true}].map((l,i)=>(
+          <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12}}>
+            <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
+            <div style={{fontSize:22}}>{l.country}</div>
+            <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
+            <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+          </div>
+        ))}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       </div>
     ),
     wallet:(
@@ -5685,12 +6409,18 @@ function MainApp({user,onLogout,lang,setLang}){
           <div style={{position:"absolute",bottom:-30,right:-30,width:130,height:130,borderRadius:"50%",background:"radial-gradient(circle,rgba(139,92,246,.2),transparent 70%)",pointerEvents:"none"}}/>
           <div style={{padding:"28px 20px 24px",textAlign:"center",position:"relative"}}>
             {/* animated coin */}
+<<<<<<< HEAD
             <div style={{width:64,height:64,borderRadius:'50%',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',padding:0,margin:"0 auto 10px",flexShrink:0,
               animation:convSuccess?"coin-drop .5s ease":"float 3s ease infinite",
               filter:convSuccess?`drop-shadow(0 0 18px ${C.gold})`:`drop-shadow(0 0 10px rgba(245,158,11,.5))`,
               boxShadow:'0 0 24px rgba(245,158,11,.4)'}}>
               <WishLogo size={64} radius={32}/>
             </div>
+=======
+            <div style={{fontSize:56,lineHeight:1,marginBottom:10,
+              animation:convSuccess?"coin-drop .5s ease":"float 3s ease infinite",
+              filter:convSuccess?`drop-shadow(0 0 18px ${C.gold})`:`drop-shadow(0 0 10px rgba(245,158,11,.5))`}}>🪙</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,.55)",textTransform:"uppercase",letterSpacing:1.2,marginBottom:4}}>Total Wish Tokens</div>
             <div style={{fontSize:44,fontWeight:900,letterSpacing:-2,
               background:`linear-gradient(135deg,${C.goldLt},${C.gold})`,
@@ -5698,10 +6428,14 @@ function MainApp({user,onLogout,lang,setLang}){
               lineHeight:1.1}}>
               {tokens.toLocaleString()}
             </div>
+<<<<<<< HEAD
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:5,fontSize:12,color:"rgba(255,255,255,.35)",marginTop:6}}>
               <span style={{width:14,height:14,borderRadius:4,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}><WishLogo size={14} radius={4}/></span>
               Wish Tokens in your vault
             </div>
+=======
+            <div style={{fontSize:12,color:"rgba(255,255,255,.35)",marginTop:6}}>🪙 Wish Tokens in your vault</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
         </div>
 
@@ -5732,20 +6466,29 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:28,fontWeight:900,letterSpacing:-1,
                 background:`linear-gradient(135deg,${C.goldLt},${C.gold})`,
                 WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{canMint.toLocaleString()}</div>
+<<<<<<< HEAD
               <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:4,marginTop:3}}>
                 <div style={{width:14,height:14,borderRadius:4,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}><WishLogo size={14} radius={4}/></div>
                 <span style={{fontSize:11,color:"rgba(245,158,11,.6)"}}>Tokens</span>
               </div>
+=======
+              <div style={{fontSize:11,color:"rgba(245,158,11,.6)",marginTop:3}}>🪙 Tokens</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </div>
           </div>
 
           {/* rate pill */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:16}}>
             <div style={{height:1,flex:1,background:C.border}}/>
+<<<<<<< HEAD
             <div style={{fontSize:11,color:C.muted,background:C.s3,borderRadius:99,padding:"3px 10px",border:`1px solid ${C.border}`,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
               {PTS_PER_TOKEN.toLocaleString()} pts = 1
               <span style={{width:14,height:14,borderRadius:4,overflow:"hidden",flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",padding:0,verticalAlign:"middle"}}><WishLogo size={14} radius={4}/></span>
               Wish Token
+=======
+            <div style={{fontSize:11,color:C.muted,background:C.s3,borderRadius:99,padding:"3px 10px",border:`1px solid ${C.border}`,whiteSpace:"nowrap"}}>
+              {PTS_PER_TOKEN.toLocaleString()} pts = 1 🪙 Wish Token
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </div>
             <div style={{height:1,flex:1,background:C.border}}/>
           </div>
@@ -5788,12 +6531,16 @@ function MainApp({user,onLogout,lang,setLang}){
                 : "none"
           }}
         >
+<<<<<<< HEAD
           {convSuccess ? "✅  Tokens Added to Vault!" : canMint>0
             ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                 <span style={{width:22,height:22,borderRadius:6,overflow:"hidden",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}><WishLogo size={22} radius={6}/></span>
                 {L("convBtn")}
               </span>
             : L("convNone")}
+=======
+          {convSuccess ? "✅  Tokens Added to Vault!" : canMint>0 ? "🪙  "+L("convBtn") : "⭐  "+L("convNone")}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         </button>
         {canMint>0&&!convSuccess&&(
           <div style={{textAlign:"center",fontSize:11,color:C.muted,marginTop:8}}>
@@ -5804,6 +6551,7 @@ function MainApp({user,onLogout,lang,setLang}){
         {/* ── Stats strip ── */}
         <div style={{display:"flex",gap:10,marginTop:18}}>
           {[
+<<<<<<< HEAD
             {label:"Points Balance",val:u.pts.toLocaleString(),icon:"⭐",isLogo:false,col:C.brandLt},
             {label:"Tokens Owned",val:tokens.toLocaleString(),icon:null,isLogo:true,col:C.gold},
           ].map(s=>(
@@ -5812,6 +6560,14 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{display:"flex",alignItems:"center",justifyContent:"center",width:28,height:28,margin:"0 auto 4px",padding:0,overflow:"hidden",borderRadius:8}}>
                 {s.isLogo ? <WishLogo size={28} radius={8}/> : <span style={{fontSize:20}}>{s.icon}</span>}
               </div>
+=======
+            {label:"Points Balance",val:u.pts.toLocaleString(),icon:"⭐",col:C.brandLt},
+            {label:"Tokens Owned",val:tokens.toLocaleString(),icon:"🪙",col:C.gold},
+          ].map(s=>(
+            <div key={s.label} style={{flex:1,background:C.s2,borderRadius:14,padding:"14px 12px",
+              border:`1px solid ${C.border}`,textAlign:"center"}}>
+              <div style={{fontSize:20,marginBottom:4}}>{s.icon}</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
               <div style={{fontSize:18,fontWeight:800,color:s.col}}>{s.val}</div>
               <div style={{fontSize:10,color:C.muted,marginTop:2}}>{s.label}</div>
             </div>
@@ -5859,6 +6615,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Display Name</div>
             <div style={{display:"flex",gap:8}}>
               <input value={editName} onChange={e=>setEN(e.target.value)} style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="Your name"/>
+<<<<<<< HEAD
               <button onClick={()=>{if(editName.trim()){saveProfileField({name:editName.trim()});setPMsg("Name updated!");}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.brand,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Save</button>
             </div>
           </div>
@@ -5867,10 +6624,24 @@ function MainApp({user,onLogout,lang,setLang}){
           <div style={{marginBottom:12}}>
             <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Email Address</div>
             <div style={{background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,borderRadius:10,padding:"10px 12px",fontSize:13,color:C.muted,userSelect:"all"}}>{u.email}</div>
+=======
+              <button onClick={()=>{if(editName.trim()){setU(p=>({...p,name:editName.trim()}));setPMsg("Name updated!");}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.brand,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Save</button>
+            </div>
+          </div>
+
+          {/* Email */}
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Email Address</div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={editEmail} onChange={e=>setEE(e.target.value)} type="email" style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="you@email.com"/>
+              <button onClick={()=>{if(editEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){setU(p=>({...p,email:editEmail}));setPMsg("Email updated!");}else setPMsg("Invalid email!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.brand,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>Save</button>
+            </div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
 
           {/* Password */}
           <div>
+<<<<<<< HEAD
             <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>Change Password</div>
             <input value={editCurrPass} onChange={e=>setECP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Current password"/>
             <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="New password (min 6 characters)"/>
@@ -5880,6 +6651,11 @@ function MainApp({user,onLogout,lang,setLang}){
               if(editPass.length<6){setPMsg("New password must be at least 6 characters.");setTimeout(()=>setPMsg(""),2500);return;}
               saveProfileField({pass:editPass});setEP("");setECP("");setPMsg("Password updated!");setTimeout(()=>setPMsg(""),2500);
             }} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>🔒 Update Password</button>
+=======
+            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6,textTransform:"uppercase",letterSpacing:.08}}>New Password</div>
+            <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Min 6 characters"/>
+            <button onClick={()=>{if(editPass.length>=6){setU(p=>({...p,pass:editPass}));setEP("");setPMsg("Password updated!");}else setPMsg("Min 6 characters!");setTimeout(()=>setPMsg(""),2500);}} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>🔒 Update Password</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
 
           {profileMsg&&(
@@ -5948,7 +6724,29 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
             <div style={{width:22,height:2,background:C.white,borderRadius:2}}/>
           </button>
+<<<<<<< HEAD
           <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{APP_NAME}</div>
+=======
+          <div style={{fontSize:20,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{position:"relative"}}>
+            <button onClick={()=>setLM(p=>!p)} style={{background:C.s2,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.white,fontSize:13,cursor:"pointer"}}>{(LANGS[lang]||LANGS.en).flag} {lang.toUpperCase()}</button>
+            {langMenu&&(
+              <div style={{position:"absolute",right:0,top:"110%",background:C.s2,border:`1px solid ${C.border}`,borderRadius:10,zIndex:99,minWidth:140,overflow:"hidden"}}>
+                {Object.entries(LANGS).map(([k,v])=>(
+                  <button key={k} onClick={()=>{
+                    setLang(k);setLM(false);
+                    Security.save('lang',k);
+                    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+                      body:JSON.stringify({id:u.id,email:u.email,lang:k})
+                    }).catch(()=>{});
+                  }} style={{display:"block",width:"100%",padding:"8px 12px",background:"none",border:"none",color:lang===k?C.brandLt:C.white,cursor:"pointer",textAlign:"left",fontSize:13}}>{v.flag} {v.name}</button>
+                ))}
+              </div>
+            )}
+          </div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         </div>
       </div>
       {/* Content */}
@@ -5978,21 +6776,34 @@ function MainApp({user,onLogout,lang,setLang}){
           // 1. Resize to max 400 px on the client so the payload stays small
           const img=new Image();
           img.onload=()=>{
+<<<<<<< HEAD
             const MAX=150;
+=======
+            const MAX=400;
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             const scale=Math.min(MAX/img.width,MAX/img.height,1);
             const cvs=document.createElement("canvas");
             cvs.width=Math.round(img.width*scale);
             cvs.height=Math.round(img.height*scale);
             cvs.getContext("2d").drawImage(img,0,0,cvs.width,cvs.height);
+<<<<<<< HEAD
             const dataUrl=cvs.toDataURL("image/jpeg",0.72);
+=======
+            const dataUrl=cvs.toDataURL("image/jpeg",0.85);
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             // 2. Show local preview immediately so the user sees feedback at once
             setU(p=>({...p,avatar:dataUrl}));
             setAP(false);
             // 3. Upload to Supabase Storage — get back a permanent public URL,
             //    then save it to the DB immediately (don't rely on auto-save,
             //    which would send the huge data-URL and get rejected).
+<<<<<<< HEAD
             fetch("/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
               body:JSON.stringify({action:"uploadAvatar",userId:u.id,imageData:dataUrl})
+=======
+            fetch("/api/upload-avatar",{method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({userId:u.id,imageData:dataUrl,mimeType:"image/jpeg"})
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             })
             .then(r=>r.json())
             .then(d=>{
@@ -6011,6 +6822,7 @@ function MainApp({user,onLogout,lang,setLang}){
         rd.readAsDataURL(f);
         e.target.value="";
       }}/>
+<<<<<<< HEAD
       {/* Announcement Toast */}
       {annToast&&(
         <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:C.s2,border:`1px solid ${C.brand}`,borderRadius:16,padding:"12px 16px",boxShadow:"0 4px 24px rgba(0,0,0,.5)",display:"flex",alignItems:"center",gap:12,maxWidth:380,width:"calc(100% - 32px)",animation:"popIn .3s ease",cursor:"pointer"}} onClick={()=>{setAnnToast(null);localStorage.setItem('wish_ann_seen',Date.now().toString());annToastShown.current=false;setSV("announcements");}}>
@@ -6023,6 +6835,8 @@ function MainApp({user,onLogout,lang,setLang}){
           <button onClick={e=>{e.stopPropagation();setAnnToast(null);}} style={{background:"none",border:"none",color:C.muted,fontSize:18,cursor:"pointer",lineHeight:1,padding:"4px",flexShrink:0}}>✕</button>
         </div>
       )}
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       {/* Sidebar Overlay */}
       {sidebarOpen&&(
         <>
@@ -6030,7 +6844,11 @@ function MainApp({user,onLogout,lang,setLang}){
           <div className="menu-drawer" style={{animation:"slideL .25s ease both"}}>
             {/* Sidebar Header */}
             <div style={{padding:"20px 24px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid rgba(139,92,246,.15)`}}>
+<<<<<<< HEAD
               <div style={{fontSize:18,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{APP_NAME}</div>
+=======
+              <div style={{fontSize:18,fontWeight:800,background:`linear-gradient(90deg,${C.brandLt},${C.pink})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>⭐ {APP_NAME}</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
               <button onClick={()=>setSO(false)} style={{background:"none",border:"none",color:C.muted,fontSize:20,cursor:"pointer",lineHeight:1,padding:4}}>✕</button>
             </div>
             {/* User info */}
@@ -6049,6 +6867,7 @@ function MainApp({user,onLogout,lang,setLang}){
             {/* Menu Items */}
             <div style={{flex:1,overflowY:"auto",paddingTop:8}}>
               {(()=>{
+<<<<<<< HEAD
                 const lastSeen = Number(localStorage.getItem('wish_ann_seen')||0);
                 const unread = annList.filter(a=>new Date(a.sentAt).getTime()>lastSeen).length;
                 const menuSVG={
@@ -6071,12 +6890,28 @@ function MainApp({user,onLogout,lang,setLang}){
                 ].map(item=>(
                   <button key={item.label} className="menu-item" style={item.comingSoon?{opacity:0.6,cursor:"default"}:{}} onClick={()=>{
                     if(item.comingSoon){return;}
+=======
+                const anns = (()=>{try{return JSON.parse(localStorage.getItem('wish_announcements')||'[]');}catch{return [];}})();
+                const lastSeen = Number(localStorage.getItem('wish_ann_seen')||0);
+                const unread = anns.filter(a=>new Date(a.sentAt).getTime()>lastSeen).length;
+                return [
+                  {icon:"👤",label:"Profile"},
+                  {icon:"🏆",label:"Leader Board"},
+                  {icon:"👥",label:"Referral Team"},
+                  {icon:"📢",label:"Announcement",badge:unread},
+                  {icon:"📄",label:"White Paper"},
+                  {icon:"🎧",label:"Support Portal"},
+                  {icon:"🔐",label:"Security"},
+                ].map(item=>(
+                  <button key={item.label} className="menu-item" onClick={()=>{
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                     if(item.label==="Profile"){setSO(false);setSV("profile");}
                     else if(item.label==="Leader Board"){setSO(false);setSV("leaders");}
                     else if(item.label==="Security"){setSO(false);setSV("security");}
                     else if(item.label==="Referral Team"){setSO(false);setSV("referral");}
                     else if(item.label==="Announcement"){
                       localStorage.setItem('wish_ann_seen', Date.now().toString());
+<<<<<<< HEAD
                       annToastShown.current = false;
                       setAnnToast(null);
                       fetch('/api/announcements').then(r=>r.ok?r.json():null).then(d=>{if(d?.announcements)setAnnList(d.announcements);}).catch(()=>{});
@@ -6086,26 +6921,40 @@ function MainApp({user,onLogout,lang,setLang}){
                     else setSO(false);
                   }}>
                     <span style={{display:"flex",alignItems:"center",justifyContent:"center",width:22,color:"rgba(139,92,246,.85)"}}>{menuSVG[item.label]}</span>
+=======
+                      setSO(false);setSV("announcements");
+                    }
+                    else setSO(false);
+                  }}>
+                    <span style={{fontSize:20}}>{item.icon}</span>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                     <span style={{flex:1}}>{item.label}</span>
                     {item.badge>0&&(
                       <span style={{background:"#ef4444",color:"#fff",fontSize:11,fontWeight:800,borderRadius:99,padding:"2px 7px",marginRight:6,minWidth:20,textAlign:"center"}}>
                         {item.badge}
                       </span>
                     )}
+<<<<<<< HEAD
                     {item.comingSoon
                       ? <span style={{background:"rgba(139,92,246,.25)",color:"#a78bfa",fontSize:10,fontWeight:700,borderRadius:99,padding:"3px 8px",marginRight:6,letterSpacing:"0.04em",textTransform:"uppercase"}}>Soon</span>
                       : <span style={{color:C.muted,fontSize:18}}>›</span>
                     }
+=======
+                    <span style={{color:C.muted,fontSize:18}}>›</span>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                   </button>
                 ));
               })()}
             </div>
+<<<<<<< HEAD
             {/* Logout Button */}
             <div style={{padding:"16px 24px 24px",borderTop:`1px solid rgba(139,92,246,.1)`}}>
               <button onClick={()=>{setSO(false);setLD(true);}} style={{width:"100%",background:"rgba(239,68,68,.12)",border:"1px solid rgba(239,68,68,.3)",borderRadius:12,padding:"13px",color:"#f87171",fontWeight:700,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
                 👋 Logout
               </button>
             </div>
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
         </>
       )}
@@ -6244,7 +7093,11 @@ function MainApp({user,onLogout,lang,setLang}){
                 {editingField==="name"&&(
                   <div style={{display:"flex",gap:8,marginTop:12}}>
                     <input value={editName} onChange={e=>setEN(e.target.value)} style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="Your display name"/>
+<<<<<<< HEAD
                     <button onClick={()=>{if(editName.trim()){saveProfileField({name:editName.trim()});setPMsg("Name updated!");setEF(null);}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+=======
+                    <button onClick={()=>{if(editName.trim()){setU(p=>({...p,name:editName.trim()}));setPMsg("Name updated!");setEF(null);}else setPMsg("Name can't be empty!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                   </div>
                 )}
               </div>
@@ -6256,6 +7109,7 @@ function MainApp({user,onLogout,lang,setLang}){
                     <div style={{fontSize:15,fontWeight:700,color:C.white}}>Change Email</div>
                     <div style={{fontSize:12,color:C.muted,marginTop:3}}>Update your email address for account access.</div>
                   </div>
+<<<<<<< HEAD
                   <button onClick={()=>{if(ecStep>0){setECS(0);setECC("");setECN("");setECO("");setECT("");setECE("");}else setECS(1);}} style={{background:ecStep>0?"rgba(255,255,255,.1)":C.brand,border:ecStep>0?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:ecStep>0?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{ecStep>0?"CANCEL":"CHANGE"}</button>
                 </div>
                 {ecStep===1&&(
@@ -6327,6 +7181,14 @@ function MainApp({user,onLogout,lang,setLang}){
                       }catch(e){setECE("Network error.");}
                       setECB(false);
                     }} style={{marginTop:8,background:"none",border:"none",color:C.brandLt,fontSize:12,cursor:"pointer",fontFamily:"inherit",padding:0}}>Resend code</button>
+=======
+                  <button onClick={()=>setEF(editingField==="email"?null:"email")} style={{background:editingField==="email"?"rgba(255,255,255,.1)":C.brand,border:editingField==="email"?`1px solid ${C.border}`:"none",borderRadius:8,padding:"7px 16px",color:editingField==="email"?C.muted:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0}}>{editingField==="email"?"CANCEL":"CHANGE"}</button>
+                </div>
+                {editingField==="email"&&(
+                  <div style={{display:"flex",gap:8,marginTop:12}}>
+                    <input value={editEmail} onChange={e=>setEE(e.target.value)} type="email" style={{flex:1,background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit"}} placeholder="you@email.com"/>
+                    <button onClick={()=>{if(editEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)){setU(p=>({...p,email:editEmail}));setPMsg("Email updated!");setEF(null);}else setPMsg("Invalid email!");setTimeout(()=>setPMsg(""),2500);}} style={{background:C.green,border:"none",borderRadius:10,padding:"10px 16px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                   </div>
                 )}
               </div>
@@ -6342,6 +7204,7 @@ function MainApp({user,onLogout,lang,setLang}){
                 </div>
                 {editingField==="pass"&&(
                   <div style={{marginTop:12}}>
+<<<<<<< HEAD
                     <input value={editCurrPass} onChange={e=>setECP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Current password"/>
                     <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="New password (min 6 characters)"/>
                     <button onClick={()=>{
@@ -6350,6 +7213,10 @@ function MainApp({user,onLogout,lang,setLang}){
                       if(editPass.length<6){setPMsg("New password must be at least 6 characters.");setTimeout(()=>setPMsg(""),2500);return;}
                       saveProfileField({pass:editPass});setEP("");setECP("");setPMsg("Password updated!");setEF(null);setTimeout(()=>setPMsg(""),2500);
                     }} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE PASSWORD</button>
+=======
+                    <input value={editPass} onChange={e=>setEP(e.target.value)} type="password" style={{width:"100%",background:"rgba(139,92,246,.07)",border:`1.5px solid ${C.border2}`,color:"#fff",borderRadius:10,padding:"10px 12px",fontSize:13,outline:"none",fontFamily:"inherit",marginBottom:8}} placeholder="Min 6 characters"/>
+                    <button onClick={()=>{if(editPass.length>=6){setU(p=>({...p,pass:editPass}));setEP("");setPMsg("Password updated!");setEF(null);}else setPMsg("Min 6 characters!");setTimeout(()=>setPMsg(""),2500);}} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:10,padding:"11px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>SAVE PASSWORD</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                   </div>
                 )}
               </div>
@@ -6363,6 +7230,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:12,fontWeight:700,color:C.muted,textTransform:"uppercase",letterSpacing:.1,marginBottom:10,padding:"0 4px"}}>Account Verification</div>
             <div style={{background:C.s2,borderRadius:16,marginBottom:24,border:`1px solid ${C.border}`,overflow:"hidden"}}>
               {/* Email Verify */}
+<<<<<<< HEAD
               <div style={{padding:"16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
                 <div style={{flex:1}}>
                   <div style={{fontSize:15,fontWeight:700,color:C.white}}>Email</div>
@@ -6372,6 +7240,15 @@ function MainApp({user,onLogout,lang,setLang}){
                   <span style={{fontSize:13}}>✓</span>
                   <span style={{fontSize:12,fontWeight:700,color:C.green}}>Verified</span>
                 </div>
+=======
+              <div style={{padding:"16px",display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:15,fontWeight:700,color:C.white}}>Email</div>
+                  <div style={{fontSize:13,color:C.brandLt,marginTop:2}}>{u.email}</div>
+                  <div style={{fontSize:11,color:C.muted,marginTop:4}}>Link your email for communication and account recovery.</div>
+                </div>
+                <button style={{background:C.cyan,border:"none",borderRadius:8,padding:"7px 16px",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",flexShrink:0,marginTop:2}}>VERIFY</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
               </div>
               <div style={{height:1,background:C.border}}/>
               {/* KYC */}
@@ -6386,6 +7263,13 @@ function MainApp({user,onLogout,lang,setLang}){
                 </div>
               </div>
             </div>
+<<<<<<< HEAD
+=======
+            {/* Logout Button */}
+            <button onClick={()=>setLD(true)} style={{width:"100%",background:`linear-gradient(135deg,${C.red},#b91c1c)`,border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",boxShadow:`0 4px 20px ${C.red}40`}}>
+              👋 Logout
+            </button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
         </div>
       )}
@@ -6397,6 +7281,7 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{fontSize:18,fontWeight:800,color:C.white}}>🏆 Leaderboard</div>
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
+<<<<<<< HEAD
             {(()=>{
               const sortedLeaders=[...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,country:u.country||"🌍",isMe:true}]
                 .sort((a,b)=>(b.pts||0)-(a.pts||0));
@@ -6430,6 +7315,36 @@ function MainApp({user,onLogout,lang,setLang}){
                 ))}
               </>);
             })()}
+=======
+            {/* Top 3 podium */}
+            <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:12,marginBottom:20,padding:"12px 0"}}>
+              {[1,0,2].map(pos=>{
+                const l=FAKE_LEADERS[pos]||{name:"—",pts:0,country:"🌍"};
+                const heights=["60px","80px","48px"];
+                const colors=[`linear-gradient(135deg,${C.gold},#d97706)`,`linear-gradient(135deg,#9ca3af,#6b7280)`,`linear-gradient(135deg,#cd7c32,#92400e)`];
+                const medals=["🥇","🥈","🥉"];
+                const displayPos=[2,1,3];
+                return(
+                  <div key={pos} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
+                    <div style={{fontSize:20}}>{medals[pos]}</div>
+                    <div style={{width:44,height:44,borderRadius:"50%",background:colors[pos],display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",border:"2px solid rgba(255,255,255,.3)"}}>{l.country}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:C.white,textAlign:"center",maxWidth:70,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.name}</div>
+                    <div style={{fontSize:11,color:C.gold,fontWeight:700}}>{l.pts.toLocaleString()}</div>
+                    <div style={{width:"100%",height:heights[pos],background:colors[pos],borderRadius:"8px 8px 0 0",opacity:.4}}/>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>ALL EARNERS</div>
+            {[...FAKE_LEADERS.slice(0,-1),{...FAKE_LEADERS[FAKE_LEADERS.length-1],name:u.name,pts:u.pts,country:u.country,isMe:true}].map((l,i)=>(
+              <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12,transition:"all .2s"}}>
+                <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
+                <div style={{fontSize:22}}>{l.country}</div>
+                <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
+                <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
+              </div>
+            ))}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
         </div>
       )}
@@ -6489,11 +7404,16 @@ function MainApp({user,onLogout,lang,setLang}){
                   <div style={{flex:1,background:"rgba(139,92,246,.1)",border:"1px solid rgba(139,92,246,.35)",borderRadius:10,padding:"11px 14px",fontFamily:"monospace",fontSize:19,fontWeight:800,color:C.brandLt,letterSpacing:3}}>
                     {u.refCode||"—"}
                   </div>
+<<<<<<< HEAD
                   <button onClick={copyCode} style={{flexShrink:0,background:refCopied==="code"?"rgba(52,211,153,.2)":"rgba(139,92,246,.15)",border:`1px solid ${refCopied==="code"?"rgba(52,211,153,.5)":"rgba(139,92,246,.4)"}`,borderRadius:10,padding:"11px 16px",color:refCopied==="code"?"#34d399":C.brandLt,fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s",display:"flex",alignItems:"center",gap:6}}>
                     {refCopied==="code"
                       ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied</>
                       : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy</>
                     }
+=======
+                  <button onClick={copyCode} style={{flexShrink:0,background:refCopied==="code"?"rgba(52,211,153,.2)":"rgba(139,92,246,.15)",border:`1px solid ${refCopied==="code"?"rgba(52,211,153,.5)":"rgba(139,92,246,.4)"}`,borderRadius:10,padding:"11px 16px",color:refCopied==="code"?"#34d399":C.brandLt,fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+                    {refCopied==="code"?"✓ Copied":"📋 Copy"}
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                   </button>
                 </div>
               </div>
@@ -6505,6 +7425,7 @@ function MainApp({user,onLogout,lang,setLang}){
                   {refLink}
                 </div>
                 <div style={{display:"flex",gap:8}}>
+<<<<<<< HEAD
                   <button onClick={copyLink} style={{flex:1,background:refCopied==="link"?"rgba(52,211,153,.15)":"rgba(6,182,212,.1)",border:`1px solid ${refCopied==="link"?"rgba(52,211,153,.4)":"rgba(6,182,212,.3)"}`,borderRadius:10,padding:"10px 8px",color:refCopied==="link"?"#34d399":"#67e8f9",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                     {refCopied==="link"
                       ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied</>
@@ -6514,6 +7435,13 @@ function MainApp({user,onLogout,lang,setLang}){
                   <button onClick={shareLink} style={{flex:1,background:"linear-gradient(135deg,rgba(139,92,246,.25),rgba(236,72,153,.2))",border:"1px solid rgba(139,92,246,.4)",borderRadius:10,padding:"10px 8px",color:C.white,fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
                     Share
+=======
+                  <button onClick={copyLink} style={{flex:1,background:refCopied==="link"?"rgba(52,211,153,.15)":"rgba(6,182,212,.1)",border:`1px solid ${refCopied==="link"?"rgba(52,211,153,.4)":"rgba(6,182,212,.3)"}`,borderRadius:10,padding:"10px 8px",color:refCopied==="link"?"#34d399":"#67e8f9",fontSize:13,fontWeight:700,cursor:"pointer",transition:"all .2s"}}>
+                    {refCopied==="link"?"✓ Copied":"📋 Copy Link"}
+                  </button>
+                  <button onClick={shareLink} style={{flex:1,background:"linear-gradient(135deg,rgba(139,92,246,.25),rgba(236,72,153,.2))",border:"1px solid rgba(139,92,246,.4)",borderRadius:10,padding:"10px 8px",color:C.white,fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                    📤 Share
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                   </button>
                 </div>
               </div>
@@ -6559,6 +7487,10 @@ function MainApp({user,onLogout,lang,setLang}){
       })()}
       {/* ── Announcements view ── */}
       {sidebarView==="announcements"&&(()=>{
+<<<<<<< HEAD
+=======
+        const anns = (()=>{try{return JSON.parse(localStorage.getItem('wish_announcements')||'[]');}catch{return [];}})();
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         const typeColor={announcement:"#06b6d4",promotion:"#10b981",info:"#8b5cf6",warning:"#f59e0b"};
         const typeIcon ={announcement:"📢",promotion:"🎁",info:"ℹ️",warning:"⚠️"};
         return(
@@ -6568,14 +7500,22 @@ function MainApp({user,onLogout,lang,setLang}){
               <div style={{fontSize:18,fontWeight:800,color:C.white}}>📢 Announcements</div>
             </div>
             <div style={{flex:1,overflowY:"auto",padding:"16px 16px 40px"}}>
+<<<<<<< HEAD
               {annList.length===0?(
+=======
+              {anns.length===0?(
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                 <div style={{textAlign:"center",padding:"60px 20px"}}>
                   <div style={{fontSize:48,marginBottom:16}}>📭</div>
                   <div style={{fontSize:16,fontWeight:700,color:C.white}}>No Announcements Yet</div>
                 </div>
               ):(
                 <div style={{display:"flex",flexDirection:"column",gap:12}}>
+<<<<<<< HEAD
                   {annList.map(a=>{
+=======
+                  {anns.map(a=>{
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
                     const col=typeColor[a.type]||C.brand;
                     const icon=typeIcon[a.type]||"📢";
                     return(
@@ -6598,6 +7538,7 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
         );
       })()}
+<<<<<<< HEAD
       {/* ── White Paper view ── */}
       {sidebarView==="whitepaper"&&(
         <div style={{position:"fixed",inset:0,background:"#08090F",zIndex:150,display:"flex",flexDirection:"column",maxWidth:480,left:"50%",transform:"translateX(-50%)",width:"100%"}}>
@@ -6612,6 +7553,8 @@ function MainApp({user,onLogout,lang,setLang}){
           />
         </div>
       )}
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       {/* Spin Ad Popup — shown after free spin is consumed and no extra spins remain */}
       {spinAdPopup&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
@@ -6624,14 +7567,20 @@ function MainApp({user,onLogout,lang,setLang}){
               or wait for your free spin to reset in 24 hours.
             </div>
             <div style={{background:"rgba(139,92,246,.08)",borderRadius:12,padding:"12px",marginBottom:16,fontSize:12,color:C.muted,border:`1px solid ${C.border}`}}>📢 Sponsored content — supports the platform</div>
+<<<<<<< HEAD
             <button onClick={watchSpinAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(139,92,246,.3)",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
               Watch Ad → Get 1 Spin
+=======
+            <button onClick={watchSpinAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(139,92,246,.3)",marginBottom:10}}>
+              📺 Watch Ad → Get 1 Spin
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
             </button>
             <button onClick={()=>setSAP(false)} style={{background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Maybe later</button>
           </div>
         </div>
       )}
+<<<<<<< HEAD
       {/* Ad Claim Toast */}
       {adToast&&(
         <div style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",background:"rgba(20,20,35,.96)",border:"1px solid rgba(245,158,11,.4)",borderRadius:14,padding:"12px 20px",fontSize:13,fontWeight:700,color:C.gold,zIndex:300,whiteSpace:"nowrap",boxShadow:"0 4px 20px rgba(0,0,0,.5)",animation:"popIn .25s ease"}}>
@@ -6701,6 +7650,30 @@ function MainApp({user,onLogout,lang,setLang}){
             <div style={{height:4,background:"rgba(255,255,255,.1)",borderRadius:2,overflow:"hidden",marginBottom:4}}>
               <div style={{height:"100%",background:"linear-gradient(90deg,#f59e0b,#10b981)",borderRadius:2,transition:"width .9s linear",width:`${((testAdModal==='rewarded'?5:3)-testAdCountdown)/(testAdModal==='rewarded'?5:3)*100}%`}}/>
             </div>
+=======
+      {/* Ad Modal */}
+      {adShowing&&adData&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:24,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:60,marginBottom:8}}>{adData.emoji}</div>
+            <div style={{fontSize:18,fontWeight:700,color:C.white,marginBottom:4}}>{adData.cat} Ad</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:20}}>Watch to earn {adData.pts} pts</div>
+            <div style={{background:C.faint,borderRadius:12,padding:"16px",marginBottom:16,fontSize:13,color:C.muted}}>📢 Sponsored content</div>
+            <button onClick={claimAd} style={{width:"100%",background:`linear-gradient(135deg,${C.brand},${C.pink})`,border:"none",borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>✓ Claim +{adData.pts} pts</button>
+          </div>
+        </div>
+      )}
+      {/* Mining Ad Modal */}
+      {mineAdShow&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:99,padding:16}}>
+          <div style={{background:C.s2,borderRadius:20,padding:28,maxWidth:340,width:"100%",textAlign:"center",border:`1px solid ${C.border2}`}}>
+            <div style={{fontSize:64,marginBottom:12}}>⛏️</div>
+            <div style={{fontSize:20,fontWeight:800,color:C.white,marginBottom:6}}>Activate Mining</div>
+            <div style={{fontSize:13,color:C.muted,marginBottom:20,lineHeight:1.6}}>Watch a short sponsored ad to start your 8-hour mining session and earn <span style={{color:C.gold,fontWeight:700}}>500 pts</span>!</div>
+            <div style={{background:"rgba(139,92,246,.1)",borderRadius:12,padding:"14px",marginBottom:16,fontSize:13,color:C.muted,border:`1px solid ${C.border}`}}>📢 Sponsored content — supports the platform</div>
+            <button onClick={startMiningAfterAd} style={{width:"100%",background:`linear-gradient(135deg,${C.gold},${C.pink})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 4px 20px rgba(245,158,11,.3)"}}>⛏️ Start Mining Now</button>
+            <button onClick={()=>setMAd(false)} style={{marginTop:10,background:"none",border:"none",color:C.muted,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>Maybe later</button>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
           </div>
         </div>
       )}
@@ -6901,6 +7874,7 @@ function PinKeypad({ onKey, disabled }) {
 
 /* ═══════════════════════════════════════════════
    SPLASH SCREEN
+<<<<<<< HEAD
    Spinning ring with coin logo, star field, dot loader.
    Auto-navigates after 5.5s.
 ═══════════════════════════════════════════════ */
@@ -6998,6 +7972,72 @@ function SplashScreen({ onDone }) {
           }}/>
         ))}
       </div>
+=======
+   Pendulum-swing logo, ambient orbs, dot loader.
+   Auto-navigates after 2.6s.
+═══════════════════════════════════════════════ */
+function SplashScreen({ onDone }) {
+  useEffect(()=>{ const t=setTimeout(onDone,2600); return()=>clearTimeout(t); },[]);
+  return (
+    <div style={{
+      position:'fixed',inset:0,zIndex:9999,
+      background:'linear-gradient(160deg,#080616 0%,#13102a 52%,#0a0820 100%)',
+      display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+      fontFamily:"'Plus Jakarta Sans',sans-serif",overflow:'hidden',
+    }}>
+      {/* Ambient orbs */}
+      <div style={{position:'absolute',top:'10%',left:'8%',width:240,height:240,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(139,92,246,.18),transparent 68%)',
+        animation:'float 4.5s ease infinite',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',bottom:'16%',right:'6%',width:180,height:180,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(236,72,153,.13),transparent 68%)',
+        animation:'float 5.5s ease infinite reverse',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',top:'55%',left:'55%',width:320,height:320,borderRadius:'50%',
+        background:'radial-gradient(circle,rgba(6,182,212,.06),transparent 68%)',
+        transform:'translate(-30%,-40%)',pointerEvents:'none'}}/>
+
+      {/* Swinging logo block — transform-origin at top-center = pendulum pivot */}
+      <div style={{
+        animation:'swing 1.7s cubic-bezier(.36,.07,.19,.97) .15s both',
+        transformOrigin:'center top',
+        display:'flex',flexDirection:'column',alignItems:'center',gap:12,
+      }}>
+        <div style={{
+          fontSize:84,lineHeight:1,
+          filter:'drop-shadow(0 0 32px rgba(139,92,246,.7)) drop-shadow(0 0 14px rgba(236,72,153,.35))',
+        }}>⭐</div>
+        <div style={{
+          fontSize:48,fontWeight:900,letterSpacing:-2,
+          background:'linear-gradient(100deg,#c4b5fd 0%,#a78bfa 40%,#ec4899 100%)',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+        }}>Wish</div>
+      </div>
+
+      {/* Tagline */}
+      <div style={{
+        marginTop:16,fontSize:13,color:'rgba(255,255,255,.35)',fontWeight:500,
+        letterSpacing:2.5,textTransform:'uppercase',
+        animation:'splashFade .7s ease .95s both',
+      }}>Earn &amp; Reward Platform</div>
+
+      {/* Dot loader */}
+      <div style={{position:'absolute',bottom:76,display:'flex',gap:9}}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{
+            width:7,height:7,borderRadius:'50%',
+            background:'rgba(139,92,246,.65)',
+            animation:`dotPulse 1.15s ease ${i*.19}s infinite`,
+          }}/>
+        ))}
+      </div>
+
+      {/* Version tag */}
+      <div style={{
+        position:'absolute',bottom:34,fontSize:11,
+        color:'rgba(255,255,255,.15)',fontWeight:500,letterSpacing:.5,
+        animation:'splashFade .5s ease 1.5s both',
+      }}>v1.0.0 · Wish Platform</div>
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     </div>
   );
 }
@@ -7052,6 +8092,7 @@ function SlideToOpen({ onUnlock }) {
       {/* Hero */}
       <div style={{textAlign:'center',marginBottom:56,animation:'splashFade .6s ease .1s both'}}>
         <div style={{fontSize:64,marginBottom:10,
+<<<<<<< HEAD
           filter:'drop-shadow(0 0 22px rgba(139,92,246,.55))'}}>
           <img src={WISH_LOGO_SRC} width={64} height={64} style={{borderRadius:16,objectFit:'cover',display:'block',margin:'0 auto'}} alt="Wish"/>
         </div>
@@ -7059,6 +8100,13 @@ function SlideToOpen({ onUnlock }) {
           background:'linear-gradient(100deg,#c4b5fd,#a78bfa,#ec4899)',
           WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
           Welcome to Wish Network
+=======
+          filter:'drop-shadow(0 0 22px rgba(139,92,246,.55))'}}>⭐</div>
+        <div style={{fontSize:34,fontWeight:900,letterSpacing:-1,
+          background:'linear-gradient(100deg,#c4b5fd,#a78bfa,#ec4899)',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>
+          Welcome to Wish
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
         </div>
         <div style={{fontSize:14,color:'rgba(255,255,255,.38)',fontWeight:500,lineHeight:1.6}}>
           Your earning journey starts here
@@ -7764,6 +8812,7 @@ function SecuritySettingsView({ user }) {
      logout → auth
 ═══════════════════════════════════════════════ */
 function WishApp(){
+<<<<<<< HEAD
   const [splashDone,setSplashDone] = useState(false);
   const [loggedUser,setLU] = useState(()=>Security.load('last_user',null));
   const [lang,setLang]     = useState(()=>Security.load('lang','en'));
@@ -7786,6 +8835,16 @@ function WishApp(){
   }
 
   const isAdminUser = loggedUser.role==="super_admin"||loggedUser.role==="moderator"||loggedUser.isAdmin;
+=======
+  const [loggedUser,setLU] = useState(null);
+  const [lang,setLang]     = useState("en");
+
+  const handleLogin=(u)=>{ setLU(u); };
+  const handleLogout=()=>{ setLU(null); };
+
+  const isAdminUser = loggedUser && (loggedUser.role==="super_admin"||loggedUser.role==="moderator"||loggedUser.isAdmin);
+  if(!loggedUser) return <AuthScreen onLogin={handleLogin} lang={lang}/>;
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
   if(isAdminUser) return <AdminPanel user={loggedUser} onExit={handleLogout} lang={lang}/>;
   return <MainApp user={loggedUser} onLogout={handleLogout} lang={lang} setLang={setLang}/>;
 }

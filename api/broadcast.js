@@ -1,10 +1,13 @@
 import { Resend } from 'resend';
 import { supabase } from './db.js';
 
+<<<<<<< HEAD
 // System row used by api/announcements.js — must not appear in recipient lists
 const SYS_ID    = 'sys_notifications';
 const SYS_EMAIL = 'notifications@sys.internal';
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 // Optional key — set ADMIN_BROADCAST_KEY in env to restrict access.
 function checkAuth(req) {
   const key = process.env.ADMIN_BROADCAST_KEY;
@@ -23,8 +26,12 @@ async function fetchRecipients(audience) {
   const { data, error } = await query;
   if (error) throw new Error(`Failed to fetch recipients: ${error.message}`);
 
+<<<<<<< HEAD
   // Exclude the internal system row used for announcement storage
   let recipients = (data || []).filter(u => u.id !== SYS_ID && u.email !== SYS_EMAIL);
+=======
+  let recipients = data || [];
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 
   // Country filter (array of country emoji/codes)
   if (audience?.countries?.length) {
@@ -37,6 +44,7 @@ async function fetchRecipients(audience) {
   return recipients;
 }
 
+<<<<<<< HEAD
 // Persist the broadcast as an in-app announcement in Supabase
 const ICON_MAP  = { info:'ℹ️', warning:'⚠️', announcement:'📢', promotion:'🎁' };
 const COLOR_MAP = { info:'#8b5cf6', warning:'#f59e0b', announcement:'#06b6d4', promotion:'#10b981' };
@@ -72,6 +80,8 @@ async function pushAnnouncement({ id, type, subject, body, sentBy }) {
   }
 }
 
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 // Wrap message body in a branded email layout
 function buildHtml(subject, body, type, appName = 'Wish') {
   const accentMap = {
@@ -111,12 +121,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
+<<<<<<< HEAD
   const { subject, body, type = 'info', channel = 'email', audience, sentBy, id } = req.body || {};
+=======
+  const { subject, body, type = 'info', channel = 'email', audience, sentBy } = req.body || {};
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
 
   if (!subject?.trim()) return res.status(400).json({ success: false, error: 'subject is required' });
   if (!body?.trim())    return res.status(400).json({ success: false, error: 'body is required' });
 
   try {
+<<<<<<< HEAD
     // Always push to in-app announcement store first (works regardless of recipient count)
     await pushAnnouncement({ id, type, subject: subject.trim(), body: body.trim(), sentBy });
 
@@ -133,12 +148,27 @@ export default async function handler(req, res) {
     }
 
     // For email channel: fetch filtered recipients and send via Resend
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     const recipients = await fetchRecipients(audience);
 
     if (recipients.length === 0) {
       return res.status(200).json({ success: true, sent: 0, failed: 0, total: 0, recipients: [] });
     }
 
+<<<<<<< HEAD
+=======
+    // In-app channel: no email sending — just return recipients (app would deliver via push/socket)
+    if (channel === 'in_app') {
+      return res.status(200).json({
+        success: true, sent: recipients.length, failed: 0,
+        total: recipients.length,
+        recipients: recipients.map(u => u.email),
+        note: 'In-app delivery recorded. Integrate with your push/socket layer to complete delivery.',
+      });
+    }
+
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
     // Email channel — send via Resend
     const resend    = new Resend(process.env.RESEND_API_KEY);
     const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';

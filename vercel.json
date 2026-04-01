@@ -26,6 +26,7 @@
       "dest": "/api/broadcast.js"
     },
     {
+<<<<<<< HEAD
       "src": "/api/announcements",
       "dest": "/api/announcements.js"
     },
@@ -62,6 +63,8 @@
       "dest": "/whitepaper.html"
     },
     {
+=======
+>>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       "src": "/(.*)",
       "dest": "/index.html"
     }
