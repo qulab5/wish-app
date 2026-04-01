@@ -1,0 +1,69 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "src": "/api/send-otp",
+      "dest": "/api/send-otp.js"
+    },
+    {
+      "src": "/api/verify-otp",
+      "dest": "/api/verify-otp.js"
+    },
+    {
+      "src": "/api/user",
+      "dest": "/api/user.js"
+    },
+    {
+      "src": "/api/backup",
+      "dest": "/api/backup.js"
+    },
+    {
+      "src": "/api/restore",
+      "dest": "/api/restore.js"
+    },
+    {
+      "src": "/api/broadcast",
+      "dest": "/api/broadcast.js"
+    },
+    {
+      "src": "/api/announcements",
+      "dest": "/api/announcements.js"
+    },
+    {
+      "src": "/api/wallet",
+      "dest": "/api/wallet.js"
+    },
+    {
+      "src": "/api/walletBalance",
+      "dest": "/api/walletBalance.js"
+    },
+    {
+      "src": "/api/walletSend",
+      "dest": "/api/walletSend.js"
+    },
+    {
+      "src": "/api/walletTx",
+      "dest": "/api/walletTx.js"
+    },
+    {
+      "src": "/(sp-[0-9]+x[0-9]+\\.png|splash\\.png|icon-192\\.png|icon-512\\.png)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/manifest.json"
+    },
+    {
+      "src": "/logo.jpg",
+      "dest": "/logo.jpg"
+    },
+    {
+      "src": "/whitepaper.html",
+      "dest": "/whitepaper.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
