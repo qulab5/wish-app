@@ -582,11 +582,15 @@ function Inp({label,type="text",val,onChange,err,placeholder,icon,countryCode,on
       {label&&<div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:.08,textTransform:"uppercase",marginBottom:6}}>{label}</div>}
       <div style={{position:"relative"}}>
         {icon&&<div style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:18,lineHeight:1,color:focused?C.brand:C.muted,transition:"color 0.2s"}}>{icon}</div>}
-        <input 
-          type={type==="password"?(show?"text":"password"):type} 
-          value={val} 
+        <input
+          type={type==="password"?(show?"text":"password"):type}
+          value={val}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
+          autoCapitalize="none"
+          autoCorrect="off"
+          autoComplete={type==="password"?"current-password":type==="email"?"email":"off"}
+          spellCheck={false}
           onFocus={()=>setFocused(true)}
           onBlur={()=>setFocused(false)}
           style={{
@@ -1025,15 +1029,17 @@ function AuthScreen({onLogin,lang}){
     if(!validate()) return;
     setLoading(true);
     if(mode==="login"){
+      const normEmail=form.email.trim().toLowerCase();
+      const normPass=form.pass.trim();
       let foundUser=null;
       // Check demo/admin users first (in-memory) for credentials
-      foundUser=users.find(u=>u.email===form.email&&u.pass===form.pass)||null;
+      foundUser=users.find(u=>u.email===normEmail&&u.pass===normPass)||null;
       // Always fetch the DB record so we get the latest pts/usd/state.
       // For in-memory/demo users this merges their saved progress on top of the
       // hardcoded seed values; for real registered users it IS the source of truth.
       if(foundUser&&!foundUser.isAdmin){
         try{
-          const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
+          const r=await fetch(`/api/user?email=${encodeURIComponent(normEmail)}`);
           const d=await r.json();
           if(d.user) foundUser={...foundUser,...d.user};
         }catch(e){}
@@ -1041,9 +1047,9 @@ function AuthScreen({onLogin,lang}){
       // Fall back to DB-only lookup for real registered users (no in-memory entry)
       if(!foundUser&&method==="email"){
         try{
-          const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
+          const r=await fetch(`/api/user?email=${encodeURIComponent(normEmail)}`);
           const d=await r.json();
-          if(d.user&&d.user.pass===form.pass) foundUser=d.user;
+          if(d.user&&d.user.pass===normPass) foundUser=d.user;
         }catch(e){}
       }
       setLoading(false);
@@ -1051,16 +1057,17 @@ function AuthScreen({onLogin,lang}){
       else setErrs({pass:"Invalid credentials"});
     } else {
       // Register: check for duplicates in memory and MongoDB
-      if(users.find(x=>x.email===form.email)){setLoading(false);setErrs({email:"Account already exists"});return;}
+      const regEmail=form.email.trim().toLowerCase();
+      if(users.find(x=>x.email===regEmail)){setLoading(false);setErrs({email:"Account already exists"});return;}
       try{
-        const r=await fetch(`/api/user?email=${encodeURIComponent(form.email)}`);
+        const r=await fetch(`/api/user?email=${encodeURIComponent(regEmail)}`);
         const d=await r.json();
         if(d.user){setLoading(false);setErrs({email:"Account already exists"});return;}
       }catch(e){}
       const fullPhone=form.countryCode+form.phone;
       const _uid="u"+Date.now();
       const _rc=form.username.toLowerCase().replace(/[^a-z0-9]/g,"").substring(0,10)+String(Math.floor(Math.random()*90)+10);
-      const nu={id:_uid,name:form.name,username:form.username,email:form.email,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:form.country||"🌍",isAdmin:false,active:true,
+      const nu={id:_uid,name:form.name,username:form.username,email:regEmail,phone:fullPhone,pass:form.pass,pts:0,usd:0,joined:"Now",country:form.country||"🌍",isAdmin:false,active:true,
         refCode:_rc,refBy:form.refCode.trim().toLowerCase()||null,refPts:0,refs:[]};
       setLoading(false);
       sendOtp(nu);
