@@ -239,6 +239,7 @@ const C = {
 /* ═══════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════ */
+const API_BASE = (window.location.origin && window.location.origin !== 'null' && !window.location.origin.startsWith('file:')) ? window.location.origin : '';
 const APP_NAME       = "Wish Network";
 const APP_TAGLINE    = "Mine Your Way to Your Wish ✦";
 const USD_PER_POINT  = 0.001;
@@ -843,7 +844,7 @@ function AuthScreen({onLogin,lang}){
     try {
       console.log('1. Starting OTP send for:', nu.email);
       
-      const baseUrl = window.location.origin;
+      const baseUrl = API_BASE;
       const apiUrl = `${baseUrl}/api/send-otp`;
       console.log('2. Fetching from:', apiUrl);
       
@@ -906,9 +907,9 @@ function AuthScreen({onLogin,lang}){
     setOtpSending(true);
     
     try {
-      const baseUrl = window.location.origin;
+      const baseUrl = API_BASE;
       const apiUrl = `${baseUrl}/api/send-otp`;
-      
+
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -965,7 +966,7 @@ function AuthScreen({onLogin,lang}){
     if(!otpToken){setOtpErr("Session expired. Please request a new code.");return;}
     setOtpSending(true);
     try{
-      const res=await fetch(`${window.location.origin}/api/verify-otp`,{
+      const res=await fetch(`${API_BASE}/api/verify-otp`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({token:otpToken,otp:entered})
@@ -975,7 +976,7 @@ function AuthScreen({onLogin,lang}){
         setUsers(p=>[...p,pendingUser]);
         // Persist new user to Supabase
         try{
-          const saveRes=await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+          const saveRes=await fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
             body:JSON.stringify({...pendingUser,joined:new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}),pts:0,usd:0,tasksDone:{},adLeft:5,adDate:new Date().toDateString(),refCode:pendingUser.refCode||null,refBy:pendingUser.refBy||null,refPts:0,refs:[]})});
           if(!saveRes.ok){
             const e=await saveRes.json();
@@ -991,13 +992,13 @@ function AuthScreen({onLogin,lang}){
         // ── Award 2,000 pts signup bonus to the referrer ─────────────────
         if(pendingUser.refBy){
           try{
-            const rr=await fetch(`/api/user?refCode=${encodeURIComponent(pendingUser.refBy)}`);
+            const rr=await fetch(`${API_BASE}/api/user?refCode=${encodeURIComponent(pendingUser.refBy)}`);
             const rd=await rr.json();
             if(rd.user){
               const ref=rd.user;
               const joinedLabel=new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
               const newRefs=[...(ref.refs||[]),{name:pendingUser.name,joined:joinedLabel,pts:0}];
-              await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+              await fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
                 body:JSON.stringify({id:ref.id,email:ref.email,pts:(ref.pts||0)+REF_SIGNUP_BONUS,refPts:(ref.refPts||0)+REF_SIGNUP_BONUS,refs:newRefs})});
             }
           }catch(_){}
@@ -1039,7 +1040,7 @@ function AuthScreen({onLogin,lang}){
       // hardcoded seed values; for real registered users it IS the source of truth.
       if(foundUser&&!foundUser.isAdmin){
         try{
-          const r=await fetch(`/api/user?email=${encodeURIComponent(normEmail)}`);
+          const r=await fetch(`${API_BASE}/api/user?email=${encodeURIComponent(normEmail)}`);
           const d=await r.json();
           if(d.user) foundUser={...foundUser,...d.user};
         }catch(e){}
@@ -1047,7 +1048,7 @@ function AuthScreen({onLogin,lang}){
       // Fall back to DB-only lookup for real registered users (no in-memory entry)
       if(!foundUser&&method==="email"){
         try{
-          const r=await fetch(`/api/user?email=${encodeURIComponent(normEmail)}`);
+          const r=await fetch(`${API_BASE}/api/user?email=${encodeURIComponent(normEmail)}`);
           const d=await r.json();
           if(d.user&&d.user.pass===normPass) foundUser=d.user;
         }catch(e){}
@@ -1060,7 +1061,7 @@ function AuthScreen({onLogin,lang}){
       const regEmail=form.email.trim().toLowerCase();
       if(users.find(x=>x.email===regEmail)){setLoading(false);setErrs({email:"Account already exists"});return;}
       try{
-        const r=await fetch(`/api/user?email=${encodeURIComponent(regEmail)}`);
+        const r=await fetch(`${API_BASE}/api/user?email=${encodeURIComponent(regEmail)}`);
         const d=await r.json();
         if(d.user){setLoading(false);setErrs({email:"Account already exists"});return;}
       }catch(e){}
@@ -1733,7 +1734,7 @@ function AdminUsers({users, setUsers, adminUser}){
       if(modal==="create"){
         const newId = `u_${Date.now()}`;
         const payload = {action:"adminCreate",id:newId,name:form.name.trim(),email:form.email.trim(),pts:Number(form.pts)||0,usd:Number(form.usd)||0,country:form.country||"",active:form.active??true,role:"user",joined:new Date().toISOString().slice(0,10)};
-        const r = await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const r = await fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         const d = await r.json();
         if(!r.ok) throw new Error(d.error||"Failed to create user");
         setUsers(prev=>[...prev,{...payload,id:newId}]);
@@ -1743,7 +1744,7 @@ function AdminUsers({users, setUsers, adminUser}){
         const updates = {action:"adminUpdate",userId:form._id,name:form.name.trim(),email:form.email.trim(),active:form.active??true};
         if(canBalance){updates.pts=Number(form.pts)||0;updates.usd=Number(form.usd)||0;}
         if(form.country!==undefined)updates.country=form.country;
-        const r = await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});
+        const r = await fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updates)});
         const d = await r.json();
         if(!r.ok) throw new Error(d.error||"Failed to save");
         setUsers(prev=>prev.map(u=>u.id===form._id?{...u,...updates}:u));
@@ -1758,7 +1759,7 @@ function AdminUsers({users, setUsers, adminUser}){
   const toggleActive = async (id) => {
     const u = users.find(x=>x.id===id);
     const newActive = !u.active;
-    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminUpdate",userId:id,active:newActive})}).catch(()=>{});
+    fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminUpdate",userId:id,active:newActive})}).catch(()=>{});
     setUsers(prev=>prev.map(x=>x.id===id?{...x,active:newActive}:x));
     logAudit(adminUser.email,newActive?"activate_user":"ban_user",`${newActive?"Activated":"Banned"} ${u?.name||id}`);
     setConfirm(null);
@@ -1766,14 +1767,14 @@ function AdminUsers({users, setUsers, adminUser}){
 
   const deleteUser = async (id) => {
     const u = users.find(x=>x.id===id);
-    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminDelete",userId:id})}).catch(()=>{});
+    fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminDelete",userId:id})}).catch(()=>{});
     setUsers(prev=>prev.filter(x=>x.id!==id));
     logAudit(adminUser.email,"delete_user",`Deleted ${u?.name||id} (${u?.email||""})`);
     setConfirm(null);
   };
 
   const resetPoints = async (u) => {
-    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminUpdate",userId:u.id,pts:0,usd:0})}).catch(()=>{});
+    fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:"adminUpdate",userId:u.id,pts:0,usd:0})}).catch(()=>{});
     setUsers(prev=>prev.map(x=>x.id===u.id?{...x,pts:0,usd:0}:x));
     logAudit(adminUser.email,"reset_balance",`Reset balance for ${u.name}`);
     setConfirm(null);
@@ -3563,7 +3564,7 @@ function AdminBackup({users, setUsers, adminUser}){
       const headers = {"Content-Type":"application/json"};
       if(adminKey) headers["x-admin-key"] = adminKey;
 
-      const res = await fetch("/api/backup",{headers});
+      const res = await fetch(API_BASE+"/api/backup",{headers});
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if(!json.success) throw new Error(json.error||"Unknown error");
@@ -3611,7 +3612,7 @@ function AdminBackup({users, setUsers, adminUser}){
       const headers = {"Content-Type":"application/json"};
       if(adminKey) headers["x-admin-key"] = adminKey;
 
-      const res = await fetch("/api/restore",{
+      const res = await fetch(API_BASE+"/api/restore",{
         method:"POST",
         headers,
         body: JSON.stringify({backup:restoreFile, strategy}),
@@ -4013,7 +4014,7 @@ function AdminBroadcast({ users, adminUser }) {
     };
 
     try {
-      const res = await fetch("/api/broadcast", {
+      const res = await fetch(API_BASE+"/api/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -4481,7 +4482,7 @@ function AdminPanel({user, onExit, lang}){
 
   // Load real users from Supabase on mount; fall back to INITIAL_USERS on error
   useEffect(()=>{
-    fetch('/api/user?action=adminData')
+    fetch(API_BASE+'/api/user?action=adminData')
       .then(r=>r.ok?r.json():Promise.reject(r.status))
       .then(d=>{
         if(d.users?.length){
@@ -4605,7 +4606,7 @@ function WalletTab({ u, C, setU }) {
     loadTx();
     if (u.walletAddress) { loadBalances(u.walletAddress); return; }
     setCreating(true);
-    fetch(`/api/wallet?userId=${encodeURIComponent(u.id)}`)
+    fetch(`${API_BASE}/api/wallet?userId=${encodeURIComponent(u.id)}`)
       .then(r => r.json())
       .then(d => { if (d.address) { setWallet(d.address); loadBalances(d.address); }
                    else setMsg(d.error || 'Could not create wallet'); })
@@ -4671,7 +4672,7 @@ function WalletTab({ u, C, setU }) {
   const loadBalances = async (addr) => {
     setBalLoad(true);
     try {
-      const r = await fetch(`/api/walletBalance?address=${encodeURIComponent(addr)}`);
+      const r = await fetch(`${API_BASE}/api/walletBalance?address=${encodeURIComponent(addr)}`);
       const d = await r.json();
       if (!d.error) {
         setSBal(d.sol);
@@ -4682,7 +4683,7 @@ function WalletTab({ u, C, setU }) {
           // Fetch fresh token balance from DB so the refresh button shows
           // the real value even when the in-memory state is stale.
           try {
-            const ur = await fetch(`/api/user?email=${encodeURIComponent(u.email)}`);
+            const ur = await fetch(`${API_BASE}/api/user?email=${encodeURIComponent(u.email)}`);
             const ud = await ur.json();
             const fresh = ud.user?.tokens ?? u.tokens ?? 0;
             setWBal(fresh);
@@ -4699,7 +4700,7 @@ function WalletTab({ u, C, setU }) {
     if (busy || !wallet || !sendTo.trim() || !sendAmt) return;
     setBusy(true); setMsg('');
     try {
-      const r = await fetch('/api/walletSend', {
+      const r = await fetch(API_BASE+'/api/walletSend', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: u.id, toAddress: sendTo.trim(), amount: Number(sendAmt) }),
       });
@@ -4717,7 +4718,7 @@ function WalletTab({ u, C, setU }) {
   };
 
   const loadTx = () => {
-    fetch(`/api/walletTx?userId=${encodeURIComponent(u.id)}`)
+    fetch(`${API_BASE}/api/walletTx?userId=${encodeURIComponent(u.id)}`)
       .then(r => r.json())
       .then(d => { if (d.txs) setTxHistory(d.txs); })
       .catch(() => {});
@@ -5011,7 +5012,7 @@ function MainApp({user,onLogout,lang,setLang}){
   // Fetch announcements from server and show toast for new ones
   useEffect(()=>{
     function loadAnns(){
-      fetch('/api/announcements')
+      fetch(API_BASE+'/api/announcements')
         .then(r=>r.ok?r.json():null)
         .then(d=>{
           if(!d?.announcements) return;
@@ -5033,7 +5034,7 @@ function MainApp({user,onLogout,lang,setLang}){
 
   // Load saved progress from MongoDB on first mount
   useEffect(()=>{
-    fetch(`/api/user?email=${encodeURIComponent(user.email)}`)
+    fetch(`${API_BASE}/api/user?email=${encodeURIComponent(user.email)}`)
       .then(r=>r.json())
       .then(d=>{
         // Always unlock auto-save, even when the user isn't in the DB yet
@@ -5115,7 +5116,7 @@ function MainApp({user,onLogout,lang,setLang}){
     // would overwrite the DB 2 seconds after every page refresh.
     if(!dbLoaded.current) return;
     const t=setTimeout(()=>{
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,name:u.name,pass:u.pass,pts:u.pts,usd:u.usd,
           avatar:u.avatar,
           tokens:u.tokens??0,tasksDone,adLeft,adDate:new Date().toDateString(),spinAngle,spinNextFree,extraSpins,
@@ -5134,7 +5135,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const saveProfileField = (fields) => {
     setU(p => ({...p, ...fields}));
     Security.save('last_user', {...u, ...fields});
-    fetch('/api/user', {method:'POST', headers:{'Content-Type':'application/json'},
+    fetch(API_BASE+'/api/user', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({id: u.id, email: u.email, ...fields})
     }).catch(()=>{});
   };
@@ -5170,7 +5171,7 @@ function MainApp({user,onLogout,lang,setLang}){
       // Save sequence immediately (before the countdown starts)
       const newTD = {...tasksDone, __ad_seq_date:today, __ad_seq:seq};
       setTD(newTD);
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
       }).catch(()=>{});
     }
@@ -5207,7 +5208,7 @@ function MainApp({user,onLogout,lang,setLang}){
         const newTD={...tasksDone,__mine_eff_session:newEffSession};
         setTD(newTD);
         Security.save('last_user',{...u,tasksDone:newTD});
-        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString(),tasksDone:newTD})
         }).catch(()=>{});
       } else if(!mineStarted){
@@ -5216,11 +5217,11 @@ function MainApp({user,onLogout,lang,setLang}){
         const newTD={...tasksDone,__pre_mine_deduct:banked};
         setTD(newTD);
         showAdToast(`⏱️ −${adData.mins} min saved! Applied when you start mining.`);
-        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString(),tasksDone:newTD})
         }).catch(()=>{});
       } else {
-        fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+        fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({id:u.id,email:u.email,adLeft:newAL,adDate:new Date().toDateString()})
         }).catch(()=>{});
       }
@@ -5229,7 +5230,7 @@ function MainApp({user,onLogout,lang,setLang}){
       const newUsd=+(u.usd+adData.pts*USD_PER_POINT).toFixed(2);
       addPts(adData.pts);
       showAdToast(`⭐ +${adData.pts.toLocaleString()} pts added to your balance!`);
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:newAL,adDate:new Date().toDateString()})
       }).catch(()=>{});
     }
@@ -5275,7 +5276,7 @@ function MainApp({user,onLogout,lang,setLang}){
       __spin_milestone_at: newMilestoneAt,
     };
     setTD(newTD);
-    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+    fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:u.id,email:u.email,spinNextFree:newSnf,extraSpins:newEs,tasksDone:newTD})
     }).catch(()=>{});
 
@@ -5294,7 +5295,7 @@ function MainApp({user,onLogout,lang,setLang}){
       setSR({pts:SPIN_PTS[i],usd:SPIN_USD[i]*0.01,isJackpot});
       setSpin(false);
       // Persist immediately — don't rely on the 2s auto-save debounce.
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:cu.id,email:cu.email,pts:newPts,usd:newUsd,
           spinAngle:newAngle,spinNextFree:newSnf,extraSpins:newEs,tasksDone:newTD})
       })
@@ -5315,7 +5316,7 @@ function MainApp({user,onLogout,lang,setLang}){
     setU(p=>({...p, pts:newPts, tokens:newTokens}));
     setConvS(true);
     setTimeout(()=>setConvS(false),2500);
-    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+    fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:uRef.current.id,email:uRef.current.email,
         pts:newPts,tokens:newTokens})
     }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[convert save]',d);})
@@ -5326,7 +5327,7 @@ function MainApp({user,onLogout,lang,setLang}){
       const newEs=extraSpins+1;
       setES(newEs);setSAP(false);
       // Persist the new spin count immediately
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,extraSpins:newEs})
       }).catch(()=>{});
     });
@@ -5350,7 +5351,7 @@ function MainApp({user,onLogout,lang,setLang}){
     // Save pts + usd + session reset immediately — do NOT rely on the 2s
     // auto-save debounce.  If the user refreshes or signs out right after
     // claiming, the DB must already have the new balance.
-    fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+    fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:u.id,email:u.email,pts:newPts,usd:newUsd,adLeft:5,tasksDone:cleanTD})
     }).then(r=>r.json()).then(d=>{if(!d.success)console.error('[mine claim save]',d);})
       .catch(e=>console.error('[mine claim save]',e));
@@ -5358,14 +5359,14 @@ function MainApp({user,onLogout,lang,setLang}){
     if(u.refBy){
       const bonus=Math.floor(earned*REF_MINE_PCT);
       if(bonus>0){
-        fetch(`/api/user?refCode=${encodeURIComponent(u.refBy)}`)
+        fetch(`${API_BASE}/api/user?refCode=${encodeURIComponent(u.refBy)}`)
           .then(r=>r.json())
           .then(rd=>{
             if(!rd.user)return;
             const ref=rd.user;
             const newRefPts=(ref.refPts||0)+bonus;
             const newRefs=(ref.refs||[]).map(r=>r.name===u.name?{...r,pts:(r.pts||0)+bonus}:r);
-            fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+            fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
               body:JSON.stringify({id:ref.id,email:ref.email,pts:(ref.pts||0)+bonus,refPts:newRefPts,refs:newRefs})
             }).catch(()=>{});
           }).catch(()=>{});
@@ -5436,7 +5437,7 @@ function MainApp({user,onLogout,lang,setLang}){
         __pre_mine_deduct: 0,
       };
       setTD(newTD);
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
       }).catch(()=>{});
     });
@@ -5453,7 +5454,7 @@ function MainApp({user,onLogout,lang,setLang}){
       setMineBoosts(nb);
       const newTD = {...tasksDone, __mine_boosts: nb};
       setTD(newTD);
-      fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
+      fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:u.id,email:u.email,tasksDone:newTD})
       }).catch(()=>{});
     });
@@ -5994,7 +5995,7 @@ function MainApp({user,onLogout,lang,setLang}){
             // 3. Upload to Supabase Storage — get back a permanent public URL,
             //    then save it to the DB immediately (don't rely on auto-save,
             //    which would send the huge data-URL and get rejected).
-            fetch("/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
+            fetch(API_BASE+"/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
               body:JSON.stringify({action:"uploadAvatar",userId:u.id,imageData:dataUrl})
             })
             .then(r=>r.json())
@@ -6003,7 +6004,7 @@ function MainApp({user,onLogout,lang,setLang}){
               // Swap preview for real URL in UI
               setU(p=>({...p,avatar:d.url}));
               // Persist URL to DB right now
-              fetch("/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
+              fetch(API_BASE+"/api/user",{method:"POST",headers:{"Content-Type":"application/json"},
                 body:JSON.stringify({id:u.id,email:u.email,avatar:d.url})
               }).catch(()=>{});
             })
@@ -6082,7 +6083,7 @@ function MainApp({user,onLogout,lang,setLang}){
                       localStorage.setItem('wish_ann_seen', Date.now().toString());
                       annToastShown.current = false;
                       setAnnToast(null);
-                      fetch('/api/announcements').then(r=>r.ok?r.json():null).then(d=>{if(d?.announcements)setAnnList(d.announcements);}).catch(()=>{});
+                      fetch(API_BASE+'/api/announcements').then(r=>r.ok?r.json():null).then(d=>{if(d?.announcements)setAnnList(d.announcements);}).catch(()=>{});
                       setSO(false);setSV("announcements");
                     }
                     else if(item.label==="White Paper"){setSO(false);setSV("whitepaper");}
@@ -6286,7 +6287,7 @@ function MainApp({user,onLogout,lang,setLang}){
                         if(ne===u.email.toLowerCase()){setECE("This is already your current email.");return;}
                         setECB(true);setECE("");
                         try{
-                          const r=await fetch('/api/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:ne})});
+                          const r=await fetch(API_BASE+'/api/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:ne})});
                           const d=await r.json();
                           if(!d.success){setECE(d.error||"Failed to send code.");setECB(false);return;}
                           setECT(d.token);setECS(3);
@@ -6305,10 +6306,10 @@ function MainApp({user,onLogout,lang,setLang}){
                       <button disabled={ecBusy||ecOtp.length<6} onClick={async()=>{
                         setECB(true);setECE("");
                         try{
-                          const vr=await fetch('/api/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ecToken,otp:ecOtp})});
+                          const vr=await fetch(API_BASE+'/api/verify-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:ecToken,otp:ecOtp})});
                           const vd=await vr.json();
                           if(!vd.success){setECE(vd.error||"Invalid code.");setECB(false);return;}
-                          const cr=await fetch('/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'changeEmail',userId:u.id,newEmail:ecNew.trim().toLowerCase()})});
+                          const cr=await fetch(API_BASE+'/api/user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'changeEmail',userId:u.id,newEmail:ecNew.trim().toLowerCase()})});
                           const cd=await cr.json();
                           if(!cd.success){setECE(cd.error||"Failed to update email.");setECB(false);return;}
                           const newEmail=ecNew.trim().toLowerCase();
@@ -6324,7 +6325,7 @@ function MainApp({user,onLogout,lang,setLang}){
                     <button onClick={async()=>{
                       setECB(true);setECE("");setECO("");
                       try{
-                        const r=await fetch('/api/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:ecNew.trim().toLowerCase()})});
+                        const r=await fetch(API_BASE+'/api/send-otp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:ecNew.trim().toLowerCase()})});
                         const d=await r.json();
                         if(d.success)setECT(d.token);else setECE(d.error||"Failed to resend.");
                       }catch(e){setECE("Network error.");}
