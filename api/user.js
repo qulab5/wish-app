@@ -33,7 +33,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ user: data || null });
     }
 
-<<<<<<< HEAD
     // ── POST /api/user?action=adminUpdate  (admin: update any user fields) ──
     if (req.method === 'POST' && req.body?.action === 'adminUpdate') {
       const { userId, action: _a, ...fields } = req.body;
@@ -78,13 +77,6 @@ export default async function handler(req, res) {
       const { data: existing } = await supabase.from('users').select('id').eq('email', newEmail).maybeSingle();
       if (existing) return res.status(400).json({ error: 'Email already in use by another account.' });
       const { error } = await supabase.from('users').update({ email: newEmail }).eq('id', userId);
-=======
-    // ── POST /api/user?action=adminUpdate  (admin: toggle active) ──
-    if (req.method === 'POST' && req.body?.action === 'adminUpdate') {
-      const { userId, active } = req.body;
-      if (!userId) return res.status(400).json({ error: 'userId required' });
-      const { error } = await supabase.from('users').update({ active }).eq('id', userId);
->>>>>>> 3b267289895b4ecffed543eb1a797cb53b97bbe2
       if (error) throw error;
       return res.status(200).json({ success: true });
     }
