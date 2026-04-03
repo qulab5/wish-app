@@ -5543,7 +5543,6 @@ function MainApp({user,onLogout,lang,setLang}){
           {/* Ready to claim banner */}
           {mineReady&&(
             <div style={{textAlign:"center",marginBottom:16,background:"rgba(16,185,129,.1)",borderRadius:14,padding:"14px",border:"1px solid rgba(16,185,129,.25)"}}>
-              <div style={{fontSize:22,marginBottom:4}}>🎉</div>
               <div style={{fontSize:14,fontWeight:800,color:C.green}}>Mining Complete!</div>
               <div style={{fontSize:13,color:C.muted,marginTop:2}}>+{mineAccum.toLocaleString()} pts ready to claim</div>
             </div>
@@ -5565,7 +5564,7 @@ function MainApp({user,onLogout,lang,setLang}){
             </button>
           ) : mineReady ? (
             <button onClick={claimMining} style={{width:"100%",background:"linear-gradient(135deg,#10b981,#059669)",border:"none",borderRadius:14,padding:"15px",color:"#fff",fontWeight:800,fontSize:15,cursor:"pointer",boxShadow:"0 6px 24px rgba(16,185,129,.4)"}}>
-              🎁 Claim {mineAccum.toLocaleString()} pts
+              Claim {mineAccum.toLocaleString()} pts
             </button>
           ) : (
             <div style={{width:"100%",background:"rgba(139,92,246,.08)",border:"1px solid rgba(139,92,246,.2)",borderRadius:14,padding:"14px",color:C.muted,fontWeight:700,fontSize:14,textAlign:"center"}}>
