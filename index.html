@@ -6936,7 +6936,7 @@ function SplashScreen({ onDone }) {
   })),[]);
 
   React.useEffect(()=>{
-    const t=setTimeout(onDone,3000);
+    const t=setTimeout(onDone,1500);
     return()=>clearTimeout(t);
   },[]);
 
