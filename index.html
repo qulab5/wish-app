@@ -4991,6 +4991,7 @@ function MainApp({user,onLogout,lang,setLang}){
   const [annToast, setAnnToast]   = useState(null);
   const annToastShown = React.useRef(false);
   const [editingField, setEF] = useState(null);
+  const [leaderUsers, setLeaderUsers] = useState(null);
   // Guard: auto-save must not fire until the initial DB load has finished.
   // Without this, the stale localStorage user (saved at login time) would be
   // written back to the DB 2 seconds after every page refresh, overwriting any
@@ -5031,6 +5032,17 @@ function MainApp({user,onLogout,lang,setLang}){
     const iv = setInterval(loadAnns, 60000);
     return ()=>clearInterval(iv);
   },[]);
+
+  // Fetch real leaderboard data from DB whenever leaderboard is opened
+  useEffect(()=>{
+    if(tab!=="leaders" && sidebarView!=="leaders") return;
+    fetch(API_BASE+'/api/user?action=adminData')
+      .then(r=>r.json())
+      .then(d=>{
+        if(d?.users) setLeaderUsers(d.users);
+      })
+      .catch(()=>{});
+  },[tab,sidebarView]);
 
   // Load saved progress from MongoDB on first mount
   useEffect(()=>{
@@ -5651,21 +5663,25 @@ function MainApp({user,onLogout,lang,setLang}){
         ))}
       </div>
     ),
-    leaders:(
+    leaders:(()=>{
+      const sortedLeaders=(leaderUsers
+        ? leaderUsers.filter(x=>x.active!==false&&!x.isAdmin).map(x=>({name:x.name||x.username||"User",pts:x.pts||0,isMe:x.email===u.email}))
+        : [...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,isMe:true}]
+      ).sort((a,b)=>(b.pts||0)-(a.pts||0));
+      return(
       <div style={{padding:"0 16px 16px"}}>
         <div style={{fontSize:12,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:1}}>TOP EARNERS</div>
-        {[...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,country:u.country||"🌍",isMe:true}]
-          .sort((a,b)=>(b.pts||0)-(a.pts||0))
-          .map((l,i)=>(
+        {leaderUsers===null&&<div style={{textAlign:"center",color:C.muted,fontSize:13,padding:"20px 0"}}>Loading…</div>}
+        {sortedLeaders.map((l,i)=>(
             <div key={i} style={{background:l.isMe?`rgba(139,92,246,.15)`:C.s2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1px solid ${l.isMe?C.brand:C.border}`,display:"flex",alignItems:"center",gap:12}}>
               <div style={{width:28,fontWeight:800,color:i<3?C.gold:C.muted,fontSize:14,textAlign:"center"}}>#{i+1}</div>
-              <div style={{fontSize:22}}>{l.country}</div>
               <div style={{flex:1,fontSize:14,fontWeight:l.isMe?700:500,color:l.isMe?C.brandLt:C.white}}>{l.name}{l.isMe?" (You)":""}</div>
               <div style={{fontSize:14,fontWeight:700,color:C.gold}}>{l.pts.toLocaleString()}</div>
             </div>
           ))}
       </div>
-    ),
+      );
+    })(),
     wallet:(
       <WalletTab u={u} C={C} setU={setU} />
     ),
@@ -6401,16 +6417,19 @@ function MainApp({user,onLogout,lang,setLang}){
           </div>
           <div style={{flex:1,overflowY:"auto",padding:"16px 16px 32px"}}>
             {(()=>{
-              const sortedLeaders=[...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,country:u.country||"🌍",isMe:true}]
-                .sort((a,b)=>(b.pts||0)-(a.pts||0));
+              const sortedLeaders=(leaderUsers
+                ? leaderUsers.filter(x=>x.active!==false&&!x.isAdmin).map(x=>({name:x.name||x.username||"User",pts:x.pts||0,isMe:x.email===u.email}))
+                : [...FAKE_LEADERS.slice(0,-1),{name:u.name,pts:u.pts,isMe:true}]
+              ).sort((a,b)=>(b.pts||0)-(a.pts||0));
               const heights=["60px","80px","48px"];
               const colors=[`linear-gradient(135deg,${C.gold},#d97706)`,`linear-gradient(135deg,#9ca3af,#6b7280)`,`linear-gradient(135deg,#cd7c32,#92400e)`];
               const medals=["🥇","🥈","🥉"];
               return(<>
+                {leaderUsers===null&&<div style={{textAlign:"center",color:C.muted,fontSize:13,padding:"20px 0"}}>Loading…</div>}
                 {/* Top 3 podium */}
                 <div style={{display:"flex",alignItems:"flex-end",justifyContent:"center",gap:12,marginBottom:20,padding:"12px 0"}}>
                   {[1,0,2].map((pos,col)=>{
-                    const l=sortedLeaders[pos]||{name:"—",pts:0,country:"🌍"};
+                    const l=sortedLeaders[pos]||{name:"—",pts:0};
                     return(
                       <div key={pos} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,flex:1}}>
                         <div style={{fontSize:20}}>{medals[col]}</div>
