@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.vercel.wish_app_theta.twa",
+      "sha256_cert_fingerprints": [
+        "0F:F3:89:CE:A1:1F:B7:E1:D0:02:AB:3A:0F:62:7D:FB:7A:BD:B1:EE:DA:4D:79:16:F0:3D:EA:EA:4F:28:20:24"
+      ]
+    }
+  }
+]
