@@ -1,129 +1,36 @@
 {
-  "version": 2,
-  "routes": [
+  "headers": [
     {
-      "src": "/api/send-otp",
-      "dest": "/api/send-otp.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+      ]
     },
     {
-      "src": "/api/verify-otp",
-      "dest": "/api/verify-otp.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/user",
-      "dest": "/api/user.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/backup",
-      "dest": "/api/backup.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/restore",
-      "dest": "/api/restore.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/broadcast",
-      "dest": "/api/broadcast.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/announcements",
-      "dest": "/api/announcements.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/wallet",
-      "dest": "/api/wallet.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/walletBalance",
-      "dest": "/api/walletBalance.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/walletSend",
-      "dest": "/api/walletSend.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/walletTx",
-      "dest": "/api/walletTx.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/(sp-[0-9]+x[0-9]+\\.png|splash\\.png|icon-192\\.png|icon-512\\.png)",
-      "dest": "/$1"
-    },
-    {
-      "src": "/manifest.json",
-      "dest": "/manifest.json"
-    },
-    {
-      "src": "/logo.jpg",
-      "dest": "/logo.jpg"
-    },
-    {
-      "src": "/whitepaper.html",
-      "dest": "/whitepaper.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html",
-      "headers": {
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0"
-      }
+      "source": "/",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" },
+        { "key": "Expires", "value": "0" }
+      ]
     }
+  ],
+  "rewrites": [
+    { "source": "/api/send-otp", "destination": "/api/send-otp.js" },
+    { "source": "/api/verify-otp", "destination": "/api/verify-otp.js" },
+    { "source": "/api/user", "destination": "/api/user.js" },
+    { "source": "/api/backup", "destination": "/api/backup.js" },
+    { "source": "/api/restore", "destination": "/api/restore.js" },
+    { "source": "/api/broadcast", "destination": "/api/broadcast.js" },
+    { "source": "/api/announcements", "destination": "/api/announcements.js" },
+    { "source": "/api/wallet", "destination": "/api/wallet.js" },
+    { "source": "/api/walletBalance", "destination": "/api/walletBalance.js" },
+    { "source": "/api/walletSend", "destination": "/api/walletSend.js" },
+    { "source": "/api/walletTx", "destination": "/api/walletTx.js" },
+    { "source": "/icon-512.png", "destination": "/public/icon-512.png" },
+    { "source": "/.well-known/assetlinks.json", "destination": "/public/.well-known/assetlinks.json" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
