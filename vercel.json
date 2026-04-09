@@ -1,4 +1,5 @@
 {
+  "outputDirectory": ".",
   "headers": [
     {
       "source": "/api/(.*)",
@@ -18,17 +19,6 @@
     }
   ],
   "rewrites": [
-    { "source": "/api/send-otp", "destination": "/api/send-otp.js" },
-    { "source": "/api/verify-otp", "destination": "/api/verify-otp.js" },
-    { "source": "/api/user", "destination": "/api/user.js" },
-    { "source": "/api/backup", "destination": "/api/backup.js" },
-    { "source": "/api/restore", "destination": "/api/restore.js" },
-    { "source": "/api/broadcast", "destination": "/api/broadcast.js" },
-    { "source": "/api/announcements", "destination": "/api/announcements.js" },
-    { "source": "/api/wallet", "destination": "/api/wallet.js" },
-    { "source": "/api/walletBalance", "destination": "/api/walletBalance.js" },
-    { "source": "/api/walletSend", "destination": "/api/walletSend.js" },
-    { "source": "/api/walletTx", "destination": "/api/walletTx.js" },
     { "source": "/icon-512.png", "destination": "/public/icon-512.png" },
     { "source": "/.well-known/assetlinks.json", "destination": "/public/.well-known/assetlinks.json" },
     { "source": "/(.*)", "destination": "/index.html" }
